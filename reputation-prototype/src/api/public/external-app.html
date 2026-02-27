@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>External App Simulator</title>
+    <link rel="stylesheet" href="/external-app.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Reputation Prototype</p>
+        <h1>External App Simulator</h1>
+        <p class="subtitle">
+          Publish mock contracts to the ledger and inspect reputation engine effects.
+        </p>
+      </header>
+
+      <section class="panel controls">
+        <label class="inline-field">
+          <span>Auto-process in engine</span>
+          <input id="autoProcess" type="checkbox" checked />
+        </label>
+        <button id="processNow" class="secondary">Process Pending Events</button>
+        <button id="refreshViews" class="secondary">Refresh Views</button>
+      </section>
+
+      <section class="grid two-col">
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Deploy `ReputationConfiguration`</h2>
+            <button id="loadConfigSample" class="ghost">Load Sample</button>
+          </div>
+          <textarea id="configPayload" rows="14"></textarea>
+          <button id="deployConfig">Deploy Configuration Contract</button>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Deploy `CompletedInteraction`</h2>
+            <button id="loadInteractionSample" class="ghost">Load Sample</button>
+          </div>
+          <textarea id="interactionPayload" rows="14"></textarea>
+          <button id="deployInteraction">Deploy Interaction Contract</button>
+        </article>
+      </section>
+
+      <section class="grid one-col">
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Deploy `Feedback`</h2>
+            <button id="loadFeedbackSample" class="ghost">Load Sample</button>
+          </div>
+          <textarea id="feedbackPayload" rows="10"></textarea>
+          <button id="deployFeedback">Deploy Feedback Contract</button>
+        </article>
+      </section>
+
+      <section class="grid two-col">
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Ledger Events</h2>
+            <button id="refreshEvents" class="ghost">Refresh</button>
+          </div>
+          <pre id="eventsView"></pre>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Rankings</h2>
+            <button id="refreshRankings" class="ghost">Refresh</button>
+          </div>
+          <pre id="rankingsView"></pre>
+        </article>
+      </section>
+
+      <section class="grid two-col">
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Active Configuration</h2>
+            <button id="refreshConfig" class="ghost">Refresh</button>
+          </div>
+          <pre id="configView"></pre>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Request Mock VC</h2>
+          </div>
+          <form id="vcForm" class="form-block">
+            <label>Party</label>
+            <input id="vcParty" type="text" value="AGENT_ALICE" />
+            <label>Disclosed components (comma separated, optional)</label>
+            <input id="vcComponents" type="text" placeholder="Reliability,Efficiency" />
+            <button type="submit" class="secondary">Issue VC</button>
+          </form>
+          <pre id="vcView"></pre>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h2>Operation Log</h2>
+        <pre id="logView"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="/external-app.js"></script>
+  </body>
+  </html>

@@ -1,0 +1,10 @@
+{
+  "name": "reputation-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "demo": "node src/demo/headless.js"
+  }
+}

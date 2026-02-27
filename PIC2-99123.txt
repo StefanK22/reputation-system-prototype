@@ -1,0 +1,918 @@
+                         Reputational Ranking System for Real Estate
+                                Transaction Agents Using Blockchain
+                                    PIC2 - Master in Computer Science and Engineering
+                                     Instituto Superior Técnico, Universidade de Lisboa
+                                                                                    ∗
+                                               Stefan Daniel Knutsen — 99123
+                                            stefan.knutsen@tecnico.ulisboa.pt
+                                                           Advisor(s):
+                                            Miguel Nuno Dias Alves Pupo Correia
+                                                          Luís Marado
+                      Abstract Trust plays an important role in real estate transactions involving buyers, sellers, agents,
+                      brokers, and legal entities. Existing reputation systems typically represent feedback as single-valued
+                      ratings, without capturing distinctions between different behavioral competencies. This work pro-
+                      poses a blockchain-based reputation system designed to address the requirements of real estate trans-
+                      actions. The system computes reputation as a multidimensional value based on blockchain-recorded
+                      interactions and user-submitted feedback, where distinct behavioral components evolve according to
+                      the context of each interaction. Reputation updates are applied through transparent and verifiable
+                      algorithms implemented as smart contracts, ensuring auditability and resistance to manipulation
+                      attacks. The system aggregates reputation components using role-specific weights and supports the
+                      issuance of verifiable credentials, enabling reputation portability across platforms. The architecture
+                      is implemented using Daml smart contracts deployed on the Canton Network, providing a ledger
+                      with privacy-preserving properties. The proposed system addresses requirements including multidi-
+                      mensional reputation representation, context-specific updates, selective visibility, protection against
+                      common attacks, and credential-based verification.
+                      Keywords — Blockchain, Reputation Systems, Real Estate, Verifiable Credentials
+                   ∗I declare that this document is an original work of my own authorship and that it fulfills all the requirements of the Code
+                of Conduct and Good Practices of the Universidade de Lisboa (https://nape.tecnico.ulisboa.pt/en/apoio-ao-estudante/
+                documentos-importantes/regulamentos-da-universidade-de-lisboa/).
+                                                                        Contents
+                   1 Introduction                                                                                                      3
+                       1.1   Work Objective . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        3
+                       1.2   Document Overview . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .            3
+                   2 Background and Related Work                                                                                       4
+                       2.1   Digital Identity and Verifiable Credentials . . . . . . . . . . . . . . . . . . . . . . . . . . .          4
+                             2.1.1   Self-Sovereign Identity (SSI) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        4
+                             2.1.2   Decentralized Identifiers (DIDs) . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         5
+                             2.1.3   Verifiable Credentials (VCs) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         5
+                       2.2   Blockchain Applications in Real Estate . . . . . . . . . . . . . . . . . . . . . . . . . . . . .           7
+                             2.2.1   Documentation and Identity Management . . . . . . . . . . . . . . . . . . . . . . .                7
+                             2.2.2   Tokenization . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         8
+                             2.2.3   Smart Contract Integration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .           8
+                       2.3   Reputation Systems . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .           9
+                             2.3.1   Interaction    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .     9
+                             2.3.2   Privacy and Security . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         9
+                             2.3.3   Trust Model . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      10
+                             2.3.4   Cryptographic Mechanisms . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .           11
+                             2.3.5   Common Attacks . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         12
+                             2.3.6   Blockchain-Based Implementations . . . . . . . . . . . . . . . . . . . . . . . . . . .           12
+                   3 Solution                                                                                                         14
+                       3.1   System Requirements        . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   14
+                       3.2   System Participants . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        15
+                       3.3   Data Structures . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      16
+                       3.4   System Architecture . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        17
+                       3.5   Interaction Outcomes Evaluation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .          19
+                       3.6   Reputation Updates Application . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .           20
+                       3.7   Blockchain Platform . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        21
+                       3.8   Smart Contracts . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        21
+                   4 Evaluation                                                                                                       22
+                   5 Work Schedule                                                                                                    22
+                   6 Conclusion                                                                                                       22
+                   Bibliography                                                                                                       24
+             1   Introduction
+             Real estate transactions represent high-value and legally complex interactions involving multiple parties,
+             such as buyers, sellers, agents, brokers, and legal entities. These transactions often require participants
+             to make decisions based on information about the past behavior and reliability of other actors. As a
+             consequence, trust plays an important role in determining whether transactions proceed efÏciently,
+             securely, and fairly.
+                Reputation serves as a mechanism to aggregate past behavior and interactions into an assessment
+             that supports trust and decision making. A reliable reputation system should help participants assess
+             professionalism, compliance with procedures, and consistency of behavior across transactions.
+             However, traditional reputation and ranking systems often lack transparent methods to measure, display,
+             andverify reputation. As a result, participants in these systems may have difÏculties assessing credibility
+             and proving their reputation across different platforms and contexts.
+                To address these limitations, Privacy-Preserving Reputation Systems (PPRS) have been pro-
+             posed to protect user identities and feedback content while ensuring the integrity and verifiability of
+             reputation scores. Blockchain technology offers a way to implement such systems by providing an
+             immutable and auditable ledger that ensures that transaction records remain transparent and resistant
+             to tampering. These systems can be designed with the principles of Self-Sovereign Identity (SSI),
+             whichenableparticipants to control their own digital identities and the information associated with them.
+             ThroughmechanismssuchasDecentralized Identifier (DID)andVerifiable Credential (VC), SSI
+             allows reputation information to be cryptographically bound to an identity, making it possible to build
+             trustworthy reputation representations without relying on a single central authority. However, designing
+             a system that aligns with the complex nature of real estate transactions remains a challenge.
+                In this work, we propose a blockchain-based reputation system that addresses the requirements
+             of real estate transactions. The system is based on blockchain recorded interactions and user submitted
+             feedback to compute reputation as a multidimensional value, where distinct behavioral components
+             evolve according to the context of each interaction. Reputation updates are applied through transparent
+             and verifiable algorithms, and aggregated using role specific weights.
+                This work was developed in collaboration with Unlockit, a DLT-based company operating in the
+             real estate sector, which focuses on digitizing and streamlining real estate transactions, with the goal of
+             improving the transparency, security, and efÏciency of property transactions through blockchain-based
+             solutions.
+             1.1  Work Objective
+             The main objectives of this work are the following.
+                • Study and analyze reputation systems, privacy-preserving reputation models, and VC mecha-
+                 nisms applicable to real estate transactions.
+                • Designablockchain-basedreputationarchitecturewithamultidimensionalandcontext-dependent
+                 structure that captures distinct behavioral aspects of real estate interactions.
+                • Implementtransparentandverifiablereputationupdateusingsmartcontracts,ensuringauditabil-
+                 ity and resistance to manipulation attacks.
+             1.2  Document Overview
+             This document is structured as follows. Section 2 presents the background and related work, cover-
+             ing digital identity and VCs, blockchain applications in real estate, and reputation systems, including
+             privacy-preserving models and blockchain-based implementations. Section 3 describes the proposed so-
+             lution, specifying system requirements, participants, data structures, architecture, and the blockchain
+             implementation using smart contracts. Section 4 outlines the evaluation methodology for assessing the
+                                                    3
+                                      Security    Controllability   Portability
+                                      Protection     Existence     Interoperability
+                                      Persistence     Control       Transparency
+                                     Minimisation     Consent          Access
+                                                                     Portability
+                                         Figure 1: The 10 principles of SSI, from [3]
+               system’s correctness and resistance to manipulation. Section 5 presents the work schedule for the re-
+               maining development and evaluation phases. Finally, Section 6 concludes the document and discusses
+               future work directions.
+               2   Background and Related Work
+               Thissectionpresentsthemostrelevantbackgroundconceptsandrelatedworktotheproposedblockchain-
+               based reputation system. It first introduces digital identity and VCs, which provide the mechanisms
+               for participant identification and credential issuance. Then, blockchain applications in real estate,
+               which demonstrate how Distributed Ledger Technology (DLT) addresses challenges in the real estate
+               sector. Finally, reputation systems, including privacy-preserving models and blockchain-based imple-
+               mentations.
+               2.1   Digital Identity and Verifiable Credentials
+               In the current digital environment, companies frequently collect large amounts of user data for processes
+               such as access control and user profiling [1]. This centralized data collection places users at risk of
+               privacy violations, including data breaches and abusive data analysis, often caused by poor security
+               practices or ineffective data management.
+                 In response, regulations such as General Data Protection Regulation (GDPR) have been
+               established to protect personal data by imposing obligations on data controllers and processors. However,
+               despite these measures, data breaches continue to occur. To address these risks and return control of
+               personal data to the individual, new identity management approaches such as SSI have been proposed.
+               2.1.1 Self-Sovereign Identity (SSI)
+               The principle of sovereignty refers to the idea that entities must maintain control over their own digital
+               identity [2]. In a SSI model, users store their own identity data and decide what information to
+               disclose in each interaction, removing the need for intermediary identity providers [1]. This approach
+               mitigates the impact of data breaches and increases user’s flexibility. Instead of identity information
+               being spread across various service providers, the user retains sovereign control and discloses only the
+               required information for a given context.
+                 According to [3], the properties of SSI systems can be grouped into three main categories, as
+               presented in Figure 1.
+                 • Security: Protect personal data by minimizing its exposure to what is functionally necessary.
+                 • Controllability: Ensure that users have full authority over their identity, including giving consent
+                   for its use and the right to delete it, supporting the principle of the right to be forgotten
+                 • Portability: Allow users to use their digital identity on any platform without being locked into a
+                   specific provider.
+                                                          4
+                   To implement these principles in practice, blockchain, a well-known implementation of DLT,
+                emerges as a suitable technology for these models. A ledger is a data structure that maintains trans-
+                actions in an indelible append-only log, establishing which transactions occurred and in what order [4].
+                Adistributed ledger extends this concept to a replicated append-only data structure maintained by
+                a network of independent nodes that do not trust each other, tolerating Byzantine behavior [5].
+                   Theblockchain offers a decentralized peer-to-peer infrastructure capable of supporting reliable access
+                control [1]. This decentralized infrastructure introduces two technologies that support the SSI system:
+                a DID and a VC.
+                2.1.2  Decentralized Identifiers (DIDs)
+                DIDs are globally unique identifiers designed to function without relying on a centralized registration
+                authority [6,7]. Instead, they are registered on a DLT, removing the dependency on traditional certificate
+                authorities or centralized registries for identity verification and key management.
+                   A DID is a structured text string composed of three elements: a URL scheme identifier, an
+                identifier for the specific DID method, and a method-specific identifier. The DID syntax follows
+                the structure of a Uniform Resource Identifier (URI), making it compatible with web standards. DIDs
+                are resolvable, similar to web URLs, enabling the retrieval of a standard document that describes the
+                DID subject.
+                   This document, known as the DID Document, defines the mechanisms required to interact with
+                the identity. It contains information such as verification methods, which include cryptographic materials
+                like public keys, used for authentication, digital signatures, encryption and authorization. The
+                document is controlled by the DID controller, the entity with the authority to make changes to the
+                DID Document. The DID subject refers to the entity (such as a person, organization, or thing) that
+                the DID identifies.
+                   Each DID Method defines how a DID is managed on a specific DLT or network. It specifies the
+                exact processes for creating, reading, updating and deactivating the DID and its document. Service
+                endpoints, also listed in the DID Document, define how external parties can communicate with the
+                DID subject.
+                   Beyond the general structure, [8] distinguishes three types of DIDs:
+                   • Anywise: Can be used with an unspecified number of parties, typically unknown to one
+                     another, supporting broad usage without limiting the number of relationships established.
+                   • Pairwise: Are shared exclusively between two entities. This improves privacy by ensuring
+                     that each relationship uses a unique identifier, reducing the risk of correlation between different
+                     interactions.
+                   • N-wise: Are shared by exactly N entities, including the subject. Pairwise DIDs are a specific
+                     instance of this model when N = 2.
+                   Aconcrete example of a DID Document is shown in Figure 2.
+                2.1.3  Verifiable Credentials (VCs)
+                Once an entity possesses a DID, it can obtain VCs, which extend the functionality of DIDs beyond
+                identity representation [8]. VCs contain claims about the DID subject that can be cryptographically
+                verified by third parties without requiring direct contact with the original issuer.
+                   AVCactsastamper-resistant data container that provides cryptographic guarantees of origin,
+                integrity, and authorization for its use [9]. The VC data model offers the flexibility to digitize virtually
+                any physical document, making it applicable to a wide range of verification scenarios. Figure 3 shows an
+                example of a VC.
+                   Within the SSI ecosystem, three primary roles are defined, as illustrated in Figure 4:
+                   • The Issuer, who creates and signs the credentials.
+                                                               5
+           {
+             "@context": "https://www.w3.org/ns/did/v1",
+             "id": "did:example:123456789abcdefghi",
+             "authentication": [{
+              "id": "did:example:123456789abcdefghi#keys-1",
+              "type": "RsaVerificationKey2018",
+              "controller": "did:example:123456789abcdefghi",
+             }],
+             "service": [{
+              "id":"did:example:123456789abcdefghi#vcs",
+              "type": "VerifiableCredentialService",
+              "serviceEndpoint": "https://example.com/vc/"
+             }]
+           }
+                    Figure 2: An example of a DID Document, adapted from [6]
+           {
+             "@context": [
+              "https://www.w3.org/2018/credentials/v1",
+              "https://www.w3.org/2018/credentials/examples/v1"
+             ],
+             "id": "http://example.edu/credentials/1872",
+             "type": ["VerifiableCredential", "AlumniCredential"],
+             "issuer": "https://example.edu/issuers/565049",
+             "issuanceDate": "2010-01-01T19:23:24Z",
+             "credentialSubject": {
+              "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+              "alumniOf": {
+               "id": "did:example:c276e12ec21ebfeb1f712ebc6f1",
+               "name": [ {
+                "value": "Example University",
+                "lang": "en"
+               }]
+              }
+             },
+             "proof": {
+              "type": "RsaSignature2018",
+              "created": "2017-06-18T21:19:10Z",
+              "proofPurpose": "assertionMethod",
+              "verificationMethod": "https://example.edu/issuers/565049#key-1",
+              "jws": "eyJhbGciOiJSUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0..."
+             }
+           }
+                       Figure 3: An example of a VC, adapted from [8]
+                                  6
+                                     Figure 4: Overview of VC main actors [8]
+                • The Holder, who possesses and manages one or more credentials.
+                • The Verifier, who receives the credential and validates its authenticity.
+                Each VC includes the URI of the subject, the URI of the issuer, and a unique identifier for
+             the credential itself [8]. In many cases, these URIs can also take the form of DIDs. Holders can also
+             construct a Verifiable Presentation (VP), which defines the way VCs are shared and signed before
+             being presented to verifiers. This ensures selective disclosure, while maintaining data authenticity and
+             privacy.
+                Both DIDs and VCs rely on a Verifiable Data Registry (VDR), typically implemented using
+             a DLT. The VDR acts as a trusted intermediary, serving as a repository that stores and manages
+             information related to DIDs and VCs. It allows for the verification of credentials and identifiers by
+             providing a reliable and immutable source of truth for identity data.
+             2.2  Blockchain Applications in Real Estate
+             The real estate sector is frequently cited as technologically outdated, driven by slow, bureaucratic
+             processes, high costs, and vulnerability to fraud [10]. Transactions commonly involve many inter-
+             mediaries, extensive manual document verification, and complex regulatory compliance such as Due
+             Diligence, GDPR, and Anti-Money Laundering.
+                Blockchain technology, together with the identity models presented in Section 2.1, has been
+             proposed as a solution to these challenges. It can offer new mechanisms to improve transparency,
+             security, and efÏciency across these processes, while reducing dependence on centralized authorities
+             and minimizing the potential for manipulation.
+             2.2.1 Documentation and Identity Management
+             Property transactions depend on the exchange and validation of sensitive documents among multiple
+             stakeholders, a process that is often fragmented and vulnerable to falsification [11]. A Blockchain-based
+             Documentation Management (BDM) system aims to solve these problems by providing a decen-
+             tralized and auditable infrastructure that records all document-related events securely on a blockchain.
+             Within this architecture, users maintain full control over their documentation while benefiting from
+             the immutability and transparency of DLT.
+                Architecturally, these systems can be based on a permissioned (private) blockchain, ensuring that
+             only authorized participants can interact with the ledger. Smart contracts, self-executing programs
+             that run on the blockchain, record events such as document uploads, approvals, and consent changes
+             on-chain, producing a verifiable sequence of interactions, while sensitive documents are encrypted and
+             stored in off-chain cloud storage.
+                                                    7
+                2.2.2  Tokenization
+                Tokenizationinrealestatereferstotheprocessofdigitallyrepresentingaphysicalassetthroughblockchain
+                tokens, enabling fractional ownership and reducing entry barriers for smaller investors [12]. These
+                tokens embody economic value, rights, and contractual obligations, functioning similarly to more tradi-
+                tional ownership models, such as shares or funds. When implemented through smart contracts, the
+                issuance, distribution, and transfer of these tokens become more efÏcient, transparent, and cost-
+                effective compared to conventional property transactions.
+                   This approach is particularly suitable for assets such as land and property, which are traditionally
+                characterized by high costs, indivisibility, multiple intermediaries, and complex regulations. Tokenization
+                mitigates these constraints by enabling near-instant agreement execution and reducing intermediary
+                expenses.
+                   Decentralized marketplaces can be developed to manage these tokenized assets [13]. These platforms
+                can integrate SSI mechanisms for identity management, where users obtain VCs at registration and
+                present VPs to prove their identity. They can be built using DLTs with smart contracts written in
+                Digital Asset Modeling Language (Daml) and deployed in the Canton Network.
+                Daml
+                Daml is an open-source functional smart contract language designed to automate multi-party busi-
+                ness workflows on DLTs [14]. The language is designed around three requirements. First, real-world
+                adequacy, achieved by providing abstractions that closely capture the legal rules governing business
+                workflows. Second, security, enforced through explicit authorization checks and well-defined seman-
+                tics. Third, composability, which enables pre-existing workflows to be combined into more complex
+                processes, even after deployment.
+                   Smart contracts in Daml are defined using templates that specify the data stored in contract in-
+                stances, the authorization rules required for contract creation and archival through signatories, and
+                the visibility rules through observers. Business logic is implemented through choices, which define the
+                allowed state transitions of a contract instance, with controllers specifying the parties authorized to
+                exercise each choice.
+                The Canton Network
+                Canton is a distributed runtime for executing Daml smart contracts that preserves Daml’s authoriza-
+                tion and privacy properties [15]. It partitions state across participants, where each participant only
+                receives, stores, and processes data it is authorized to see, avoiding the scalability and privacy limitations
+                of a globally replicated state. Canton’s architecture is based on participant nodes and synchronization
+                domains. Parties interact through participant nodes that connect to domains responsible for sequencing
+                and mediating transaction messages. This design supports parallel processing of independent workflows
+                and enables horizontal scalability for high-value real estate transactions [13].
+                2.2.3  Smart Contract Integration
+                In property rental processes, where multiple stakeholders often lack mutual trust and documents are
+                shared through insecure channels, smart contracts can automate the enforcement of conditions
+                established in lease agreements, such as rent collection [16]. However, blockchains are inherently deter-
+                ministic systems and cannot directly access external data sources, which limits their ability to interact
+                with real-world information.
+                   To enable real-world integration, oracles serve as trusted intermediaries that provide external
+                data to smart contracts. They can be categorized according to the direction of data flow, whether it is
+                sent from the blockchain to the external world or vice versa, and by their trust model, being centralized
+                or decentralized.
+                                                               8
+             2.3  Reputation Systems
+             In distributed environments, where multiple spatially separated components communicate to operate,
+             reputation systems are among the few mechanisms that enable users to be held accountable for their
+             actions [17]. By collecting and aggregating user experiences, these systems incentivize better behavior
+             among participants and provide a reference for users to assess each other’s trustworthiness.
+                The reputation of a user, as a ratee or a votee, is determined by feedback from other users, known
+             as raters or voters, who have gained personal experience through interactions with that user [18]. The
+             systemthenaggregatesthisfeedbacktoproduceareputation score. Actionsperceivedaslegitimateare
+             expected to generate positive feedback, resulting in a higher reputation score, while dishonest behavior
+             typically leads to a lower aggregated reputation score. Research on peer-to-peer e-commerce platforms
+             such as eBay has shown that these reputation scores contribute to improving customer satisfaction and
+             reducing fraud in transactions [19].
+             2.3.1 Interaction
+             Reputation systems can be classified by the direction that the reputation is given [19]. The main types
+             are:
+                • Simplex: The simplest model, commonly found on platforms such as Amazon. The evaluation
+                 is unidirectional, where only one party provides feedback after a transaction, typically from the
+                 customer to the seller.
+                • Half-Duplex: Found in systems such as eBay. In this model, both parties can evaluate each other
+                 after a transaction, creating mutual accountability.
+                • Full-Duplex: UsedbyplatformslikeReddit. Thismodelallowsallpeerstorateeachotherwithout
+                 predefined roles such as buyer or seller.
+                Beyond the direction of feedback exchange, reputation systems can also be distinguished based on
+             the methods used to calculate the reputation score, dividing them into two main categories: voter-
+             agnostic and voter-conscious approaches.
+                Voter-agnostic functions compute reputation scores by treating all feedback as equal, regardless
+             of which user submitted the rating. Common methods include the Accrue Star model, where ratings
+             are summed, and the Average Star method, used by eBay, which computes the arithmetic mean of all
+             ratings. More adaptive models, such as the Gompertz function [20], assign greater weight to recent
+             interactions, allowing reputation to grow gradually through consistent positive behavior, while declining
+             sharply after negative events.
+                In contrast, voter-conscious functions take into account the identity or attributes of the voter.
+             These systems typically use weighted sums or averages, where the weight assigned to a given vote is
+             determined by specific information about the voter, such as their own reputation score.
+             2.3.2 Privacy and Security
+             Although reputation systems are used to build trust, traditional centralized implementation of these
+             systems often create privacy challenges by exposing the identity of the feedback provider [18]. Such
+             exposure can make honest users hesitate to provide negative feedback, for reasons ranging from fear of
+             retaliation to concerns about revealing sensitive personal information.
+                PPRSare specifically designed to address these issues. Their goal is to protect both user identities
+             and feedback content while ensuring the integrity and verifiability of reputation scores. To better under-
+             stand their structure, [18] introduces an analysis framework that identifies the main design dimensions
+             of PPRS, as illustrated in Figure 5. These can be divided into two main categories, according to their
+             security objectives:
+                                                    9
+                                  Figure 5: Analysis framework for privacy-preserving reputation systems [18]
+                    1. User Anonymity-Oriented Systems: In these systems, each user is represented by one or more
+                       pseudonyms, and the goal is to preserve the anonymity of the user providing the feedback. This is
+                       achieved through privacy goals that include:
+                          • User-PseudonymUnlinkability: Theuser’strueidentityisnotlinkabletoanypseudonym.
+                          • Pseudonym-Pseudonym Unlinkability: Two pseudonyms that belong to the same user
+                            cannot be linked.
+                          • Reputation Transfer Aggregation: Allows users to manage reputation across different
+                            pseudonyms while maintaining unlinkability.
+                    2. Feedback Confidentiality-Oriented Systems: Thesesystems, in contrast, focus on keeping the
+                       content of the rating private, rather than hiding the participants’ identities. While the existence
+                       of a feedback interaction may be public, the score and content of the feedback remain confidential.
+                     Figure 6 provides an overview of the main security objectives in the design of PPRS.
+                 2.3.3    Trust Model
+                 In a PPRS, security and privacy guarantees are often dependent on the trust of a user in other entities
+                 within the system [18]. These trusted parties might be a single, central authority or a selection of
+                 fellow participants. This reliance is based on the user’s assumption that these entities will operate in a
+                 predictable, expected manner in order to protect their security and privacy.
+                     The most traditional approach is the Trusted Third Party (TTP) model, in which users must
+                 place complete trust in a single centralized entity. A more distributed alternative is a model in which
+                 users rely on a defined subset of other participants to validate their interactions. This can be
+                 implemented by requiring a user to trust an arbitrary number (k) of other users or by allowing a user to
+                 personally select specific peers that they will trust.
+                     The most recent model is the Trustless model. In this context, trustless does not imply the absence
+                 of trust, but rather that trust is placed in algorithms and cryptographic protocols instead of any specific
+                 entity or fellow users.   This model is enabled by blockchain technology, ensuring an immutable
+                 and transparent environment, where users can verify the integrity of interactions and computation of
+                                                                     10
+                                 Figure 6: Security objectives of privacy-preserving reputation systems [18]
+                 the reputation score.  Reputation systems built with these principles can use smart contracts to
+                 automatically compute and update scores, without the intervention of a central authority.
+                    In these trustless environments, the reliability of interactions depends on the system’s ability to en-
+                 sure agreement among independent participants [21]. This agreement is achieved through consensus
+                 mechanisms, the protocols that determine how blockchain nodes validate and record new information
+                 without central coordination. In the Proof-of-Work (PoW) model, nodes compete to solve a compu-
+                 tationally difÏcult puzzle, and the first to find a solution publishes the next block, which can be easily
+                 verified by others. In contrast, the Proof-of-Stake (PoS) model determines consensus based on the
+                 amount of cryptocurrency that participants lock as stake within the network. The probability of being
+                 selected to publish a block increases with the proportion of the total stake held by each participant.
+                 PoSreduces the need for resource-intensive computations and aligns network security with the financial
+                 commitment of users, as those with larger stakes have stronger incentives to preserve the integrity
+                 of the system.
+                    Other consensus protocols are commonly used in permissioned blockchain environments, particularly
+                 those based on Byzantine Fault Tolerance (BFT) [22]. These protocols operate under the assump-
+                 tion of a known and authenticated set of participants and are designed to tolerate a bounded number of
+                 faulty or malicious nodes while still guaranteeing safety and liveness. Examples include Practical Byzan-
+                 tine Fault Tolerance (PBFT) and BFT-SMaRt, which achieve agreement on the order of transactions
+                 through structured message exchanges among replicas. Unlike PoW or PoS, Byzantine consensus pro-
+                 tocols provide definitive agreement and avoid both the computational overhead of PoW or the economic
+                 incentive mechanisms of PoS systems.
+                 2.3.4   Cryptographic Mechanisms
+                 Toimplementtheprivacy and security objectives described in Section 2.3.2, PPRS employ cryptographic
+                 primitives that enable anonymous yet verifiable interactions. These mechanisms allow users to prove
+                 statements about their identity or behavior without revealing sensitive information.
+                                                                  11
+                   • In a Blind signature scheme, a signer produces a valid signature on a message without learning
+                     anything about the message content [23]. A blind signature system is expected to ensure that only
+                     the legitimate signer, who possesses the required private key, can issue valid signatures. Besides
+                     that, it should implement untraceability, ensuring that once the signed message is later revealed,
+                     the signer cannot determine when or under what circumstances it was signed.
+                   • A Zero-knowledge proof (ZKP) is a protocol that enables a prover to convince a verifier that a
+                     given statement is true without revealing any information beyond the statement’s validity [24]. A
+                     ZKPmustsatisfythese three properties: completeness (an honest prover can always convince the
+                     verifier of a true statement), soundness (a malicious prover cannot convince the verifier of a false
+                     statement), and zero-knowledge (the verifier learns nothing beyond the truth of the statement).
+                     Zero-Knowledge Succinct Non-Interactive Arguments of Knowledge (zkSNARK) is
+                     a type of ZKP that can be verified without requiring direct communication between prover and
+                     verifier [17].
+                   • A Pedersen commitment scheme allows a user to commit to a message without revealing it,
+                     with the ability to later prove the validity of the commitment [24]. These schemes depend on two
+                     properties: binding and hiding. The binding property ensures that, once a commitment is made,
+                     the committer cannot alter the original message. The hiding property guarantees that the receiver
+                     cannot deduce the committed message from the commitment value.
+                2.3.5  Common Attacks
+                Reputation systems are vulnerable to various malicious behaviors that aim to manipulate or exploit the
+                system. According to [18], some of the most common attacks include:
+                   • Sybil attack: A single malicious user creates and controls multiple fake identities (Sybil nodes)
+                     to gain disproportionate influence in the system.
+                   • Self-promotion or ballot stufÏng: Arateeattemptstoboosttheirownreputationbygenerating
+                     or soliciting false positive feedback.
+                   • Slandering or bad-mouthing: An adversary intentionally submits false negative feedback to
+                     damage the reputation of another user.
+                   • Whitewashing: A user abandons an identity with poor reputation and rejoins the system with a
+                     new pseudonym to reset their reputation score.
+                   • Oscillation: A user behaves honestly over time to build a strong reputation and then exploits it
+                     for malicious activities before abandoning the account.
+                   • Random ratings: A user submits arbitrary or random feedback without real interactions, often
+                     to appear active or disrupt system reliability.
+                   • Free riding: A user benefits from the reputation system, such as using reputation information to
+                     make decisions, without contributing feedback themselves.
+                2.3.6  Blockchain-Based Implementations
+                Building upon trustless models and cryptographic mechanisms, various implementations have been pro-
+                posed that leverage blockchain technology to achieve transparency, immutability, and verifiability while
+                eliminating dependence on central authorities. The following proposals highlight some strategies devel-
+                oped to achieve these goals.
+                   Schaub et al. [23] proposed a trustless and decentralized PPRS designed for e-commerce applica-
+                tions. Their system uses blockchain and blind signatures to ensure user anonymity. In this model, a
+                Service Provider (SP) issues blinded tokens, which are signed commitments that confirm a transaction
+                                                               12
+        has occurred while concealing both the transaction details and the customer’s identity. After unblinding
+        these tokens, customers can submit ratings and reviews to the blockchain, and this feedback is verifiable
+        yet unlinkable to specific users. To limit self-promotion attacks, the system uses a coin mechanism
+        where issuing tokens requires spending coins owned by the SP.
+         Dimitriou [17] developed a peer-to-peer decentralized PPRS built on blockchain and zkSNARKs,
+        enabling anonymity together with verifiable reputation scores and updates. In this system, each partic-
+        ipant can use multiple pseudonyms that are all cryptographically linked to a single reputation token,
+        allowing their reputation to persist across contexts while maintaining unlinkability between identities.
+        When providing their reputation, users can disclose only a reputation level instead of an exact score,
+        reducing the risk of de-anonymization. The system prevents self-promotion attacks through self-
+        redeeming tags, computed from the user pseudonym, so if a user attempts to rate themselves using
+        different pseudonyms, the tags will coincide and the transaction is rejected.
+         Dimitriou later proposed VISOR [24], a PPRS that uses randomizable signatures and ZKPs
+        to enable anonymous ratings through review tokens issued by SPs. The system begins with a decen-
+        tralized registration phase, in which users obtain a registration token linked to a unique long-term
+        secret identity. During interactions with SPs, users generate one-time pseudonyms as Pedersen com-
+        mitments on their secret key, allowing them to request and redeem review tokens while preserving
+        unlinkability. Submitted reviews are published on a public bulletin board, serving as an append-only
+        ledger, where anyone can verify the authenticity of tokens and reviews.
+         Owiyo et al. [25] proposed a decentralized PPRS that integrates blockchain with secure multi-
+        party computation based on verifiable secret sharing. In this system, when a customer queries a
+        SP’s reputation, the feedback providers split their private ratings into shares that are distributed between
+        multiple nodes, which then collectively compute the aggregated score without any single party accessing
+        the complete feedback data. The blockchain serves as both an access control intermediary and an im-
+        mutable storage layer for ratings and transactions, while the multiparty computation protocols perform
+        the actual aggregation, ensuring that no single party can access complete feedback data. Similarly to
+        Schaub et al. [23], the system employs blind signatures to preserve customer anonymity, allowing
+        users to obtain blinded transaction tokens that can later be unblinded and used to submit verified yet
+        unlinkable ratings.
+         Liu et al. [26] presented an Anonymous Reputation System atop a PoS blockchain (ARS-
+        PS), designed for Industrial Internet of Things (IIoT)-enabled retail environments. This system inte-
+        grates ZKP and Bulletproof range proofs (a type of ZKP) to protect both consumer identity and
+        feedback confidentiality, revealing only aggregated retailer ratings. ARS-PS uses an off-chain token gen-
+        eration phase to reduce storage and computation overhead and associates retailer reputation with staking
+        power within the PoS consensus, aligning incentives for honest participation. Reviews are accumu-
+        lated in smart contracts, aggregated by elected slot leaders, and decrypted through a distributed
+        decryption process where committee members provide partial decryption tokens, ensuring that indi-
+        vidual rating scores remain confidential while aggregated retailer reputation is publicly verifiable on the
+        blockchain.
+         Larangeira[27]proposedatrust layer over PoSsystemstoconstructastake-basedreputationsys-
+        tem. The system allows participants to publicly assign trust to trustees by issuing certificates containing
+        a context identifier (IDcontext), representing specific services, products, or entities. Users can pub-
+        lish trust assignment certificates on the ledger, with reputation scores computed as the percentage of
+        stake each trustee receives relative to the total stake of all assigners for that context. This stake-based
+        approach enables the system to support secure multiparty computation protocols and reputation-fair
+        lottery mechanisms for Proof-of-Reputation consensus, with all reputation scores publicly verifiable
+        through the blockchain ledger.
+         Table 1 summarizes and compares these blockchain-based reputation systems in their main design
+        characteristics.
+                              13
+                     Work          Domain          Evaluation      Reputation          Cryptographic Context-
+                                                   Structure       Representation      Mechanisms         Aware
+                     Schaub et     E-commerce      Single-valued   Single score        Blind signatures   ×
+                     al.                           rating
+                                                   Single-valued   Single reputation   zkSNARKs,
+                     Dimitriou     Peer-to-peer    rating          token value         self-redeeming     ×
+                                                                                       tags
+                     VISOR         E-commerce      Single-valued   Single aggregated   Pedersen           ×
+                                                   rating          score               comm., ZKPs
+                     Owiyo et                      Single-valued   Single aggregated   Blind
+                     al.           E-commerce      rating          score (MPC)         signatures,        ×
+                                                                                       MPC
+                                                   Single-valued   Single aggregated   ZKPs,
+                     Liu et al.    IIoT retail     rating          score               Bulletproof        ×
+                                                                   (stake-linked)      range proofs
+                     Larangeira PoS System         Stake %         Stake-weighted %    Trust              ✓
+                                                                                       certificates
+                               Table 1: Comparison of Blockchain-Based Reputation System Implementations
+                 3    Solution
+                 Real estate transactions represent a network of interactions in which participants must rely on each
+                 other’s competence, reliability, and professional conduct. Each interaction can generate behavioral in-
+                 formation that collectively influence how participants perceive each other. Existing blockchain based
+                 reputation systems, including those discussed in Section 2.3.6, commonly represent this informa-
+                 tion as a single numeric score. While this approach is effective for general purpose applications, it
+                 aggregates behaviorally distinct dimensions into a single value.
+                    Real estate processes introduce characteristics that motivate a more multidimensional represen-
+                 tation. Each role within a real estate transaction requires distinct competencies and a single score
+                 provides no process to distinguish which competencies contributed to a reputation change. Further-
+                 more, reputation updates may be interpreted uniformly across different use cases without considering
+                 the specific context in which the observed behavior occurred.
+                    Building on the trustless and privacy-preserving properties presented in Section 2.3, we propose
+                 a reputation architecture designed to address the requirements of real estate transactions. The proposed
+                 architecture separates behavioral information into distinct components and updates them according
+                 to the context of interaction context. This design introduces a multidimensional blockchain-
+                 based, feedback confidentiality-oriented PPRS with context-dependent reputation update
+                 functions.
+                    The architecture is presented in three parts. First, Sections 3.1 and 3.2 define the system require-
+                 ments and the participants. Second, the system model is presented in Sections 3.3-3.6, specifying
+                 data structures, architectural layers, and the reputation update logic that processes interaction outcomes
+                 and modifies component values. Finally, the blockchain implementation is presented in Sections 3.7
+                 and 3.8, explaining how the chosen platform and smart contract design support the required privacy and
+                 security properties.
+                 3.1    System Requirements
+                 The proposed system must satisfy the following functional and security requirements:
+                    1. Multidimensional reputation representation. Reputation must be represented as a vector
+                       of components, where each component corresponds to a distinct dimension that contributes to
+                       the overall reputation of a participant.
+                                                                   14
+                                 Figure 7: Use Cases Diagram of the Proposed Solution
+               2. Context specific updates. Reputation updates must depend on the type of interaction, the
+                 rules associated with that interaction, and the observed behavior within that context. Different
+                 types of interaction must be able to modify different reputation components.
+               3. Role-based aggregation. Thereputationvalueofaparticipantmustbecomputedbyaggregating
+                 the component values using weights determined by the participant’s role. Different roles should
+                 prioritize different reputation components.
+               4. Selective visibility and privacy. Participants must have access to the structure of their own
+                 reputation vector, including individual component values and their evolution over time. External
+                 verifiers should only observe the aggregated results or explicitly disclosed components.
+               5. Protection against common attacks. The system must mitigate the attacks presented in
+                 Section 2.3.5, including Sybil attacks, whitewashing, ballot stufÏng, and self-promotion.
+               6. Auditability and verifiability. All reputation updates must be recorded on a tamper-resistant
+                 ledger and must be publicly verifiable without revealing sensitive interaction details or feedback
+                 content.
+             3.2  System Participants
+             The system defines three primary participant types: the Reputation Subject, the Interaction Par-
+             ticipant, and the Verifier. Each participant is identified by a DID, establishing a cryptographically
+             verifiable identity within the system. Figure 7 illustrates the use cases for each participant type.
+                • AReputation Subjectisaparticipantthatpossessesreputation within the system. Each subject
+                 holds a reputation state associated with their DID that evolves through interactions with other
+                 participants. Subjects have access to their reputation vector, including individual component
+                 values and update history. They can generate VCs with proof of their own reputation and control
+                 the level of disclosure, optionally revealing selected component values for specific verification
+                                                    15
+                       contexts or only an aggregated score. In the context of real estate transactions, Reputation Subjects
+                       can include real estate agents, brokers, property sellers, property buyers, and other roles whose
+                       behavior can be evaluated over time.
+                     • An Interaction Participant is a participant capable of submitting evaluations following in-
+                       teractions with Reputation Subjects. They contribute to reputation updates in two ways. First, by
+                       completing interactions that trigger automated updates to specific reputation components, based
+                       on observable metrics. Second, through feedback submission for components that require sub-
+                       jective evaluation. Interaction Participants can include buyers evaluating agents after a property
+                       sale, sellers providing feedback on brokers, or other participants involved in evaluating the behavior
+                       of other transaction participants.
+                     • A Verifier is a participant that validates VCs produced by a Reputation Subject. The verifier
+                       receives a VC containing reputation information and then verifies the authenticity and in-
+                       tegrity of the credential, confirming that it was correctly issued and has not been tampered with.
+                       Verifiers can include real estate platforms, financial institutions, landlords, employers, or regulatory
+                       entities that need to assess the reputation of agents, brokers, or other transaction participants.
+                     In addition to these participant types, the system includes a privileged administrative role respon-
+                 sible for configuring interaction types, defining evaluation rules, and managing system parameters.
+                 3.3    Data Structures
+                 Among the blockchain-based reputation systems discussed in Section 2.3.6, the Reputation Token
+                 proposed by Dimitriou [17] provides the most suitable basis for representing the reputation state of each
+                 subject in the system. The token binds reputation as a single numeric value to a cryptographic identity
+                 and supports verifiable reputation updates on a ledger.
+                     This structure addresses two of the trustless and privacy-preserving requirements defined in Section
+                 3.1. Auditability and verifiability are achieved through updates that are recorded as tamper-resistant
+                 transaction.   Protection against common attacks is provided through binding of reputation to
+                 identity, preventing impersonation and unauthorized modifications.
+                     Ourarchitecture extends Dimitriou’s model by representing reputation as a vector of components,
+                 where each component represents a distinct behavioral dimension. Figure 8 presents the data model of
+                 the proposed reputation system. The model defines these entities: Participant, ReputationToken,
+                 Component, Interaction and Feedback.
+                     • TheReputationTokenentityrepresentsthereputationstateofaparticipant. Eachtokencontains
+                       an overallScore computed from its components, a role identifier, and roleWeights that determine
+                       how components are aggregated for that specific role. A token is composed of multiple Compo-
+                       nent entities, each capturing a distinct behavioral dimension. Each component maintains a name
+                       identifier, a numeric value and is updated by the applyDelta() operation. Each component addi-
+                       tionally maintains an interactionCount, representing the number of past updates applied to that
+                       component, which is used to weight the impact of future reputation changes.
+                     • The Interaction entity models activities between participants. Each interaction has an interac-
+                       tion type identifier, temporal bounds (startTime, endTime), and a status indicator. When an
+                       interaction completes, the complete() operation generates outcome records containing metrics for
+                       each participant of the interaction. The evaluateOutcomes() operation processes these outcomes
+                       according to the rules associated with the interaction type, producing a set of reputation deltas
+                       for the affected components of each participant.
+                     • The Feedback entity enables subjective evaluation of interaction outcomes. Each feedback con-
+                       tains componentRatings, a map that assigns numeric ratings to specific components, and an optional
+                       textual comment. The publicComment flag controls the visibility of the comment field to other
+                       participants. The submit() operation converts feedback ratings into an outcome structure.
+                                                                     16
+                                  Figure 8: Class Diagram of the Proposed Solution
+             3.4  System Architecture
+             The Reputation System follows a three-layer architecture, as illustrated in Figure 9.
+             Presentation Layer
+             The Presentation Layer provides the web-based user interface where participants interact with the
+             system. The Web Application serves as the frontend of the system and adapts its interface to present
+             functionality and information relevant to the authenticated user, ensuring that participants can only
+             perform operations permitted by their roles.
+             Application Layer
+             The Application Layer implements the business logic of the system, exposing a REST API that
+             connects the Presentation Layer with the Blockchain Layer. This layer handles reputation operations,
+             credential issuance and verification, participant authentication, and interaction management
+             through four core services:
+                • The Authentication Service manages participant authentication, access control, and role-
+                 based permissions through credential-based verification. Participants present a VC from their
+                 wallet containing role information and a cryptographic identity. The service validates the credential,
+                 extracts the role and blockchain address, assigns corresponding permissions, and establishes an
+                 authenticated session that binds the application account and blockchain identity.
+                • The Reputation Management Service manages reputation updates and provides query
+                 capabilities for reputation data. The service handles updates from interaction outcomes and
+                 feedback submissions, applying context-dependent updates to specific reputation components based
+                 on interaction type. It computes aggregated reputation scores using role-specific weights and
+                 forwards all updates to the Blockchain Layer for immutable recording. Participants can view
+                 rankings of all participants by aggregated score, query their own reputation details, and access
+                 their update history.
+                • The Interaction Management Service allows authorized participants to create new interac-
+                 tions, enables other participants to join ongoing interactions, and completes interactions, generat-
+                 ing interaction outcomes. Participants can query their interaction history and submit feedback
+                 providing subjective ratings for specific reputation components. The service validates participant
+                                                    17
+                      Figure 9: Proposed Architecture Archimate Diagram
+                                 18
+                                 {
+                                   "interactionId": "sale_123",
+                                   "participantId": "agent_A",
+                                   "interactionType": "SaleCompletion",
+                                   "metrics": {
+                                     "contractSigned": true,
+                                     "settlementDelayDays": 1,
+                                     "documentSubmissionLatencyHours": 6.4,
+                                     "revisionCount": 2
+                                   }
+                                 }
+                                Figure 10: Example of an Interaction outcome structure
+                 authorization to prevent attacks such as ballot stufÏng and self-promotion, and invokes reputation
+                 update operations upon interaction completion. Additionally, the service provides administrative
+                 functionality for defining and managing interaction type configurations, including the definition of
+                 evaluation rules and their parameters, which are recorded on the blockchain and referenced during
+                 outcome evaluation.
+                • The Credential Management Service issues and manages VCs for reputation verification. The
+                 service generates credentials containing reputation data with configurable disclosure levels, al-
+                 lowing Reputation Subjects to select which components are revealed. It verifies credentials by
+                 validating their authenticity and integrity to confirm they were correctly issued and remain unal-
+                 tered. Reputation Subjects can query their history to track all credentials they have generated
+                 and shared with verifiers.
+             Blockchain Layer
+             The Blockchain Layer implements the data structures and operations defined in Section 3.3 as smart
+             contracts on a DLT and exposes a Smart Contract API used by the Application Layer to submit
+             authorized operations. This layer is responsible for all security and trust-sensitive functionality, in-
+             cluding the representation of participant reputation, the execution of reputation update logic, and the
+             immutable recording of interactions and feedback. All submitted operations are executed as blockchain
+             transactions, ensuring tamper-resistant and auditable state transitions.
+                Placing these components on-chain provides immutability, verifiability of reputation computation,
+             and smart contract-enforced authorization, preventing unauthorized reputation manipulation. In con-
+             trast, functionality such as authentication, interaction initiation, session management, and user interface
+             logic remains off-chain, as these operations do not benefit from decentralized trust, global consensus,
+             or immutable execution.
+             3.5  Interaction Outcomes Evaluation
+             In the proposed system, the evolution of a participant’s reputation is determined by the completion
+             of interactions and the subsequent submission of feedback. These actions generate observable
+             outcomes that affect the reputation state of the involved participants. Reputation updates are applied
+             to individual components, allowing behavior in different contexts to influence distinct dimensions of
+             reputation.
+                When an interaction reaches completion, the complete() operation produces a set of outcome
+             records for each participant, containing objectively measured metrics derived from system observable
+             events. Figure 10 illustrates an example of the outcome structure generated by the completion of a sale
+             interaction.
+                                                    19
+                            {
+                               "interactionId": "sale_123",
+                               "participantId": "agent_A",
+                               "deltas": {
+                                 "ProcessEfficiency": 3.5,
+                                 "DocumentationAccuracy": 2.5,
+                                 "TransactionFollowThrough": 2.0
+                               },
+                               "reasons": {
+                                 "ProcessEfficiency": "SETTLEMENT_DELAY_BELOW_THRESHOLD",
+                                 "DocumentationAccuracy": "LOW_DOCUMENT_REVISION_COUNT",
+                                 "TransactionFollowThrough": "ALL_TRANSACTION_STAGES_COMPLETED"
+                               }
+                            }
+                         Figure 11: Example of the output produced by the evaluation of a completed Interaction
+                   Following the completion of the interaction, a feedback phase is initiated during which the par-
+                ticipants of the interaction may submit subjective evaluations of each other’s performance. Each
+                feedback submission generates an additional outcome record.
+                   The evaluateOutcomes() operation processes both system generated and feedback derived outcome
+                records according to the interaction type and its evaluation rules. This operation produces a set of
+                reputation deltas for the affected reputation components of each participant. Figure 11 illustrates an
+                example of the output produced by the evaluation of a completed sale interaction.
+                3.6   Reputation Updates Application
+                Reputation updates are performed through the applyDelta() operation of each component. Each ad-
+                justed delta modifies the component’s numeric value, after which the interaction count is incremented to
+                weigh future updates. To ensure stability and resilience against manipulation, the system applies a di-
+                minishing impact computation,wheretheeffectofsuccessiveinteractionsonacomponentdecreases
+                as its interaction count increases.
+                   For each reputation component, the adjusted delta applied to its value is computed as follows:
+                                             adjustedDelta = √     baseDelta
+                                                              interactionCount+ ������
+                where interactionCount is the number of previous updates applied to that component, and k is a
+                positive constant that controls the initial sensitivity of the reputation system. This constant prevents
+                high volatility during the first interactions.
+                   An alternative mechanism could be drawn from the Exponential Weighted Moving Average
+                (EWMA). Thisapproachmaintainsthevalueofeachcomponentasaweightedaveragethatprioritizes
+                recent interactions.
+                                 newValue = ������ · (currentValue + baseDelta) + (1 − ������) · currentValue
+                where ������ is a weighting factor that determines the influence of new interactions relative to historical
+                performance. This formula causes the influence of older interactions to decay exponentially over time,
+                ensuring that reputation reflects more recent behavioral patterns.
+                   Updates are recorded with the identifier of the interaction that generated them, along with the reason
+                for the change, providing a traceable and auditable reputation evolution.
+                   After the application of each reputation update, the overall reputation score of the participant is
+                recomputed by aggregating the current values of all reputation components using the role specific
+                                                              20
+                        Smart Contract         Signatories         Observers                  Choice Controllers
+                        ReputationToken        Operator            Reputation Subject         Operator
+                        Interaction            Operator            Interaction Participants   Operator
+                        InteractionType        Operator            All System Participants    Operator
+                        FeedbackPrivate        Feedback Author     Feedback Recipient         Feedback Author
+                        FeedbackPublic         Feedback Author     Interaction Participants   Feedback Author
+                                            Table 2: Smart Contract Visibility and Control Rules
+                 weights associated with the participant at registration time. This ensures that the ledger always reflects
+                 the current aggregated reputation of each participant.
+                 3.7    Blockchain Platform
+                 The proposed reputation system is implemented using smart contracts written in Daml and deployed
+                 on the Canton Network. These platforms were chosen for this implementation for their ability to meet
+                 the functional and security requirements defined in Section 3.1.
+                     • Daml supports explicit authorization through signatories, observers, and controlled choices,
+                       allowing contract actions to be executed only by entitled parties.
+                     • The Canton Network acts as the execution and coordination layer for the Daml smart contracts,
+                       enabling a synchronized ledger. Its architecture, built on sequencers and mediators, ensures
+                       that contract executions are ordered, validated, and privacy-preserving. The only parties involved
+                       in a given interaction observe the associated contract state and outcomes.
+                 3.8    Smart Contracts
+                 The proposed system is implemented through a set of smart contracts written as Daml templates and
+                 deployed on the Canton Network. These contracts provide the on-chain implementation of the entities
+                 defined in Section 3.3 and represent the authorization, privacy, and execution rules required to manage
+                 interactions, feedback, and reputation updates.
+                     All contract creation and choice execution are mediated by the application layer, which submits com-
+                 mands to the blockchain on behalf of authorized parties. The system has a privileged administrative
+                 party, called the operator, that exercises choices such as completing interactions, evaluating outcomes,
+                 and applying reputation updates.
+                     Table 2 presents the smart contracts implemented in the system and their associated visibility and
+                 control rules.
+                     • The ReputationToken contract maintains the on-chain representation of a participant’s reputa-
+                       tion through a composite structure of weighted components and an aggregated score. Each token is
+                       represented by a contract in which the operator executes reputation updates by invoking component
+                       modification operations with computed deltas from evaluated interactions. The Reputation Sub-
+                       ject is assigned as an observer of their own contract, ensuring transparency over their reputation
+                       state.
+                     • The Interaction contract represents an interaction instance between participants. It is signed by
+                       the operator and is visible only to the participants involved in the interaction. The contract imple-
+                       ments the evaluateOutcomes choice, which invokes the evaluation logic defined by the associated
+                       InteractionType contract to compute the component deltas required for reputation updates.
+                                                                    21
+            • The InteractionType contract defines the evaluation logic for a specific type of interaction
+             through a parameterized template. Each interaction type is represented by a contract in which
+             the evaluation structure is implemented in the template, while parameters such as component
+             thresholds, delta values, and weight configurations are maintained as contract data. This enables
+             the operator to modify evaluation behavior without requiring modifications to the Interaction
+             or ReputationToken contracts. All the participants in the system are assigned as observers to
+             the contract, ensuring transparency of the evaluation algorithms and parameter configurations
+             applied to each interaction type.
+            • The FeedbackPrivate and FeedbackPublic contracts implement subjective evaluation while
+             maintaining confidentiality requirements based on user preference. Private feedback contracts
+             include component ratings and optional textual comments, with the feedback recipient as the
+             only observer. Public feedback contracts contain the same information, but assign all interaction
+             participants as observers, making the evaluation transparent to everyone involved in the interaction.
+          4  Evaluation
+          The evaluation of the proposed system will be conducted by implementing a functional prototype and
+          controlled simulations of real estate interactions recorded on the blockchain. The prototype will be
+          usedtoassesswhetherthesystemcorrectlycomputes,updatesandaggregatesreputationscoresaccording
+          to interaction context and participant roles, and whether VC containing reputation information can be
+          correctly issued and verified. Correctness will be evaluated by verifying that reputation updates reflect
+          the defined evaluation rules and that reputation evolution is consistent across repeated interactions and
+          feedback submissions.
+            In addition to correctness, the evaluation will focus on system metrics, including latency, measured
+          as the time required for interaction recording, reputation update propagation, and credential issuance or
+          verification, and throughput, representing the volume of interactions and reputation updates that the
+          system can sustain within a given time interval.
+            The system will also be evaluated with respect to its resistance to manipulation by simulating
+          commonattacks such as self-promotion and ballot stufÏng, observing whether unauthorized or malicious
+          actions are correctly prevented.
+          5  Work Schedule
+            • February: Refine the system architecture and design of the reputation model, data structures,
+             and system components.
+            • March: Implement the backend and frontend components. Set up the blockchain environment
+             and integrate the application with the ledger.
+            • April: Implement smart contracts for interactions, reputation updates, and feedback submission.
+            • May: Implement the issuance of reputation scores and VCs, and integrate all system components
+             into a functional prototype.
+            • June: Perform controlled simulations and evaluate the system under different behavioral scenarios.
+            • July: Final revisions, finalize evaluation, and complete the dissertation document.
+          6  Conclusion
+          Thisworkpresentsablockchain-basedreputationsystemdesignedtoaddresstrustandtransparency
+          challenges in real estate transactions. The proposed architecture introduces a multidimensional rep-
+          utation model where distinct behavioral components are updated according to interaction context,
+                                       22
+        enabling more accurate evaluation of participant competence. Reputation updates are applied through
+        transparent algorithms implemented as smart contracts, ensuring auditability and resistance to ma-
+        nipulation attacks, while role-specific weights enable aggregation that reflects different competency
+        requirements. The system addresses requirements including selective visibility, protection against
+        common attacks, and support for VCs that enable reputation portability across platforms. Future work
+        will focus on implementing the prototype, conducting simulations to evaluate system behavior, and
+        assessing the fairness, robustness, and usability of the reputation mechanisms.
+                              23
+                Bibliography
+                 [1] R. Belchior, B. Putz, G. Pernul, M. Correia, A. Vasconcelos, and S. Guerreiro, “Ssibac: self-sovereign
+                    identity based access control,” in 2020 IEEE 19th International Conference on Trust, Security and
+                    Privacy in Computing and Communications (TrustCom).     IEEE, 2020, pp. 1935–1943.
+                 [2] D. Baars, “Towards self-sovereign identity using blockchain technology,” Master’s thesis, University
+                    of Twente, 2016.
+                 [3] A. Mühle, A. Grüner, T. Gayvoronskaya, and C. Meinel, “A survey on essential components of a
+                    self-sovereign identity,” Computer Science Review, vol. 30, pp. 80–86, 2018.
+                 [4] M. Herlihy, “Blockchains from a distributed computing perspective,” Communications of the ACM,
+                    vol. 62, no. 2, pp. 78–85, 2019.
+                 [5] T. T. A. Dinh, R. Liu, M. Zhang, G. Chen, B. C. Ooi, and J. Wang, “Untangling blockchain: A
+                    data processing view of blockchain systems,” IEEE transactions on knowledge and data engineering,
+                    vol. 30, no. 7, pp. 1366–1385, 2018.
+                 [6] D. Reed, M. Sporny, D. Longley, C. Allen, R. Grant, M. Sabadello, and J. Holt, “Decentralized
+                    identifiers (dids) v1. 0,” Draft Community Group Report, 2020.
+                 [7] O. Steele, M. Sporny, M. Prorock, and K. Hartog, “Did specification registries: The inter operability
+                    registry for decentralized identifiers,” W3C, Apr, 2022.
+                 [8] C. Mazzocca, A. Acar, S. Uluagac, R. Montanari, P. Bellavista, and M. Conti, “A survey on decen-
+                    tralized identifiers and verifiable credentials,” IEEE Communications Surveys & Tutorials, 2025.
+                 [9] R. Bochnia, D. Richter, and J. Anke, “Lifting the veil of credential usage in organizations: A
+                    taxonomy,” in Open Identity Summit 2023.   Gesellschaft für Informatik eV, 2023, pp. 27–38.
+                [10] J. Luís, J. Santos, T. Dias, and M. Correia, “Real estate documentation authentication with
+                    blockchain and self-sovereign identity.”
+                [11] J. F. Santos, M. P. Correia, and T. R. Dias, “Blockchain-based rental documentation management
+                    with audit support,” in 2024 6th Conference on Blockchain Research & Applications for Innovative
+                    Networks and Services (BRAINS).    IEEE, 2024, pp. 1–10.
+                [12] J. Kreppmeier, R. Laschinger, B. I. Steininger, and G. Dorfleitner, “Real estate security token
+                    offerings and the secondary market: Driven by crypto hype or fundamentals?” Journal of Banking
+                    &Finance, vol. 154, p. 106940, 2023.
+                [13] D. Costa, J. Santos, T. Dias, and M. Correia, “A decentralized marketplace for tokenized real
+                    estate,” in 2025 20th European Dependable Computing Conference Companion Proceedings (EDCC-
+                    C).   IEEE, 2025, pp. 157–162.
+                [14] A. Bernauer, S. Faro, R. Hämmerle, M. Huschenbett, M. Kiefer, A. Lochbihler, J. Mäki, F. Mazzoli,
+                    S. Meier, N. Mitchell et al., “Daml: A smart contract language for securely automating real-world
+                    multi-party business workflows,” arXiv preprint arXiv:2303.03749, 2023.
+                [15] Digital Asset Canton Team, “Canton: A daml based ledger interoperability protocol,” Digital Asset,
+                    Whitepaper, 2020. [Online]. Available: https://www.canton.io/publications/canton-whitepaper.pdf
+                [16] N. Braz, J. Santos, T. Dias, and M. Correia, “Blockchain oracles for real estate rental,” arXiv preprint
+                    arXiv:2504.06180, 2025.
+                [17] T. Dimitriou, “Decentralized reputation,” in Proceedings of the Eleventh ACM Conference on Data
+                    and Application Security and Privacy, 2021, pp. 119–130.
+                                                               24
+                 [18] O. Hasan, L. Brunie, and E. Bertino, “Privacy-preserving reputation systems based on blockchain
+                      and other cryptographic building blocks: A survey,” ACM Computing Surveys (CSUR), vol. 55,
+                      no. 2, pp. 1–37, 2022.
+                 [19] S. Gurtler and I. Goldberg, “Sok: Privacy-preserving reputation systems,” Proceedings on Privacy
+                      Enhancing Technologies, 2021.
+                 [20] K. M. Tjørve and E. Tjørve, “The use of gompertz models in growth analyses, and new gompertz-
+                      model approach: An addition to the unified-richards family,” PloS one, vol. 12, no. 6, p. e0178691,
+                      2017.
+                 [21] D. Yaga, P. Mell, N. Roby, and K. Scarfone, “Blockchain technology overview,” arXiv preprint
+                      arXiv:1906.11078, 2019.
+                 [22] M. Correia, “From byzantine consensus to blockchain consensus,” in Essentials of Blockchain Tech-
+                      nology.  CRCPress, 2019, ch. 3.
+                 [23] A. Schaub, R. Bazin, O. Hasan, and L. Brunie, “A trustless privacy-preserving reputation system,”
+                      in IFIP International Conference on ICT Systems Security and Privacy Protection. Springer, 2016,
+                      pp. 398–411.
+                 [24] T. Dimitriou, “Visor: Privacy-preserving reputation for decentralized marketplaces,” in IFIP Annual
+                      Conference on Data and Applications Security and Privacy.      Springer, 2024, pp. 131–150.
+                 [25] E. Owiyo, Y. Wang, E. Asamoah, D. Kamenyi, and I. Obiri, “Decentralized privacy preserving
+                      reputation system,” in 2018 IEEE Third International Conference on Data Science in Cyberspace
+                      (DSC). IEEE, 2018, pp. 665–672.
+                 [26] D. Liu, A. Alahmadi, J. Ni, X. Lin, and X. Shen, “Anonymous reputation system for iiot-enabled
+                      retail marketing atop pos blockchain,” IEEE Transactions on Industrial Informatics, vol. 15, no. 6,
+                      pp. 3527–3537, 2019.
+                 [27] M. Larangeira, “Reputation at stake! a trust layer over decentralized ledger for multiparty compu-
+                      tation and reputation-fair lottery,” in International Conference on Information Security and Cryp-
+                      tology.  Springer, 2022, pp. 195–215.
+                                                                     25
