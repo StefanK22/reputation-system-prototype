@@ -6,14 +6,20 @@ Simple, runnable prototype of the reputation system with the architecture:
 - `Reputation Engine` (consumes contracts, computes reputation)
 - `Database` (in-memory read model)
 - `Web API` (HTTP endpoints for querying reputation and rules)
+- `External App Simulator` (React UI)
 
 ## Contracts consumed
 - `CompletedInteraction`
 - `Feedback`
 - `ReputationConfiguration`
 
-If the incoming contract payload structure changes, update only:
-- `src/contracts/schema.js` (`contractMappings` + normalizers)
+Single source of truth for contract structure:
+- `src/shared/contracts/registry.js`
+
+When payload structure changes, update the registry and both:
+- backend normalization/validation
+- React deployment forms
+will adapt automatically.
 
 ## Direct rating update model
 This prototype uses **actual ratings** (0-100) instead of deltas.
@@ -40,6 +46,7 @@ npm run demo
 ## Useful endpoints
 - `GET /health`
 - `GET /external-app` (frontend simulator for contract deployment)
+- `GET /schema/contracts` (shared schema used by UI and backend)
 - `GET /config`
 - `GET /config/all`
 - `GET /rankings?limit=10`
@@ -61,3 +68,5 @@ Open [http://localhost:8080/external-app](http://localhost:8080/external-app) to
 - deploy `CompletedInteraction` contracts
 - deploy `Feedback` contracts
 - inspect ledger events, active configuration, rankings, and request mock VCs
+
+The simulator is React-based and uses browser ESM imports (`esm.sh`) for `react` and `react-dom`.

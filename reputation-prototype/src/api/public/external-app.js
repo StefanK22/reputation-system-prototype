@@ -1,303 +1,435 @@
-const qs = (id) => document.getElementById(id);
+import React, { useEffect, useState } from 'https://esm.sh/react@18.2.0';
+import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+import htm from 'https://esm.sh/htm@3.1.1';
 
-const sampleConfig = {
-  operator: 'Operator',
-  configId: 'REAL_ESTATE_CONFIG',
-  version: 2,
-  activationTime: '2026-03-01T00:00:00Z',
-  systemParameters: {
-    reputationFloor: 0,
-    reputationCeiling: 100,
-    sensitivityK: 2,
-  },
-  components: [
-    {
-      componentId: 'Reliability',
-      description: 'Completes transactions successfully',
-      initialValue: 70,
-      minValue: 0,
-      maxValue: 100,
-    },
-    {
-      componentId: 'DocumentationAccuracy',
-      description: 'Correct and timely document handling',
-      initialValue: 70,
-      minValue: 0,
-      maxValue: 100,
-    },
-    {
-      componentId: 'Efficiency',
-      description: 'Speed of transaction completion',
-      initialValue: 70,
-      minValue: 0,
-      maxValue: 100,
-    },
-  ],
-  roleWeights: [
-    {
-      roleId: 'AGENT',
-      componentWeights: {
-        Reliability: 0.2,
-        DocumentationAccuracy: 0.4,
-        Efficiency: 0.4,
-      },
-    },
-    {
-      roleId: 'BUYER',
-      componentWeights: {
-        Reliability: 0.5,
-        DocumentationAccuracy: 0.25,
-        Efficiency: 0.25,
-      },
-    },
-  ],
-  interactionTypes: [
-    {
-      interactionTypeId: 'SELL',
-      description: 'Property sale workflow',
-      ratingRules: [
-        {
-          componentId: 'Reliability',
-          conditionField: 'closedSuccessfully',
-          conditionOperator: 'EQ',
-          conditionValue: 1,
-          assignedRating: 85,
-        },
-        {
-          componentId: 'Reliability',
-          conditionField: 'cancelled',
-          conditionOperator: 'EQ',
-          conditionValue: 1,
-          assignedRating: 50,
-        },
-        {
-          componentId: 'DocumentationAccuracy',
-          conditionField: 'documentRejections',
-          conditionOperator: 'GT',
-          conditionValue: 2,
-          assignedRating: 60,
-        },
-        {
-          componentId: 'DocumentationAccuracy',
-          conditionField: 'documentRejections',
-          conditionOperator: 'EQ',
-          conditionValue: 0,
-          assignedRating: 85,
-        },
-      ],
-    },
-  ],
-  partyRoles: {
-    AGENT_ALICE: 'AGENT',
-    BUYER_BOB: 'BUYER',
-    SELLER_CAROL: 'BUYER',
-  },
-  defaultRoleId: 'AGENT',
-};
+const html = htm.bind(React.createElement);
 
-const sampleInteraction = {
-  platform: 'Operator',
-  participants: ['AGENT_ALICE', 'BUYER_BOB'],
-  interactionType: 'SELL',
-  outcome: {
-    closedSuccessfully: 1,
-    cancelled: 0,
-    documentRejections: 0,
-  },
-  completedAt: new Date().toISOString(),
-  configVersion: 1,
-  evaluated: false,
-};
-
-const sampleFeedback = {
-  platform: 'Operator',
-  interactionId: 'sell_2026_004',
-  from: 'BUYER_BOB',
-  to: 'AGENT_ALICE',
-  componentRatings: {
-    Reliability: 90,
-    DocumentationAccuracy: 87,
-    Efficiency: 84,
-  },
-  submittedAt: new Date().toISOString(),
-  phase: 'FINAL',
-};
-
-function asPretty(value) {
+function pretty(value) {
   return JSON.stringify(value, null, 2);
 }
 
-function appendLog(message, payload = null) {
-  const stamp = new Date().toISOString();
-  const lines = [`[${stamp}] ${message}`];
-  if (payload != null) {
-    lines.push(asPretty(payload));
+function getByPath(source, path) {
+  const keys = path.split('.');
+  let current = source;
+
+  for (const key of keys) {
+    if (current == null || typeof current !== 'object') {
+      return undefined;
+    }
+    current = current[key];
   }
-  const existing = qs('logView').textContent.trim();
-  const next = `${lines.join('\n')}\n\n${existing}`.trim();
-  qs('logView').textContent = next;
+
+  return current;
 }
 
-function parseJsonFromTextarea(id) {
-  const raw = qs(id).value.trim();
-  if (!raw) {
-    throw new Error('Payload is empty.');
+function setByPath(target, path, value) {
+  const keys = path.split('.');
+  let cursor = target;
+
+  for (let i = 0; i < keys.length - 1; i += 1) {
+    const key = keys[i];
+    if (cursor[key] == null || typeof cursor[key] !== 'object' || Array.isArray(cursor[key])) {
+      cursor[key] = {};
+    }
+    cursor = cursor[key];
   }
-  return JSON.parse(raw);
+
+  cursor[keys[keys.length - 1]] = value;
+}
+
+function stringifyFieldValue(value, type) {
+  if (type === 'boolean') {
+    return Boolean(value);
+  }
+
+  if (value == null) {
+    if (type === 'object' || type === 'array' || type === 'numberMap') {
+      return '';
+    }
+    return '';
+  }
+
+  if (type === 'object' || type === 'array' || type === 'numberMap') {
+    return pretty(value);
+  }
+
+  return String(value);
+}
+
+function parseFieldValue(rawValue, type) {
+  if (type === 'boolean') {
+    return Boolean(rawValue);
+  }
+
+  const text = String(rawValue ?? '').trim();
+
+  if (type === 'number') {
+    if (!text) {
+      throw new Error('Expected number.');
+    }
+    const parsed = Number(text);
+    if (!Number.isFinite(parsed)) {
+      throw new Error('Expected valid number.');
+    }
+    return parsed;
+  }
+
+  if (type === 'object' || type === 'array' || type === 'numberMap') {
+    if (!text) {
+      throw new Error('Expected JSON value.');
+    }
+    const parsed = JSON.parse(text);
+
+    if (type === 'array' && !Array.isArray(parsed)) {
+      throw new Error('Expected JSON array.');
+    }
+
+    if (type === 'object' && (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed))) {
+      throw new Error('Expected JSON object.');
+    }
+
+    if (
+      type === 'numberMap' &&
+      (parsed == null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed) ||
+        !Object.values(parsed).every((item) => typeof item === 'number' && Number.isFinite(item)))
+    ) {
+      throw new Error('Expected object map with numeric values.');
+    }
+
+    return parsed;
+  }
+
+  return text;
 }
 
 async function requestJson(path, options = {}) {
   const response = await fetch(path, options);
-  const text = await response.text();
-  const body = text ? JSON.parse(text) : {};
+  const rawText = await response.text();
+  const body = rawText ? JSON.parse(rawText) : {};
+
   if (!response.ok) {
-    throw new Error(body.error || `HTTP ${response.status}`);
+    const detail = body.details ? ` (${body.details.join('; ')})` : '';
+    throw new Error((body.error || `HTTP ${response.status}`) + detail);
   }
+
   return body;
 }
 
-async function deployContract(templateId, payload) {
-  const autoProcess = qs('autoProcess').checked;
-  const endpoint = `/mock/contracts/${encodeURIComponent(templateId)}?autoProcess=${String(autoProcess)}`;
-  const result = await requestJson(endpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  appendLog(`Published ${templateId}`, result);
-  await refreshViews();
+function createInitialFieldState(definition) {
+  return Object.fromEntries(
+    definition.fields.map((field) => {
+      const fromSample = getByPath(definition.samplePayload, field.path);
+      const value = fromSample === undefined ? field.defaultValue : fromSample;
+      return [field.key, stringifyFieldValue(value, field.type)];
+    })
+  );
 }
 
-async function processNow() {
-  const result = await requestJson('/engine/process', { method: 'POST' });
-  appendLog('Processed engine manually', result);
-  await refreshViews();
-}
+function buildPayloadFromFields(definition, fieldState) {
+  const payload = {};
 
-async function refreshEvents() {
-  const events = await requestJson('/events');
-  qs('eventsView').textContent = asPretty(events);
-}
+  for (const field of definition.fields) {
+    const current = fieldState[field.key];
 
-async function refreshRankings() {
-  const rankings = await requestJson('/rankings?limit=20');
-  qs('rankingsView').textContent = asPretty(rankings);
-}
+    if (current === '' || current == null) {
+      if (field.defaultValue !== undefined) {
+        setByPath(payload, field.path, field.defaultValue);
+      }
+      continue;
+    }
 
-async function refreshConfig() {
-  const config = await requestJson('/config');
-  qs('configView').textContent = asPretty(config);
-}
-
-async function requestVc(event) {
-  event.preventDefault();
-  const party = qs('vcParty').value.trim();
-  if (!party) {
-    appendLog('VC request failed', { error: 'Party is required.' });
-    return;
+    const parsed = parseFieldValue(current, field.type);
+    setByPath(payload, field.path, parsed);
   }
 
-  const disclosed = qs('vcComponents')
-    .value.split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  const vc = await requestJson('/vc/request', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      party,
-      disclosedComponents: disclosed,
-    }),
-  });
-
-  qs('vcView').textContent = asPretty(vc);
-  appendLog(`Issued VC for ${party}`, vc);
+  return payload;
 }
 
-async function refreshViews() {
-  await Promise.all([refreshEvents(), refreshRankings(), refreshConfig()]);
+function ContractForm({ definition, autoProcess, onPublish, addLog }) {
+  const [fieldState, setFieldState] = useState(() => createInitialFieldState(definition));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setFieldState(createInitialFieldState(definition));
+  }, [definition]);
+
+  const handleLoadSample = () => {
+    setFieldState(createInitialFieldState(definition));
+  };
+
+  const handleChange = (key, value) => {
+    setFieldState((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      const payload = buildPayloadFromFields(definition, fieldState);
+      await onPublish(definition.templateId, payload, autoProcess);
+      addLog(`Published ${definition.templateId}`, payload);
+    } catch (error) {
+      addLog(`Failed to publish ${definition.templateId}`, { error: error.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return html`
+    <article className="panel">
+      <div className="panel-head">
+        <h2>Deploy <code>${definition.templateId}</code></h2>
+        <button className="ghost" onClick=${handleLoadSample}>Load Sample</button>
+      </div>
+
+      <div className="form-block">
+        ${definition.fields.map((field) => {
+          const value = fieldState[field.key];
+
+          if (field.type === 'boolean') {
+            return html`
+              <label key=${field.key} className="inline-field">
+                <span>${field.path}</span>
+                <input
+                  type="checkbox"
+                  checked=${Boolean(value)}
+                  onChange=${(event) => handleChange(field.key, event.target.checked)}
+                />
+              </label>
+            `;
+          }
+
+          const isStructured = field.type === 'object' || field.type === 'array' || field.type === 'numberMap';
+
+          return html`
+            <label key=${field.key}>${field.path} (${field.type})</label>
+            ${isStructured
+              ? html`
+                  <textarea
+                    rows=${6}
+                    value=${value}
+                    onChange=${(event) => handleChange(field.key, event.target.value)}
+                  />
+                `
+              : html`
+                  <input
+                    type=${field.type === 'number' ? 'number' : 'text'}
+                    value=${value}
+                    onChange=${(event) => handleChange(field.key, event.target.value)}
+                  />
+                `}
+          `;
+        })}
+      </div>
+
+      <button onClick=${handleSubmit} disabled=${isSubmitting}>
+        ${isSubmitting ? 'Deploying...' : 'Deploy Contract'}
+      </button>
+    </article>
+  `;
 }
 
-function wireButtons() {
-  qs('loadConfigSample').addEventListener('click', () => {
-    qs('configPayload').value = asPretty(sampleConfig);
-  });
+function App() {
+  const [schemaDefinitions, setSchemaDefinitions] = useState([]);
+  const [autoProcess, setAutoProcess] = useState(true);
+  const [events, setEvents] = useState([]);
+  const [rankings, setRankings] = useState([]);
+  const [activeConfig, setActiveConfig] = useState(null);
+  const [vcPayload, setVcPayload] = useState(null);
+  const [vcParty, setVcParty] = useState('AGENT_ALICE');
+  const [vcComponents, setVcComponents] = useState('');
+  const [logEntries, setLogEntries] = useState([]);
 
-  qs('loadInteractionSample').addEventListener('click', () => {
-    qs('interactionPayload').value = asPretty(sampleInteraction);
-  });
-
-  qs('loadFeedbackSample').addEventListener('click', () => {
-    qs('feedbackPayload').value = asPretty(sampleFeedback);
-  });
-
-  qs('deployConfig').addEventListener('click', async () => {
-    try {
-      await deployContract('ReputationConfiguration', parseJsonFromTextarea('configPayload'));
-    } catch (error) {
-      appendLog('Failed to deploy configuration', { error: error.message });
+  const addLog = (message, payload = null) => {
+    const stamp = new Date().toISOString();
+    const lines = [`[${stamp}] ${message}`];
+    if (payload != null) {
+      lines.push(pretty(payload));
     }
-  });
 
-  qs('deployInteraction').addEventListener('click', async () => {
-    try {
-      await deployContract('CompletedInteraction', parseJsonFromTextarea('interactionPayload'));
-    } catch (error) {
-      appendLog('Failed to deploy interaction', { error: error.message });
-    }
-  });
+    setLogEntries((prev) => [lines.join('\n'), ...prev].slice(0, 80));
+  };
 
-  qs('deployFeedback').addEventListener('click', async () => {
-    try {
-      await deployContract('Feedback', parseJsonFromTextarea('feedbackPayload'));
-    } catch (error) {
-      appendLog('Failed to deploy feedback', { error: error.message });
-    }
-  });
+  const refreshViews = async () => {
+    const [eventsData, rankingsData, configData] = await Promise.all([
+      requestJson('/events'),
+      requestJson('/rankings?limit=20'),
+      requestJson('/config'),
+    ]);
 
-  qs('processNow').addEventListener('click', async () => {
-    try {
-      await processNow();
-    } catch (error) {
-      appendLog('Manual process failed', { error: error.message });
-    }
-  });
+    setEvents(eventsData);
+    setRankings(rankingsData);
+    setActiveConfig(configData);
+  };
 
-  qs('refreshViews').addEventListener('click', async () => {
+  const loadSchema = async () => {
+    const definitions = await requestJson('/schema/contracts');
+    setSchemaDefinitions(definitions);
+  };
+
+  const publishContract = async (templateId, payload, shouldAutoProcess) => {
+    const endpoint = `/mock/contracts/${encodeURIComponent(templateId)}?autoProcess=${String(
+      shouldAutoProcess
+    )}`;
+
+    const result = await requestJson(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    addLog(`Ledger accepted ${templateId}`, result);
+    await refreshViews();
+  };
+
+  const handleManualProcess = async () => {
     try {
+      const result = await requestJson('/engine/process', { method: 'POST' });
+      addLog('Processed pending events', result);
       await refreshViews();
-      appendLog('Views refreshed');
     } catch (error) {
-      appendLog('Refresh failed', { error: error.message });
+      addLog('Manual process failed', { error: error.message });
     }
-  });
+  };
 
-  qs('refreshEvents').addEventListener('click', refreshEvents);
-  qs('refreshRankings').addEventListener('click', refreshRankings);
-  qs('refreshConfig').addEventListener('click', refreshConfig);
-  qs('vcForm').addEventListener('submit', async (event) => {
+  const handleVcRequest = async (event) => {
+    event.preventDefault();
+
     try {
-      await requestVc(event);
+      const disclosedComponents = vcComponents
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      const vc = await requestJson('/vc/request', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          party: vcParty,
+          disclosedComponents,
+        }),
+      });
+
+      setVcPayload(vc);
+      addLog(`Issued VC for ${vcParty}`, vc);
     } catch (error) {
-      appendLog('VC issuance failed', { error: error.message });
+      addLog('VC issuance failed', { error: error.message });
     }
-  });
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await loadSchema();
+        await refreshViews();
+        addLog('React simulator ready');
+      } catch (error) {
+        addLog('Initialization failed', { error: error.message });
+      }
+    })();
+  }, []);
+
+  return html`
+    <main className="page">
+      <header className="hero">
+        <p className="eyebrow">Reputation Prototype</p>
+        <h1>External App Simulator (React)</h1>
+        <p className="subtitle">
+          Forms are generated from a shared backend schema. Change the schema in one place and both
+          API parsing and simulator forms update.
+        </p>
+      </header>
+
+      <section className="panel controls">
+        <label className="inline-field">
+          <span>Auto-process in engine</span>
+          <input
+            type="checkbox"
+            checked=${autoProcess}
+            onChange=${(event) => setAutoProcess(event.target.checked)}
+          />
+        </label>
+        <button className="secondary" onClick=${handleManualProcess}>Process Pending Events</button>
+        <button
+          className="secondary"
+          onClick=${async () => {
+            try {
+              await refreshViews();
+              addLog('Views refreshed');
+            } catch (error) {
+              addLog('Refresh failed', { error: error.message });
+            }
+          }}
+        >
+          Refresh Views
+        </button>
+      </section>
+
+      <section className="grid two-col">
+        ${schemaDefinitions.map(
+          (definition) => html`
+            <${ContractForm}
+              key=${definition.templateId}
+              definition=${definition}
+              autoProcess=${autoProcess}
+              onPublish=${publishContract}
+              addLog=${addLog}
+            />
+          `
+        )}
+      </section>
+
+      <section className="grid two-col">
+        <article className="panel">
+          <div className="panel-head">
+            <h2>Ledger Events</h2>
+          </div>
+          <pre>${pretty(events)}</pre>
+        </article>
+
+        <article className="panel">
+          <div className="panel-head">
+            <h2>Rankings</h2>
+          </div>
+          <pre>${pretty(rankings)}</pre>
+        </article>
+      </section>
+
+      <section className="grid two-col">
+        <article className="panel">
+          <div className="panel-head">
+            <h2>Active Configuration</h2>
+          </div>
+          <pre>${pretty(activeConfig)}</pre>
+        </article>
+
+        <article className="panel">
+          <div className="panel-head">
+            <h2>Request Mock VC</h2>
+          </div>
+          <form className="form-block" onSubmit=${handleVcRequest}>
+            <label>Party</label>
+            <input type="text" value=${vcParty} onChange=${(event) => setVcParty(event.target.value)} />
+            <label>Disclosed components (comma separated)</label>
+            <input
+              type="text"
+              value=${vcComponents}
+              onChange=${(event) => setVcComponents(event.target.value)}
+              placeholder="Reliability,Efficiency"
+            />
+            <button className="secondary" type="submit">Issue VC</button>
+          </form>
+          <pre>${pretty(vcPayload)}</pre>
+        </article>
+      </section>
+
+      <section className="panel">
+        <h2>Operation Log</h2>
+        <pre>${logEntries.join('\n\n')}</pre>
+      </section>
+    </main>
+  `;
 }
 
-function initPayloads() {
-  qs('configPayload').value = asPretty(sampleConfig);
-  qs('interactionPayload').value = asPretty(sampleInteraction);
-  qs('feedbackPayload').value = asPretty(sampleFeedback);
-}
-
-async function init() {
-  initPayloads();
-  wireButtons();
-  await refreshViews();
-  appendLog('External app simulator ready');
-}
-
-init().catch((error) => {
-  appendLog('Initialization failed', { error: error.message });
-});
+createRoot(document.getElementById('root')).render(html`<${App} />`);

@@ -8,106 +8,125 @@ import {
   asString,
   getByPath,
 } from '../lib/objectPath.js';
+import { getContractDefinition, TEMPLATE_IDS } from '../shared/contracts/registry.js';
 
-// Single place to change incoming contract shape mappings.
-export const contractMappings = {
-  completedInteraction: {
-    platform: 'platform',
-    participants: 'participants',
-    interactionType: 'interactionType',
-    outcome: 'outcome',
-    completedAt: 'completedAt',
-    configVersion: 'configVersion',
-    evaluated: 'evaluated',
-  },
-  feedback: {
-    platform: 'platform',
-    interactionId: 'interactionId',
-    from: 'from',
-    to: 'to',
-    componentRatings: 'componentRatings',
-    submittedAt: 'submittedAt',
-    phase: 'phase',
-  },
-  reputationConfiguration: {
-    operator: 'operator',
-    configId: 'configId',
-    version: 'version',
-    activationTime: 'activationTime',
-    systemParameters: 'systemParameters',
-    components: 'components',
-    roleWeights: 'roleWeights',
-    interactionTypes: 'interactionTypes',
-    interactionTypesFallback: 'iinteractionTypes',
-    partyRoles: 'partyRoles',
-    defaultRoleId: 'defaultRoleId',
-  },
-};
+function cloneDefaultValue(value) {
+  if (value == null || typeof value !== 'object') {
+    return value;
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readRawFieldValue(payload, fieldDef) {
+  const candidatePaths = [fieldDef.path, ...(fieldDef.aliases || [])];
+
+  for (const candidatePath of candidatePaths) {
+    const value = getByPath(payload, candidatePath);
+    if (value !== undefined) {
+      return value;
+    }
+  }
+
+  return cloneDefaultValue(fieldDef.defaultValue);
+}
+
+function coerceFieldValue(value, fieldDef) {
+  const defaultValue = cloneDefaultValue(fieldDef.defaultValue);
+
+  switch (fieldDef.type) {
+    case 'string':
+      return asString(value, asString(defaultValue, ''));
+    case 'number':
+      return asNumber(value, asNumber(defaultValue, 0));
+    case 'boolean':
+      return asBoolean(value, asBoolean(defaultValue, false));
+    case 'isoDate':
+      return asIsoString(value, new Date().toISOString());
+    case 'array':
+      return asArray(value);
+    case 'object':
+      return asObject(value);
+    case 'numberMap':
+      return asNumberMap(value);
+    default:
+      return value ?? defaultValue;
+  }
+}
+
+function extractContractValues(templateId, payload) {
+  const definition = getContractDefinition(templateId);
+  if (!definition) {
+    throw new Error(`Unknown contract template: ${templateId}`);
+  }
+
+  const values = {};
+  for (const fieldDef of definition.fields) {
+    const raw = readRawFieldValue(payload, fieldDef);
+    values[fieldDef.key] = coerceFieldValue(raw, fieldDef);
+  }
+
+  return values;
+}
 
 export function normalizeCompletedInteraction(payload) {
-  const mapping = contractMappings.completedInteraction;
+  const values = extractContractValues(TEMPLATE_IDS.COMPLETED_INTERACTION, payload);
+
   return {
-    platform: asString(getByPath(payload, mapping.platform), 'UNKNOWN_PLATFORM'),
-    participants: asArray(getByPath(payload, mapping.participants)).map(String),
-    interactionType: asString(getByPath(payload, mapping.interactionType), 'UNKNOWN_INTERACTION'),
-    outcome: asObject(getByPath(payload, mapping.outcome)),
-    completedAt: asIsoString(getByPath(payload, mapping.completedAt), new Date().toISOString()),
-    configVersion: asNumber(getByPath(payload, mapping.configVersion), 1),
-    evaluated: asBoolean(getByPath(payload, mapping.evaluated), false),
+    platform: values.platform || 'UNKNOWN_PLATFORM',
+    participants: asArray(values.participants).map(String),
+    interactionType: values.interactionType || 'UNKNOWN_INTERACTION',
+    outcome: asObject(values.outcome),
+    completedAt: values.completedAt,
+    configVersion: values.configVersion || 1,
+    evaluated: Boolean(values.evaluated),
   };
 }
 
 export function normalizeFeedback(payload) {
-  const mapping = contractMappings.feedback;
+  const values = extractContractValues(TEMPLATE_IDS.FEEDBACK, payload);
+
   return {
-    platform: asString(getByPath(payload, mapping.platform), 'UNKNOWN_PLATFORM'),
-    interactionId: asString(getByPath(payload, mapping.interactionId), 'unknown_interaction'),
-    from: asString(getByPath(payload, mapping.from), 'UNKNOWN_PARTY'),
-    to: asString(getByPath(payload, mapping.to), 'UNKNOWN_PARTY'),
-    componentRatings: asNumberMap(getByPath(payload, mapping.componentRatings)),
-    submittedAt: asIsoString(getByPath(payload, mapping.submittedAt), new Date().toISOString()),
-    phase: asString(getByPath(payload, mapping.phase), 'FINAL'),
+    platform: values.platform || 'UNKNOWN_PLATFORM',
+    interactionId: values.interactionId || 'unknown_interaction',
+    from: values.from || 'UNKNOWN_PARTY',
+    to: values.to || 'UNKNOWN_PARTY',
+    componentRatings: asNumberMap(values.componentRatings),
+    submittedAt: values.submittedAt,
+    phase: values.phase || 'FINAL',
   };
 }
 
 export function normalizeReputationConfiguration(payload) {
-  const mapping = contractMappings.reputationConfiguration;
-
-  const interactionTypesRaw =
-    getByPath(payload, mapping.interactionTypes) ??
-    getByPath(payload, mapping.interactionTypesFallback) ??
-    [];
-
-  const systemParametersRaw = asObject(getByPath(payload, mapping.systemParameters));
+  const values = extractContractValues(TEMPLATE_IDS.REPUTATION_CONFIGURATION, payload);
+  const systemParametersRaw = asObject(values.systemParameters);
+  const systemParameters = {
+    ...systemParametersRaw,
+    reputationFloor: asNumber(systemParametersRaw.reputationFloor, 0),
+    reputationCeiling: asNumber(systemParametersRaw.reputationCeiling, 100),
+  };
 
   return {
-    operator: asString(getByPath(payload, mapping.operator), 'Operator'),
-    configId: asString(getByPath(payload, mapping.configId), 'DEFAULT_CONFIG'),
-    version: asNumber(getByPath(payload, mapping.version), 1),
-    activationTime: asIsoString(getByPath(payload, mapping.activationTime), new Date().toISOString()),
-    systemParameters: {
-      reputationFloor: asNumber(systemParametersRaw.reputationFloor, 0),
-      reputationCeiling: asNumber(systemParametersRaw.reputationCeiling, 100),
-      sensitivityK: asNumber(systemParametersRaw.sensitivityK, 2),
-    },
-    components: asArray(getByPath(payload, mapping.components)).map((item) => {
+    operator: values.operator || 'Operator',
+    configId: values.configId || 'DEFAULT_CONFIG',
+    version: values.version || 1,
+    activationTime: values.activationTime,
+    systemParameters,
+    components: asArray(values.components).map((item) => {
       const obj = asObject(item);
       return {
         componentId: asString(obj.componentId),
         description: asString(obj.description),
         initialValue: asNumber(obj.initialValue, 70),
-        minValue: asNumber(obj.minValue, 0),
-        maxValue: asNumber(obj.maxValue, 100),
       };
     }),
-    roleWeights: asArray(getByPath(payload, mapping.roleWeights)).map((item) => {
+    roleWeights: asArray(values.roleWeights).map((item) => {
       const obj = asObject(item);
       return {
         roleId: asString(obj.roleId),
         componentWeights: asNumberMap(obj.componentWeights),
       };
     }),
-    interactionTypes: asArray(interactionTypesRaw).map((item) => {
+    interactionTypes: asArray(values.interactionTypes).map((item) => {
       const obj = asObject(item);
       return {
         interactionTypeId: asString(obj.interactionTypeId),
@@ -125,11 +144,8 @@ export function normalizeReputationConfiguration(payload) {
       };
     }),
     partyRoles: Object.fromEntries(
-      Object.entries(asObject(getByPath(payload, mapping.partyRoles))).map(([party, roleId]) => [
-        String(party),
-        String(roleId),
-      ])
+      Object.entries(asObject(values.partyRoles)).map(([party, roleId]) => [String(party), String(roleId)])
     ),
-    defaultRoleId: asString(getByPath(payload, mapping.defaultRoleId), ''),
+    defaultRoleId: asString(values.defaultRoleId, ''),
   };
 }

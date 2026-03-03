@@ -12,6 +12,16 @@ export class InMemoryReadModelStore {
     );
     if (!exists) {
       this.configurations.push(configuration);
+      this.subjects.forEach((subject) => {
+        if (subject.configVersion !== configuration.version) {
+          configuration.components.forEach((component) => {
+            this.addComponentToSubject(subject.party, component.componentId, configuration);
+          });
+          subject.configVersion = configuration.version;
+          this.recomputeOverallScore(subject, configuration); 
+          this.saveSubject(subject);
+        }
+      });
     }
   }
 
@@ -28,8 +38,10 @@ export class InMemoryReadModelStore {
     return this.configurations.find((cfg) => cfg.version === version);
   }
 
-  getActiveConfiguration(atIso = new Date().toISOString()) {
-    const atMillis = Date.parse(atIso);
+  getActiveConfiguration(atIso = new Date().toISOString(), options = {}) {
+    const fallback = options.fallback ?? 'upcoming';
+    const parsedAt = Date.parse(atIso);
+    const atMillis = Number.isNaN(parsedAt) ? Date.now() : parsedAt;
 
     const active = this.configurations
       .filter((cfg) => Date.parse(cfg.activationTime) <= atMillis)
@@ -41,7 +53,33 @@ export class InMemoryReadModelStore {
         return b.version - a.version;
       });
 
-    return active[0];
+    if (active.length > 0) {
+      return active[0];
+    }
+
+    if (fallback === 'none') {
+      return undefined;
+    }
+
+    if (fallback === 'latest') {
+      return this.getAllConfigurations()[0];
+    }
+
+    const upcoming = this.configurations
+      .filter((cfg) => Date.parse(cfg.activationTime) > atMillis)
+      .sort((a, b) => {
+        const timeDiff = Date.parse(a.activationTime) - Date.parse(b.activationTime);
+        if (timeDiff !== 0) {
+          return timeDiff;
+        }
+        return b.version - a.version;
+      });
+
+    if (upcoming.length > 0) {
+      return upcoming[0];
+    }
+
+    return this.getAllConfigurations()[0];
   }
 
   getSubject(party) {
@@ -59,8 +97,6 @@ export class InMemoryReadModelStore {
             componentId: component.componentId,
             description: component.description,
             value: component.initialValue,
-            minValue: component.minValue,
-            maxValue: component.maxValue,
             interactionCount: 0,
             history: [],
           },
@@ -80,23 +116,25 @@ export class InMemoryReadModelStore {
       return created;
     }
 
-    for (const component of configuration.components) {
-      if (!existing.components[component.componentId]) {
-        existing.components[component.componentId] = {
-          componentId: component.componentId,
-          description: component.description,
-          value: component.initialValue,
-          minValue: component.minValue,
-          maxValue: component.maxValue,
-          interactionCount: 0,
-          history: [],
-        };
-      }
-    }
-
     existing.roleId = roleId;
     existing.configVersion = configuration.version;
     return existing;
+  }
+
+  addComponentToSubject(party, componentId, configuration) {
+    const subject = this.subjects.get(party);
+    const component = configuration.components.find(c => c.componentId === componentId);
+    if (!subject.components[componentId]){
+      console.log(`Adding component ${componentId} to subject ${party}`);
+      subject.components[componentId] = {
+        componentId: componentId,
+        description: component.description,
+        value: component.initialValue,
+        interactionCount: 0,
+        history: [], 
+      }
+    }
+
   }
 
   saveSubject(subject) {
@@ -116,6 +154,10 @@ export class InMemoryReadModelStore {
         party: subject.party,
         roleId: subject.roleId,
         overallScore: subject.overallScore,
+        components: Object.values(subject.components).map(c => ({
+          componentId: c.componentId,
+          value: c.value
+        }))
       }));
   }
 

@@ -1,4 +1,4 @@
-import { TEMPLATE_IDS } from '../contracts/templateIds.js';
+import { TEMPLATE_IDS } from '../shared/contracts/registry.js';
 import {
   normalizeCompletedInteraction,
   normalizeFeedback,
@@ -51,7 +51,7 @@ export class ReputationEngine {
 
             const configuration =
               this.store.getConfigurationByVersion(interaction.configVersion) ||
-              this.store.getActiveConfiguration(event.createdAt);
+              this.store.getActiveConfiguration(event.createdAt, { fallback: 'none' });
 
             if (!configuration) {
               stats.warnings.push(`No active config for interaction event at offset ${event.offset}`);
@@ -79,7 +79,8 @@ export class ReputationEngine {
           case TEMPLATE_IDS.FEEDBACK: {
             const feedback = normalizeFeedback(event.payload);
             const configuration =
-              this.store.getActiveConfiguration(event.createdAt) || this.store.getConfigurationByVersion(1);
+              this.store.getActiveConfiguration(event.createdAt, { fallback: 'none' }) ||
+              this.store.getConfigurationByVersion(1);
 
             if (!configuration) {
               stats.warnings.push(`No active config for feedback event at offset ${event.offset}`);
@@ -114,10 +115,8 @@ export class ReputationEngine {
   applyRatingsToParty({ party, ratings, configuration, reason, sourceId, from = '' }) {
     const roleId = this.resolveRoleForParty(party, configuration);
     const subject = this.store.getOrCreateSubject(party, roleId, configuration);
-
     const floor = configuration.systemParameters.reputationFloor;
     const ceiling = configuration.systemParameters.reputationCeiling;
-    const k = Number(configuration.systemParameters.sensitivityK ?? 2);
 
     let applied = 0;
 
@@ -133,12 +132,9 @@ export class ReputationEngine {
       }
 
       const currentValue = Number(component.value);
-      const step = 1 / (component.interactionCount + 1);
+      const step = 1 / (component.interactionCount + 2); // Takes initial value into account
       const rawNext = currentValue + step * (rating - currentValue);
-
-      const boundedByComponent = clamp(rawNext, component.minValue, component.maxValue);
-      const boundedBySystem = clamp(boundedByComponent, floor, ceiling);
-      const nextValue = round2(boundedBySystem);
+      const nextValue = round2(clamp(rawNext, floor, ceiling));
 
       component.value = nextValue;
       component.interactionCount += 1;

@@ -2,7 +2,9 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { URL, fileURLToPath } from 'node:url';
+import { validateContractPayload } from '../contracts/validation.js';
 import { issueReputationCredential } from '../engine/credentialIssuer.js';
+import { listContractDefinitions } from '../shared/contracts/registry.js';
 
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
@@ -75,16 +77,16 @@ export function createApiServer({ ledger, store, engine }) {
       }
 
       const url = new URL(req.url, 'http://localhost');
-      const path = url.pathname;
+      const pathname = url.pathname;
 
       if (req.method === 'GET') {
-        const served = await tryServeStatic(path, res);
+        const served = await tryServeStatic(pathname, res);
         if (served) {
           return;
         }
       }
 
-      if (req.method === 'GET' && path === '/health') {
+      if (req.method === 'GET' && pathname === '/health') {
         sendJson(res, 200, {
           status: 'ok',
           ledgerEnd: ledger.ledgerEnd(),
@@ -93,7 +95,12 @@ export function createApiServer({ ledger, store, engine }) {
         return;
       }
 
-      if (req.method === 'GET' && path === '/config') {
+      if (req.method === 'GET' && pathname === '/schema/contracts') {
+        sendJson(res, 200, listContractDefinitions());
+        return;
+      }
+
+      if (req.method === 'GET' && pathname === '/config') {
         const at = url.searchParams.get('at') || new Date().toISOString();
         const activeConfig = store.getActiveConfiguration(at);
         if (!activeConfig) {
@@ -104,19 +111,19 @@ export function createApiServer({ ledger, store, engine }) {
         return;
       }
 
-      if (req.method === 'GET' && path === '/config/all') {
+      if (req.method === 'GET' && pathname === '/config/all') {
         sendJson(res, 200, store.getAllConfigurations());
         return;
       }
 
-      if (req.method === 'GET' && path === '/rankings') {
+      if (req.method === 'GET' && pathname === '/rankings') {
         const limit = Number(url.searchParams.get('limit') || 10);
         sendJson(res, 200, store.getRankings(limit));
         return;
       }
 
-      if (req.method === 'GET' && path.startsWith('/reputation/')) {
-        const party = decodeURIComponent(path.replace('/reputation/', ''));
+      if (req.method === 'GET' && pathname.startsWith('/reputation/')) {
+        const party = decodeURIComponent(pathname.replace('/reputation/', ''));
         const subject = store.getSubject(party);
         if (!subject) {
           sendJson(res, 404, { error: `No reputation found for ${party}` });
@@ -126,19 +133,19 @@ export function createApiServer({ ledger, store, engine }) {
         return;
       }
 
-      if (req.method === 'GET' && path === '/events') {
+      if (req.method === 'GET' && pathname === '/events') {
         const from = Number(url.searchParams.get('from') || 0);
         sendJson(res, 200, ledger.streamFrom(from));
         return;
       }
 
-      if (req.method === 'POST' && path === '/engine/process') {
+      if (req.method === 'POST' && pathname === '/engine/process') {
         const result = engine.processNewEvents();
         sendJson(res, 200, result);
         return;
       }
 
-      if (req.method === 'POST' && path === '/vc/request') {
+      if (req.method === 'POST' && pathname === '/vc/request') {
         const body = await readJsonBody(req);
         const party = String(body.party || '');
         if (!party) {
@@ -172,9 +179,18 @@ export function createApiServer({ ledger, store, engine }) {
         return;
       }
 
-      if (req.method === 'POST' && path.startsWith('/mock/contracts/')) {
-        const templateId = decodeURIComponent(path.replace('/mock/contracts/', ''));
+      if (req.method === 'POST' && pathname.startsWith('/mock/contracts/')) {
+        const templateId = decodeURIComponent(pathname.replace('/mock/contracts/', ''));
         const body = await readJsonBody(req);
+        const validation = validateContractPayload(templateId, body);
+        if (!validation.ok) {
+          sendJson(res, 400, {
+            error: 'Payload validation failed',
+            details: validation.errors,
+          });
+          return;
+        }
+
         const event = ledger.publish(templateId, body);
         const autoProcess = url.searchParams.get('autoProcess') !== 'false';
         const processResult = autoProcess ? engine.processNewEvents() : null;

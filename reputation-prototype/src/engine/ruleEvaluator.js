@@ -21,6 +21,5 @@ export function evaluateInteractionRatings(interaction, configuration) {
       ratings[rule.componentId] = rule.assignedRating;
     }
   }
-
   return ratings;
 }
