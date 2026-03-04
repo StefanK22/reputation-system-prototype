@@ -18,31 +18,51 @@ function sendText(res, statusCode, payload, contentType = 'text/plain; charset=u
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const publicDir = path.join(__dirname, 'public');
-
-const staticFileMap = new Map([
-  ['/', 'external-app.html'],
-  ['/external-app', 'external-app.html'],
-  ['/external-app/', 'external-app.html'],
-  ['/external-app.css', 'external-app.css'],
-  ['/external-app.js', 'external-app.js'],
-]);
+const publicDir = path.resolve(__dirname, 'public');
+const appEntryRoutes = new Set(['/', '/external-app', '/external-app/']);
 
 const staticContentType = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
 };
+const staticExtensions = new Set(Object.keys(staticContentType));
+
+function resolveStaticFileName(pathname) {
+  if (appEntryRoutes.has(pathname)) {
+    return 'external-app.html';
+  }
+
+  const normalized = path.posix.normalize(pathname);
+  if (!normalized.startsWith('/') || normalized.includes('..')) {
+    return null;
+  }
+
+  const fileName = normalized.slice(1);
+  if (!fileName) {
+    return null;
+  }
+
+  const ext = path.extname(fileName);
+  if (!staticExtensions.has(ext)) {
+    return null;
+  }
+
+  return fileName;
+}
 
 async function tryServeStatic(pathname, res) {
-  const fileName = staticFileMap.get(pathname);
+  const fileName = resolveStaticFileName(pathname);
   if (!fileName) {
     return false;
   }
 
   const ext = path.extname(fileName);
   const contentType = staticContentType[ext] || 'application/octet-stream';
-  const filePath = path.join(publicDir, fileName);
+  const filePath = path.resolve(publicDir, fileName);
+  if (!filePath.startsWith(`${publicDir}${path.sep}`)) {
+    return false;
+  }
 
   try {
     const content = await fs.readFile(filePath, 'utf8');

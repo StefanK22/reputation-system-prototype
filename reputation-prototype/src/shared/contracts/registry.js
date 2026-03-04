@@ -1,6 +1,34 @@
+import { CONTRACT_DEFAULTS, TEMPLATE_IDS, TEMPLATE_TITLES } from './constants.js';
+
+function defineField({ key, path = key, type, required = true, defaultValue, aliases }) {
+  return {
+    key,
+    path,
+    type,
+    required,
+    ...(aliases ? { aliases } : {}),
+    ...(defaultValue !== undefined ? { defaultValue } : {}),
+  };
+}
+
+const field = {
+  string: (key, options = {}) => defineField({ key, type: 'string', ...options }),
+  number: (key, options = {}) => defineField({ key, type: 'number', ...options }),
+  boolean: (key, options = {}) => defineField({ key, type: 'boolean', ...options }),
+  isoDate: (key, options = {}) => defineField({ key, type: 'isoDate', ...options }),
+  array: (key, options = {}) => defineField({ key, type: 'array', ...options }),
+  object: (key, options = {}) => defineField({ key, type: 'object', ...options }),
+  numberMap: (key, options = {}) => defineField({ key, type: 'numberMap', ...options }),
+};
+
+const operatorField = (key) =>
+  field.string(key, {
+    defaultValue: CONTRACT_DEFAULTS.OPERATOR,
+  });
+
 const reputationConfigurationSample = {
-  operator: 'Operator',
-  configId: 'REAL_ESTATE_CONFIG',
+  operator: CONTRACT_DEFAULTS.OPERATOR,
+  configId: CONTRACT_DEFAULTS.CONFIG_ID,
   version: 1,
   activationTime: '2026-03-01T00:00:00Z',
   systemParameters: {
@@ -83,11 +111,11 @@ const reputationConfigurationSample = {
     BUYER_BOB: 'BUYER',
     SELLER_CAROL: 'BUYER',
   },
-  defaultRoleId: 'AGENT',
+  defaultRoleId: CONTRACT_DEFAULTS.DEFAULT_ROLE_ID,
 };
 
 const completedInteractionSample = {
-  platform: 'Operator',
+  platform: CONTRACT_DEFAULTS.OPERATOR,
   participants: ['AGENT_ALICE', 'BUYER_BOB'],
   interactionType: 'SELL',
   outcome: {
@@ -101,7 +129,7 @@ const completedInteractionSample = {
 };
 
 const feedbackSample = {
-  platform: 'Operator',
+  platform: CONTRACT_DEFAULTS.OPERATOR,
   interactionId: 'sell_001',
   from: 'BUYER_BOB',
   to: 'AGENT_ALICE',
@@ -111,189 +139,52 @@ const feedbackSample = {
     Efficiency: 84,
   },
   submittedAt: '2026-02-27T11:00:00Z',
-  phase: 'FINAL',
+  phase: CONTRACT_DEFAULTS.INTERACTION_PHASE,
 };
-
-export const TEMPLATE_IDS = Object.freeze({
-  REPUTATION_CONFIGURATION: 'ReputationConfiguration',
-  COMPLETED_INTERACTION: 'CompletedInteraction',
-  FEEDBACK: 'Feedback',
-});
 
 export const CONTRACT_REGISTRY = Object.freeze({
   [TEMPLATE_IDS.REPUTATION_CONFIGURATION]: {
     templateId: TEMPLATE_IDS.REPUTATION_CONFIGURATION,
-    title: 'Reputation Configuration',
+    title: TEMPLATE_TITLES[TEMPLATE_IDS.REPUTATION_CONFIGURATION],
     fields: [
-      {
-        key: 'operator',
-        path: 'operator',
-        type: 'string',
-        required: true,
-        defaultValue: 'Operator',
-      },
-      {
-        key: 'configId',
-        path: 'configId',
-        type: 'string',
-        required: true,
-        defaultValue: 'REAL_ESTATE_CONFIG',
-      },
-      {
-        key: 'version',
-        path: 'version',
-        type: 'number',
-        required: true,
-        defaultValue: 1,
-      },
-      {
-        key: 'activationTime',
-        path: 'activationTime',
-        type: 'isoDate',
-        required: true,
-      },
-      {
-        key: 'systemParameters',
-        path: 'systemParameters',
-        type: 'object',
-        required: true,
-      },
-      {
-        key: 'components',
-        path: 'components',
-        type: 'array',
-        required: true,
-      },
-      {
-        key: 'roleWeights',
-        path: 'roleWeights',
-        type: 'array',
-        required: true,
-      },
-      {
-        key: 'interactionTypes',
-        path: 'interactionTypes',
-        aliases: ['iinteractionTypes'],
-        type: 'array',
-        required: true,
-      },
-      {
-        key: 'partyRoles',
-        path: 'partyRoles',
-        type: 'object',
-        required: false,
-        defaultValue: {},
-      },
-      {
-        key: 'defaultRoleId',
-        path: 'defaultRoleId',
-        type: 'string',
-        required: false,
-        defaultValue: 'AGENT',
-      },
+      operatorField('operator'),
+      field.string('configId', { defaultValue: CONTRACT_DEFAULTS.CONFIG_ID }),
+      field.number('version', { defaultValue: 1 }),
+      field.isoDate('activationTime'),
+      field.object('systemParameters'),
+      field.array('components'),
+      field.array('roleWeights'),
+      field.array('interactionTypes', { aliases: ['iinteractionTypes'] }),
+      field.object('partyRoles', { required: false, defaultValue: {} }),
+      field.string('defaultRoleId', { required: false, defaultValue: CONTRACT_DEFAULTS.DEFAULT_ROLE_ID }),
     ],
     samplePayload: reputationConfigurationSample,
   },
   [TEMPLATE_IDS.COMPLETED_INTERACTION]: {
     templateId: TEMPLATE_IDS.COMPLETED_INTERACTION,
-    title: 'Completed Interaction',
+    title: TEMPLATE_TITLES[TEMPLATE_IDS.COMPLETED_INTERACTION],
     fields: [
-      {
-        key: 'platform',
-        path: 'platform',
-        type: 'string',
-        required: true,
-        defaultValue: 'Operator',
-      },
-      {
-        key: 'participants',
-        path: 'participants',
-        type: 'array',
-        required: true,
-      },
-      {
-        key: 'interactionType',
-        path: 'interactionType',
-        type: 'string',
-        required: true,
-      },
-      {
-        key: 'outcome',
-        path: 'outcome',
-        type: 'object',
-        required: true,
-      },
-      {
-        key: 'completedAt',
-        path: 'completedAt',
-        type: 'isoDate',
-        required: true,
-      },
-      {
-        key: 'configVersion',
-        path: 'configVersion',
-        type: 'number',
-        required: true,
-        defaultValue: 1,
-      },
-      {
-        key: 'evaluated',
-        path: 'evaluated',
-        type: 'boolean',
-        required: true,
-        defaultValue: false,
-      },
+      operatorField('platform'),
+      field.array('participants'),
+      field.string('interactionType'),
+      field.object('outcome'),
+      field.isoDate('completedAt'),
+      field.number('configVersion', { defaultValue: 1 }),
+      field.boolean('evaluated', { defaultValue: false }),
     ],
     samplePayload: completedInteractionSample,
   },
   [TEMPLATE_IDS.FEEDBACK]: {
     templateId: TEMPLATE_IDS.FEEDBACK,
-    title: 'Feedback',
+    title: TEMPLATE_TITLES[TEMPLATE_IDS.FEEDBACK],
     fields: [
-      {
-        key: 'platform',
-        path: 'platform',
-        type: 'string',
-        required: true,
-        defaultValue: 'Operator',
-      },
-      {
-        key: 'interactionId',
-        path: 'interactionId',
-        type: 'string',
-        required: true,
-      },
-      {
-        key: 'from',
-        path: 'from',
-        type: 'string',
-        required: true,
-      },
-      {
-        key: 'to',
-        path: 'to',
-        type: 'string',
-        required: true,
-      },
-      {
-        key: 'componentRatings',
-        path: 'componentRatings',
-        type: 'numberMap',
-        required: true,
-      },
-      {
-        key: 'submittedAt',
-        path: 'submittedAt',
-        type: 'isoDate',
-        required: true,
-      },
-      {
-        key: 'phase',
-        path: 'phase',
-        type: 'string',
-        required: true,
-        defaultValue: 'FINAL',
-      },
+      operatorField('platform'),
+      field.string('interactionId'),
+      field.string('from'),
+      field.string('to'),
+      field.numberMap('componentRatings'),
+      field.isoDate('submittedAt'),
+      field.string('phase', { defaultValue: CONTRACT_DEFAULTS.INTERACTION_PHASE }),
     ],
     samplePayload: feedbackSample,
   },
@@ -315,3 +206,5 @@ export function cloneContractSample(templateId) {
 
   return JSON.parse(JSON.stringify(definition.samplePayload));
 }
+
+export { TEMPLATE_IDS, TEMPLATE_TITLES, CONTRACT_DEFAULTS };

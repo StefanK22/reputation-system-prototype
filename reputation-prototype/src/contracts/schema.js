@@ -6,32 +6,13 @@ import {
   asNumberMap,
   asObject,
   asString,
-  getByPath,
 } from '../lib/objectPath.js';
-import { getContractDefinition, TEMPLATE_IDS } from '../shared/contracts/registry.js';
-
-function cloneDefaultValue(value) {
-  if (value == null || typeof value !== 'object') {
-    return value;
-  }
-  return JSON.parse(JSON.stringify(value));
-}
-
-function readRawFieldValue(payload, fieldDef) {
-  const candidatePaths = [fieldDef.path, ...(fieldDef.aliases || [])];
-
-  for (const candidatePath of candidatePaths) {
-    const value = getByPath(payload, candidatePath);
-    if (value !== undefined) {
-      return value;
-    }
-  }
-
-  return cloneDefaultValue(fieldDef.defaultValue);
-}
+import { TEMPLATE_IDS } from '../shared/contracts/constants.js';
+import { getContractDefinition } from '../shared/contracts/registry.js';
+import { cloneJsonValue, readFirstFieldValue } from '../shared/contracts/fieldAccess.js';
 
 function coerceFieldValue(value, fieldDef) {
-  const defaultValue = cloneDefaultValue(fieldDef.defaultValue);
+  const defaultValue = cloneJsonValue(fieldDef.defaultValue);
 
   switch (fieldDef.type) {
     case 'string':
@@ -61,7 +42,8 @@ function extractContractValues(templateId, payload) {
 
   const values = {};
   for (const fieldDef of definition.fields) {
-    const raw = readRawFieldValue(payload, fieldDef);
+    const { found, value } = readFirstFieldValue(payload, fieldDef);
+    const raw = found ? value : cloneJsonValue(fieldDef.defaultValue);
     values[fieldDef.key] = coerceFieldValue(raw, fieldDef);
   }
 

@@ -1,25 +1,5 @@
-import { getByPath } from '../lib/objectPath.js';
 import { getContractDefinition } from '../shared/contracts/registry.js';
-
-function readField(payload, fieldDef) {
-  const candidatePaths = [fieldDef.path, ...(fieldDef.aliases || [])];
-  for (const candidatePath of candidatePaths) {
-    const value = getByPath(payload, candidatePath);
-    if (value !== undefined) {
-      return { found: true, value };
-    }
-  }
-  return { found: false, value: undefined };
-}
-
-function isIsoDate(value) {
-  if (typeof value !== 'string') {
-    return false;
-  }
-
-  const date = new Date(value);
-  return !Number.isNaN(date.getTime());
-}
+import { readFirstFieldValue } from '../shared/contracts/fieldAccess.js';
 
 function matchesType(value, type) {
   switch (type) {
@@ -30,7 +10,10 @@ function matchesType(value, type) {
     case 'boolean':
       return typeof value === 'boolean';
     case 'isoDate':
-      return isIsoDate(value);
+      if (typeof value !== 'string') {
+        return false;
+      }
+      return !Number.isNaN(new Date(value).getTime());
     case 'array':
       return Array.isArray(value);
     case 'object':
@@ -63,7 +46,7 @@ export function validateContractPayload(templateId, payload) {
   }
 
   for (const field of definition.fields) {
-    const { found, value } = readField(payload, field);
+    const { found, value } = readFirstFieldValue(payload, field);
 
     if (!found) {
       if (field.required && field.defaultValue === undefined) {

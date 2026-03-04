@@ -1,4 +1,4 @@
-import { TEMPLATE_IDS } from '../shared/contracts/registry.js';
+import { TEMPLATE_IDS } from '../shared/contracts/constants.js';
 import {
   normalizeCompletedInteraction,
   normalizeFeedback,

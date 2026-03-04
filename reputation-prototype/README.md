@@ -28,8 +28,6 @@ For each component update:
 - `step = 1 / sqrt(interactionCount + k)`
 - `newValue = currentValue + step * (rating - currentValue)`
 
-Where `k` comes from configuration (`systemParameters.sensitivityK`) and defaults to `2`.
-
 ## How to run
 ```bash
 cd /Users/stefan.d.k/Desktop/tese-v2/reputation-prototype

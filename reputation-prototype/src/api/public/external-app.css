@@ -94,7 +94,8 @@ h2 {
 }
 
 textarea,
-input {
+input,
+select {
   width: 100%;
   border: 1px solid #d8e0e8;
   border-radius: 12px;
@@ -110,9 +111,56 @@ textarea {
   min-height: 120px;
 }
 
+.form-block h3 {
+  margin: 12px 0 4px;
+  color: var(--accent);
+}
+
+.section-card {
+  border: 1px solid #dbe6f1;
+  border-radius: 12px;
+  background: #fdfefe;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
 .form-block {
   display: grid;
   gap: 8px;
+}
+
+.item-card {
+  border: 1px solid #dbe6f1;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.nested-card {
+  background: #edf4fb;
+}
+
+.item-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.weight-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 8px;
+  align-items: center;
 }
 
 .inline-field {
@@ -175,6 +223,11 @@ pre {
 
 @media (max-width: 920px) {
   .two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .item-row,
+  .weight-row {
     grid-template-columns: 1fr;
   }
 }

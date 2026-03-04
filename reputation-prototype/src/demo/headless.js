@@ -1,14 +1,6 @@
-import { ReputationEngine } from '../engine/reputationEngine.js';
-import { MockLedger } from '../ledger/mockLedger.js';
-import { seedContracts } from './seedContracts.js';
-import { InMemoryReadModelStore } from '../store/readModelStore.js';
+import { createRuntime } from '../runtime/bootstrap.js';
 
-const ledger = new MockLedger();
-const store = new InMemoryReadModelStore();
-const engine = new ReputationEngine({ ledger, store });
-
-seedContracts(ledger);
-const stats = engine.processNewEvents();
+const { store, initialStats: stats } = createRuntime();
 
 console.log('Headless demo complete');
 console.log(JSON.stringify({

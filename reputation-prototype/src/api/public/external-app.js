@@ -1,234 +1,14 @@
 import React, { useEffect, useState } from 'https://esm.sh/react@18.2.0';
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-import htm from 'https://esm.sh/htm@3.1.1';
-
-const html = htm.bind(React.createElement);
-
-function pretty(value) {
-  return JSON.stringify(value, null, 2);
-}
-
-function getByPath(source, path) {
-  const keys = path.split('.');
-  let current = source;
-
-  for (const key of keys) {
-    if (current == null || typeof current !== 'object') {
-      return undefined;
-    }
-    current = current[key];
-  }
-
-  return current;
-}
-
-function setByPath(target, path, value) {
-  const keys = path.split('.');
-  let cursor = target;
-
-  for (let i = 0; i < keys.length - 1; i += 1) {
-    const key = keys[i];
-    if (cursor[key] == null || typeof cursor[key] !== 'object' || Array.isArray(cursor[key])) {
-      cursor[key] = {};
-    }
-    cursor = cursor[key];
-  }
-
-  cursor[keys[keys.length - 1]] = value;
-}
-
-function stringifyFieldValue(value, type) {
-  if (type === 'boolean') {
-    return Boolean(value);
-  }
-
-  if (value == null) {
-    if (type === 'object' || type === 'array' || type === 'numberMap') {
-      return '';
-    }
-    return '';
-  }
-
-  if (type === 'object' || type === 'array' || type === 'numberMap') {
-    return pretty(value);
-  }
-
-  return String(value);
-}
-
-function parseFieldValue(rawValue, type) {
-  if (type === 'boolean') {
-    return Boolean(rawValue);
-  }
-
-  const text = String(rawValue ?? '').trim();
-
-  if (type === 'number') {
-    if (!text) {
-      throw new Error('Expected number.');
-    }
-    const parsed = Number(text);
-    if (!Number.isFinite(parsed)) {
-      throw new Error('Expected valid number.');
-    }
-    return parsed;
-  }
-
-  if (type === 'object' || type === 'array' || type === 'numberMap') {
-    if (!text) {
-      throw new Error('Expected JSON value.');
-    }
-    const parsed = JSON.parse(text);
-
-    if (type === 'array' && !Array.isArray(parsed)) {
-      throw new Error('Expected JSON array.');
-    }
-
-    if (type === 'object' && (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed))) {
-      throw new Error('Expected JSON object.');
-    }
-
-    if (
-      type === 'numberMap' &&
-      (parsed == null ||
-        typeof parsed !== 'object' ||
-        Array.isArray(parsed) ||
-        !Object.values(parsed).every((item) => typeof item === 'number' && Number.isFinite(item)))
-    ) {
-      throw new Error('Expected object map with numeric values.');
-    }
-
-    return parsed;
-  }
-
-  return text;
-}
-
-async function requestJson(path, options = {}) {
-  const response = await fetch(path, options);
-  const rawText = await response.text();
-  const body = rawText ? JSON.parse(rawText) : {};
-
-  if (!response.ok) {
-    const detail = body.details ? ` (${body.details.join('; ')})` : '';
-    throw new Error((body.error || `HTTP ${response.status}`) + detail);
-  }
-
-  return body;
-}
-
-function createInitialFieldState(definition) {
-  return Object.fromEntries(
-    definition.fields.map((field) => {
-      const fromSample = getByPath(definition.samplePayload, field.path);
-      const value = fromSample === undefined ? field.defaultValue : fromSample;
-      return [field.key, stringifyFieldValue(value, field.type)];
-    })
-  );
-}
-
-function buildPayloadFromFields(definition, fieldState) {
-  const payload = {};
-
-  for (const field of definition.fields) {
-    const current = fieldState[field.key];
-
-    if (current === '' || current == null) {
-      if (field.defaultValue !== undefined) {
-        setByPath(payload, field.path, field.defaultValue);
-      }
-      continue;
-    }
-
-    const parsed = parseFieldValue(current, field.type);
-    setByPath(payload, field.path, parsed);
-  }
-
-  return payload;
-}
-
-function ContractForm({ definition, autoProcess, onPublish, addLog }) {
-  const [fieldState, setFieldState] = useState(() => createInitialFieldState(definition));
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    setFieldState(createInitialFieldState(definition));
-  }, [definition]);
-
-  const handleLoadSample = () => {
-    setFieldState(createInitialFieldState(definition));
-  };
-
-  const handleChange = (key, value) => {
-    setFieldState((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSubmit = async () => {
-    try {
-      setIsSubmitting(true);
-      const payload = buildPayloadFromFields(definition, fieldState);
-      await onPublish(definition.templateId, payload, autoProcess);
-      addLog(`Published ${definition.templateId}`, payload);
-    } catch (error) {
-      addLog(`Failed to publish ${definition.templateId}`, { error: error.message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return html`
-    <article className="panel">
-      <div className="panel-head">
-        <h2>Deploy <code>${definition.templateId}</code></h2>
-        <button className="ghost" onClick=${handleLoadSample}>Load Sample</button>
-      </div>
-
-      <div className="form-block">
-        ${definition.fields.map((field) => {
-          const value = fieldState[field.key];
-
-          if (field.type === 'boolean') {
-            return html`
-              <label key=${field.key} className="inline-field">
-                <span>${field.path}</span>
-                <input
-                  type="checkbox"
-                  checked=${Boolean(value)}
-                  onChange=${(event) => handleChange(field.key, event.target.checked)}
-                />
-              </label>
-            `;
-          }
-
-          const isStructured = field.type === 'object' || field.type === 'array' || field.type === 'numberMap';
-
-          return html`
-            <label key=${field.key}>${field.path} (${field.type})</label>
-            ${isStructured
-              ? html`
-                  <textarea
-                    rows=${6}
-                    value=${value}
-                    onChange=${(event) => handleChange(field.key, event.target.value)}
-                  />
-                `
-              : html`
-                  <input
-                    type=${field.type === 'number' ? 'number' : 'text'}
-                    value=${value}
-                    onChange=${(event) => handleChange(field.key, event.target.value)}
-                  />
-                `}
-          `;
-        })}
-      </div>
-
-      <button onClick=${handleSubmit} disabled=${isSubmitting}>
-        ${isSubmitting ? 'Deploying...' : 'Deploy Contract'}
-      </button>
-    </article>
-  `;
-}
+import { ContractForm } from './external-app.contract-form.js';
+import { ReputationConfigurationEditor } from './external-app.configuration-editor.js';
+import {
+  getContractDisplayName,
+  html,
+  isReputationConfigurationDefinition,
+  pretty,
+  requestJson,
+} from './external-app.shared.js';
 
 function App() {
   const [schemaDefinitions, setSchemaDefinitions] = useState([]);
@@ -240,6 +20,7 @@ function App() {
   const [vcParty, setVcParty] = useState('AGENT_ALICE');
   const [vcComponents, setVcComponents] = useState('');
   const [logEntries, setLogEntries] = useState([]);
+  const definitionsById = new Map(schemaDefinitions.map((definition) => [definition.templateId, definition]));
 
   const addLog = (message, payload = null) => {
     const stamp = new Date().toISOString();
@@ -269,6 +50,7 @@ function App() {
   };
 
   const publishContract = async (templateId, payload, shouldAutoProcess) => {
+    const contractName = getContractDisplayName(definitionsById.get(templateId) || { templateId });
     const endpoint = `/mock/contracts/${encodeURIComponent(templateId)}?autoProcess=${String(
       shouldAutoProcess
     )}`;
@@ -279,7 +61,7 @@ function App() {
       body: JSON.stringify(payload),
     });
 
-    addLog(`Ledger accepted ${templateId}`, result);
+    addLog(`Ledger accepted ${contractName}`, result);
     await refreshViews();
   };
 
@@ -330,14 +112,21 @@ function App() {
     })();
   }, []);
 
+  const configurationDefinition = schemaDefinitions.find(
+    (definition) => isReputationConfigurationDefinition(definition)
+  );
+  const otherDefinitions = schemaDefinitions.filter(
+    (definition) => !isReputationConfigurationDefinition(definition)
+  );
+
   return html`
     <main className="page">
       <header className="hero">
         <p className="eyebrow">Reputation Prototype</p>
         <h1>External App Simulator (React)</h1>
         <p className="subtitle">
-          Forms are generated from a shared backend schema. Change the schema in one place and both
-          API parsing and simulator forms update.
+          Forms are generated from a shared backend schema. The configuration editor loads the active
+          store config and lets you edit/add roles and interaction types before publishing.
         </p>
       </header>
 
@@ -366,8 +155,22 @@ function App() {
         </button>
       </section>
 
+      ${configurationDefinition
+        ? html`
+            <section className="grid one-col">
+              <${ReputationConfigurationEditor}
+                definition=${configurationDefinition}
+                autoProcess=${autoProcess}
+                onPublish=${publishContract}
+                addLog=${addLog}
+                activeConfig=${activeConfig}
+              />
+            </section>
+          `
+        : null}
+
       <section className="grid two-col">
-        ${schemaDefinitions.map(
+        ${otherDefinitions.map(
           (definition) => html`
             <${ContractForm}
               key=${definition.templateId}

@@ -1,4 +1,9 @@
 import { clamp, round2 } from '../lib/conditions.js';
+import {
+  compareConfigurationsByActivationAsc,
+  compareConfigurationsByActivationDesc,
+  createSubjectComponent,
+} from '../shared/reputation/model.js';
 
 export class InMemoryReadModelStore {
   constructor() {
@@ -7,31 +12,30 @@ export class InMemoryReadModelStore {
   }
 
   addConfiguration(configuration) {
-    const exists = this.configurations.some(
+    const alreadyExists = this.configurations.some(
       (item) => item.configId === configuration.configId && item.version === configuration.version
     );
-    if (!exists) {
-      this.configurations.push(configuration);
-      this.subjects.forEach((subject) => {
-        if (subject.configVersion !== configuration.version) {
-          configuration.components.forEach((component) => {
-            this.addComponentToSubject(subject.party, component.componentId, configuration);
-          });
-          subject.configVersion = configuration.version;
-          this.recomputeOverallScore(subject, configuration); 
-          this.saveSubject(subject);
-        }
-      });
+    if (alreadyExists) {
+      return;
     }
+
+    this.configurations.push(configuration);
+    this.subjects.forEach((subject) => {
+      if (subject.configVersion === configuration.version) {
+        return;
+      }
+
+      for (const component of configuration.components) {
+        this.addComponentToSubject(subject.party, component.componentId, configuration);
+      }
+      subject.configVersion = configuration.version;
+      this.recomputeOverallScore(subject, configuration);
+      this.saveSubject(subject);
+    });
   }
 
   getAllConfigurations() {
-    return [...this.configurations].sort((a, b) => {
-      if (a.activationTime === b.activationTime) {
-        return b.version - a.version;
-      }
-      return Date.parse(b.activationTime) - Date.parse(a.activationTime);
-    });
+    return [...this.configurations].sort(compareConfigurationsByActivationDesc);
   }
 
   getConfigurationByVersion(version) {
@@ -45,13 +49,7 @@ export class InMemoryReadModelStore {
 
     const active = this.configurations
       .filter((cfg) => Date.parse(cfg.activationTime) <= atMillis)
-      .sort((a, b) => {
-        const timeDiff = Date.parse(b.activationTime) - Date.parse(a.activationTime);
-        if (timeDiff !== 0) {
-          return timeDiff;
-        }
-        return b.version - a.version;
-      });
+      .sort(compareConfigurationsByActivationDesc);
 
     if (active.length > 0) {
       return active[0];
@@ -67,13 +65,7 @@ export class InMemoryReadModelStore {
 
     const upcoming = this.configurations
       .filter((cfg) => Date.parse(cfg.activationTime) > atMillis)
-      .sort((a, b) => {
-        const timeDiff = Date.parse(a.activationTime) - Date.parse(b.activationTime);
-        if (timeDiff !== 0) {
-          return timeDiff;
-        }
-        return b.version - a.version;
-      });
+      .sort(compareConfigurationsByActivationAsc);
 
     if (upcoming.length > 0) {
       return upcoming[0];
@@ -91,18 +83,8 @@ export class InMemoryReadModelStore {
 
     if (!existing) {
       const components = Object.fromEntries(
-        configuration.components.map((component) => [
-          component.componentId,
-          {
-            componentId: component.componentId,
-            description: component.description,
-            value: component.initialValue,
-            interactionCount: 0,
-            history: [],
-          },
-        ])
+        configuration.components.map((component) => [component.componentId, createSubjectComponent(component)])
       );
-
       const created = {
         party,
         roleId,
@@ -123,18 +105,20 @@ export class InMemoryReadModelStore {
 
   addComponentToSubject(party, componentId, configuration) {
     const subject = this.subjects.get(party);
-    const component = configuration.components.find(c => c.componentId === componentId);
-    if (!subject.components[componentId]){
-      console.log(`Adding component ${componentId} to subject ${party}`);
-      subject.components[componentId] = {
-        componentId: componentId,
-        description: component.description,
-        value: component.initialValue,
-        interactionCount: 0,
-        history: [], 
-      }
+    if (!subject) {
+      return;
     }
 
+    if (subject.components[componentId]) {
+      return;
+    }
+
+    const component = configuration.components.find((item) => item.componentId === componentId);
+    if (!component) {
+      return;
+    }
+
+    subject.components[componentId] = createSubjectComponent(component);
   }
 
   saveSubject(subject) {
@@ -154,10 +138,10 @@ export class InMemoryReadModelStore {
         party: subject.party,
         roleId: subject.roleId,
         overallScore: subject.overallScore,
-        components: Object.values(subject.components).map(c => ({
+        components: Object.values(subject.components).map((c) => ({
           componentId: c.componentId,
-          value: c.value
-        }))
+          value: c.value,
+        })),
       }));
   }
 
