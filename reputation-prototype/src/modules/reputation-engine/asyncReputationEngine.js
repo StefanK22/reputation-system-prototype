@@ -1,26 +1,53 @@
-import { TEMPLATE_IDS } from '../shared/contracts/constants.js';
+import { TEMPLATE_IDS } from '../../shared/contracts/constants.js';
 import {
   normalizeCompletedInteraction,
   normalizeFeedback,
   normalizeReputationConfiguration,
-} from '../contracts/schema.js';
-import { clamp, round2 } from '../lib/conditions.js';
-import { evaluateInteractionRatings } from './ruleEvaluator.js';
+} from '../../shared/contracts/schema.js';
+import { clamp, evaluateCondition, round2 } from '../../shared/domain/conditions.js';
 
-export class ReputationEngine {
-  constructor({ ledger, store, logger = console }) {
+function evaluateInteractionRatings(interaction, configuration) {
+  const interactionType = configuration.interactionTypes.find(
+    (item) => item.interactionTypeId === interaction.interactionType
+  );
+
+  if (!interactionType) {
+    return {};
+  }
+
+  const ratings = {};
+
+  for (const rule of interactionType.ratingRules) {
+    if (ratings[rule.componentId] != null) {
+      continue;
+    }
+
+    const observed = interaction.outcome?.[rule.conditionField];
+    if (evaluateCondition(observed, rule.conditionOperator, rule.conditionValue)) {
+      ratings[rule.componentId] = rule.assignedRating;
+    }
+  }
+
+  return ratings;
+}
+
+export class AsyncReputationEngine {
+  constructor({ ledger, store }) {
     this.ledger = ledger;
     this.store = store;
-    this.logger = logger;
     this.lastProcessedOffset = 0;
+  }
+
+  async init() {
+    this.lastProcessedOffset = await this.store.getCheckpoint();
   }
 
   getCheckpoint() {
     return this.lastProcessedOffset;
   }
 
-  processNewEvents() {
-    const events = this.ledger.streamFrom(this.lastProcessedOffset);
+  async processNewEvents() {
+    const events = await this.ledger.streamFrom(this.lastProcessedOffset);
 
     const stats = {
       fromOffset: this.lastProcessedOffset,
@@ -39,7 +66,7 @@ export class ReputationEngine {
         switch (event.templateId) {
           case TEMPLATE_IDS.REPUTATION_CONFIGURATION: {
             const configuration = normalizeReputationConfiguration(event.payload);
-            this.store.addConfiguration(configuration);
+            await this.store.addConfiguration(configuration);
             break;
           }
           case TEMPLATE_IDS.COMPLETED_INTERACTION: {
@@ -50,8 +77,8 @@ export class ReputationEngine {
             }
 
             const configuration =
-              this.store.getConfigurationByVersion(interaction.configVersion) ||
-              this.store.getActiveConfiguration(event.createdAt, { fallback: 'none' });
+              (await this.store.getConfigurationByVersion(interaction.configVersion)) ||
+              (await this.store.getActiveConfiguration(event.createdAt, { fallback: 'none' }));
 
             if (!configuration) {
               stats.warnings.push(`No active config for interaction event at offset ${event.offset}`);
@@ -66,7 +93,7 @@ export class ReputationEngine {
             }
 
             for (const party of interaction.participants) {
-              stats.appliedUpdates += this.applyRatingsToParty({
+              stats.appliedUpdates += await this.applyRatingsToParty({
                 party,
                 ratings,
                 configuration,
@@ -79,8 +106,8 @@ export class ReputationEngine {
           case TEMPLATE_IDS.FEEDBACK: {
             const feedback = normalizeFeedback(event.payload);
             const configuration =
-              this.store.getActiveConfiguration(event.createdAt, { fallback: 'none' }) ||
-              this.store.getConfigurationByVersion(1);
+              (await this.store.getActiveConfiguration(event.createdAt, { fallback: 'none' })) ||
+              (await this.store.getConfigurationByVersion(1));
 
             if (!configuration) {
               stats.warnings.push(`No active config for feedback event at offset ${event.offset}`);
@@ -88,7 +115,7 @@ export class ReputationEngine {
               break;
             }
 
-            stats.appliedUpdates += this.applyRatingsToParty({
+            stats.appliedUpdates += await this.applyRatingsToParty({
               party: feedback.to,
               ratings: feedback.componentRatings,
               configuration,
@@ -107,14 +134,15 @@ export class ReputationEngine {
       }
 
       this.lastProcessedOffset = event.offset;
+      await this.store.setCheckpoint(this.lastProcessedOffset);
     }
 
     return stats;
   }
 
-  applyRatingsToParty({ party, ratings, configuration, reason, sourceId, from = '' }) {
-    const roleId = this.resolveRoleForParty(party, configuration);
-    const subject = this.store.getOrCreateSubject(party, roleId, configuration);
+  async applyRatingsToParty({ party, ratings, configuration, reason, sourceId, from = '' }) {
+    const roleId = await this.resolveRoleForParty(party, configuration);
+    const subject = await this.store.getOrCreateSubject(party, roleId, configuration);
     const floor = configuration.systemParameters.reputationFloor;
     const ceiling = configuration.systemParameters.reputationCeiling;
 
@@ -153,13 +181,13 @@ export class ReputationEngine {
     }
 
     this.store.recomputeOverallScore(subject, configuration);
-    this.store.saveSubject(subject);
+    await this.store.saveSubject(subject);
 
     return applied;
   }
 
-  resolveRoleForParty(party, configuration) {
-    const existing = this.store.getSubject(party);
+  async resolveRoleForParty(party, configuration) {
+    const existing = await this.store.getSubject(party);
     if (existing?.roleId) {
       return existing.roleId;
     }

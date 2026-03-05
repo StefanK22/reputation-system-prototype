@@ -16,7 +16,7 @@ export function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-export function getByPath(source, path) {
+function getByPath(source, path) {
   const keys = path.split('.');
   let current = source;
 
@@ -30,7 +30,7 @@ export function getByPath(source, path) {
   return current;
 }
 
-export function setByPath(target, path, value) {
+function setByPath(target, path, value) {
   const keys = path.split('.');
   let cursor = target;
 
@@ -45,7 +45,7 @@ export function setByPath(target, path, value) {
   cursor[keys[keys.length - 1]] = value;
 }
 
-export function stringifyFieldValue(value, type) {
+function stringifyFieldValue(value, type) {
   if (type === 'boolean') {
     return Boolean(value);
   }
@@ -64,7 +64,7 @@ export function stringifyFieldValue(value, type) {
   return String(value);
 }
 
-export function parseFieldValue(rawValue, type) {
+function parseFieldValue(rawValue, type) {
   if (type === 'boolean') {
     return Boolean(rawValue);
   }

@@ -1,5 +1,5 @@
-import { getContractDefinition } from '../shared/contracts/registry.js';
-import { readFirstFieldValue } from '../shared/contracts/fieldAccess.js';
+import { getContractDefinition } from './registry.js';
+import { readFirstFieldValue } from './fieldAccess.js';
 
 function matchesType(value, type) {
   switch (type) {

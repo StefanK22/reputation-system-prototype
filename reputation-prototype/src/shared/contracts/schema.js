@@ -6,10 +6,10 @@ import {
   asNumberMap,
   asObject,
   asString,
-} from '../lib/objectPath.js';
-import { TEMPLATE_IDS } from '../shared/contracts/constants.js';
-import { getContractDefinition } from '../shared/contracts/registry.js';
-import { cloneJsonValue, readFirstFieldValue } from '../shared/contracts/fieldAccess.js';
+} from '../domain/objectPath.js';
+import { TEMPLATE_IDS } from './constants.js';
+import { getContractDefinition } from './registry.js';
+import { cloneJsonValue, readFirstFieldValue } from './fieldAccess.js';
 
 function coerceFieldValue(value, fieldDef) {
   const defaultValue = cloneJsonValue(fieldDef.defaultValue);

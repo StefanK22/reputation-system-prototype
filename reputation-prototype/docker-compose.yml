@@ -1,0 +1,100 @@
+services:
+  database:
+    image: postgres:17.6
+    container_name: reputation-db
+    environment:
+      POSTGRES_DB: reputation
+      POSTGRES_USER: reputation
+      POSTGRES_PASSWORD: reputation_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reputation -d reputation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - reputation-network
+
+  canton-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reputation-canton-node
+    command: ["npm", "run", "start:canton-mock"]
+    environment:
+      PORT: 7575
+      SEED_CONTRACTS: 1
+    ports:
+      - "7575:7575"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:7575/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - reputation-network
+
+  reputation-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reputation-engine
+    command: ["npm", "run", "start:engine"]
+    environment:
+      PORT: 9091
+      POLL_INTERVAL_MS: 3000
+      CANTON_API_URL: http://canton-node:7575
+      DATABASE_URL: postgresql://reputation:reputation_password@database:5432/reputation
+      CANTON_PARTY: OPERATOR
+      CANTON_USER_ID: operator-user
+    depends_on:
+      database:
+        condition: service_healthy
+      canton-node:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9091/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - reputation-network
+
+  web-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reputation-web-app
+    command: ["npm", "run", "start:web"]
+    environment:
+      PORT: 8080
+      CANTON_API_URL: http://canton-node:7575
+      ENGINE_API_URL: http://reputation-engine:9091
+      DATABASE_URL: postgresql://reputation:reputation_password@database:5432/reputation
+      CANTON_PARTY: OPERATOR
+      CANTON_USER_ID: operator-user
+    ports:
+      - "8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+      canton-node:
+        condition: service_healthy
+      reputation-engine:
+        condition: service_healthy
+    networks:
+      - reputation-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  reputation-network:
+    driver: bridge

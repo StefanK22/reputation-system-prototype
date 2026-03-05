@@ -1,4 +1,4 @@
-export function normalizeComparable(value) {
+function normalizeComparable(value) {
   if (typeof value === 'boolean') {
     return value ? 1 : 0;
   }

@@ -1,5 +1,5 @@
-import { TEMPLATE_IDS } from '../shared/contracts/constants.js';
-import { cloneContractSample } from '../shared/contracts/registry.js';
+import { TEMPLATE_IDS } from '../../shared/contracts/constants.js';
+import { cloneContractSample } from '../../shared/contracts/registry.js';
 
 const COMMUNICATION_COMPONENT = Object.freeze({
   componentId: 'Communication',

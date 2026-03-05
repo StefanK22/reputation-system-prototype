@@ -1,4 +1,4 @@
-import { getByPath } from '../../lib/objectPath.js';
+import { getByPath } from '../domain/objectPath.js';
 
 export function cloneJsonValue(value) {
   if (value == null || typeof value !== 'object') {

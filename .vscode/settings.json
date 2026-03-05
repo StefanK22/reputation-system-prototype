@@ -1,0 +1,13 @@
+{
+	"sqltools.connections": [
+		{
+			"ssh": "Disabled",
+			"previewLimit": 50,
+			"server": "localhost",
+			"driver": "PostgreSQL",
+			"username": "reputation",
+			"name": "Reputation",
+			"connectString": "postgresql://reputation:reputation_password@localhost:5432/reputation"
+		}
+	]
+}

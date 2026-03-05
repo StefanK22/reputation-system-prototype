@@ -2,18 +2,43 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { URL, fileURLToPath } from 'node:url';
-import { validateContractPayload } from '../contracts/validation.js';
-import { issueReputationCredential } from '../engine/credentialIssuer.js';
-import { listContractDefinitions } from '../shared/contracts/registry.js';
+import { validateContractPayload } from '../../shared/contracts/validation.js';
+import { listContractDefinitions } from '../../shared/contracts/registry.js';
+import { readJsonBody, sendJson, sendText } from '../../shared/runtime/http.js';
 
-function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(payload, null, 2));
-}
+function issueReputationCredential({ subject, configuration, disclosedComponentIds = [] }) {
+  const includeAll = disclosedComponentIds.length === 0;
 
-function sendText(res, statusCode, payload, contentType = 'text/plain; charset=utf-8') {
-  res.writeHead(statusCode, { 'content-type': contentType });
-  res.end(payload);
+  const disclosedComponents = Object.fromEntries(
+    Object.entries(subject.components)
+      .filter(([componentId]) => includeAll || disclosedComponentIds.includes(componentId))
+      .map(([componentId, component]) => [
+        componentId,
+        {
+          value: component.value,
+          interactionCount: component.interactionCount,
+        },
+      ])
+  );
+
+  return {
+    id: `vc:reputation:${subject.party}:${Date.now()}`,
+    type: ['VerifiableCredential', 'ReputationCredential'],
+    issuer: configuration.operator,
+    issuanceDate: new Date().toISOString(),
+    credentialSubject: {
+      id: subject.party,
+      roleId: subject.roleId,
+      overallScore: subject.overallScore,
+      components: disclosedComponents,
+      configId: configuration.configId,
+      configVersion: configuration.version,
+    },
+    proof: {
+      type: 'MockProof',
+      purpose: 'prototype-only',
+    },
+  };
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,20 +99,6 @@ async function tryServeStatic(pathname, res) {
   return true;
 }
 
-async function readJsonBody(req) {
-  const chunks = [];
-  for await (const chunk of req) {
-    chunks.push(chunk);
-  }
-
-  if (chunks.length === 0) {
-    return {};
-  }
-
-  const text = Buffer.concat(chunks).toString('utf8');
-  return JSON.parse(text);
-}
-
 export function createApiServer({ ledger, store, engine }) {
   return http.createServer(async (req, res) => {
     try {
@@ -107,10 +118,12 @@ export function createApiServer({ ledger, store, engine }) {
       }
 
       if (req.method === 'GET' && pathname === '/health') {
+        const ledgerEnd = await ledger.ledgerEnd();
+        const engineCheckpoint = await engine.getCheckpoint();
         sendJson(res, 200, {
           status: 'ok',
-          ledgerEnd: ledger.ledgerEnd(),
-          engineCheckpoint: engine.getCheckpoint(),
+          ledgerEnd,
+          engineCheckpoint,
         });
         return;
       }
@@ -122,7 +135,7 @@ export function createApiServer({ ledger, store, engine }) {
 
       if (req.method === 'GET' && pathname === '/config') {
         const at = url.searchParams.get('at') || new Date().toISOString();
-        const activeConfig = store.getActiveConfiguration(at);
+        const activeConfig = await store.getActiveConfiguration(at);
         if (!activeConfig) {
           sendJson(res, 404, { error: 'No active configuration' });
           return;
@@ -132,19 +145,19 @@ export function createApiServer({ ledger, store, engine }) {
       }
 
       if (req.method === 'GET' && pathname === '/config/all') {
-        sendJson(res, 200, store.getAllConfigurations());
+        sendJson(res, 200, await store.getAllConfigurations());
         return;
       }
 
       if (req.method === 'GET' && pathname === '/rankings') {
         const limit = Number(url.searchParams.get('limit') || 10);
-        sendJson(res, 200, store.getRankings(limit));
+        sendJson(res, 200, await store.getRankings(limit));
         return;
       }
 
       if (req.method === 'GET' && pathname.startsWith('/reputation/')) {
         const party = decodeURIComponent(pathname.replace('/reputation/', ''));
-        const subject = store.getSubject(party);
+        const subject = await store.getSubject(party);
         if (!subject) {
           sendJson(res, 404, { error: `No reputation found for ${party}` });
           return;
@@ -155,12 +168,12 @@ export function createApiServer({ ledger, store, engine }) {
 
       if (req.method === 'GET' && pathname === '/events') {
         const from = Number(url.searchParams.get('from') || 0);
-        sendJson(res, 200, ledger.streamFrom(from));
+        sendJson(res, 200, await ledger.streamFrom(from));
         return;
       }
 
       if (req.method === 'POST' && pathname === '/engine/process') {
-        const result = engine.processNewEvents();
+        const result = await engine.processNewEvents();
         sendJson(res, 200, result);
         return;
       }
@@ -173,13 +186,13 @@ export function createApiServer({ ledger, store, engine }) {
           return;
         }
 
-        const subject = store.getSubject(party);
+        const subject = await store.getSubject(party);
         if (!subject) {
           sendJson(res, 404, { error: `No reputation found for ${party}` });
           return;
         }
 
-        const activeConfig = store.getActiveConfiguration();
+        const activeConfig = await store.getActiveConfiguration();
         if (!activeConfig) {
           sendJson(res, 404, { error: 'No active configuration' });
           return;
@@ -211,9 +224,9 @@ export function createApiServer({ ledger, store, engine }) {
           return;
         }
 
-        const event = ledger.publish(templateId, body);
+        const event = await ledger.publish(templateId, body);
         const autoProcess = url.searchParams.get('autoProcess') !== 'false';
-        const processResult = autoProcess ? engine.processNewEvents() : null;
+        const processResult = autoProcess ? await engine.processNewEvents() : null;
         sendJson(res, 201, { event, processResult });
         return;
       }
