@@ -1,67 +1,48 @@
-import { getContractDefinition } from './registry.js';
-import { readFirstFieldValue } from './fieldAccess.js';
+/**
+ * Contract payload validation
+ * Validates that payloads match contract field definitions
+ */
 
-function matchesType(value, type) {
-  switch (type) {
-    case 'string':
-      return typeof value === 'string';
-    case 'number':
-      return typeof value === 'number' && Number.isFinite(value);
-    case 'boolean':
-      return typeof value === 'boolean';
-    case 'isoDate':
-      if (typeof value !== 'string') {
-        return false;
-      }
-      return !Number.isNaN(new Date(value).getTime());
-    case 'array':
-      return Array.isArray(value);
-    case 'object':
-      return value != null && typeof value === 'object' && !Array.isArray(value);
-    case 'numberMap':
-      return (
-        value != null &&
-        typeof value === 'object' &&
-        !Array.isArray(value) &&
-        Object.values(value).every((item) => typeof item === 'number' && Number.isFinite(item))
-      );
-    default:
-      return true;
-  }
+import { matches } from '../utils/types.js';
+import { getByPath, getFirstMatch } from '../utils/paths.js';
+import { getDefinition as getContractDefinition } from '../../config/contracts.js';
+
+function readFirstFieldValue(payload, fieldDef) {
+  const paths = [fieldDef.path, ...(fieldDef.aliases || [])];
+  const { found, value } = getFirstMatch(payload, paths);
+  return { found, value };
 }
 
-export function validateContractPayload(templateId, payload) {
-  const definition = getContractDefinition(templateId);
-  if (!definition) {
+function validateField(field, payload) {
+  const { found, value } = readFirstFieldValue(payload, field);
+
+  if (!found && field.required && field.defaultValue === undefined) {
+    return `Missing required field: ${field.path}`;
+  }
+
+  if (found && !matches(value, field.type)) {
+    return `Invalid type for ${field.path}. Expected ${field.type}.`;
+  }
+
+  return null;
+}
+
+export function validate(templateId, payload) {
+  const def = getContractDefinition(templateId);
+  if (!def) {
     return { ok: false, errors: [`Unknown templateId: ${templateId}`] };
   }
 
-  const errors = [];
-
   if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) {
-    return {
-      ok: false,
-      errors: ['Payload must be a JSON object.'],
-    };
+    return { ok: false, errors: ['Payload must be a JSON object.'] };
   }
 
-  for (const field of definition.fields) {
-    const { found, value } = readFirstFieldValue(payload, field);
+  const errors = def.fields
+    .map(field => validateField(field, payload))
+    .filter(Boolean);
 
-    if (!found) {
-      if (field.required && field.defaultValue === undefined) {
-        errors.push(`Missing required field: ${field.path}`);
-      }
-      continue;
-    }
-
-    if (!matchesType(value, field.type)) {
-      errors.push(`Invalid type for ${field.path}. Expected ${field.type}.`);
-    }
-  }
-
-  return {
-    ok: errors.length === 0,
-    errors,
-  };
+  return { ok: errors.length === 0, errors };
 }
+
+// Legacy name for backwards compatibility
+export { validate as validateContractPayload };

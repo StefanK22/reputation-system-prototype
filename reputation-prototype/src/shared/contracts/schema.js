@@ -1,90 +1,41 @@
-import {
-  asArray,
-  asBoolean,
-  asIsoString,
-  asNumber,
-  asNumberMap,
-  asObject,
-  asString,
-} from '../domain/objectPath.js';
-import { TEMPLATE_IDS } from './constants.js';
-import { getContractDefinition } from './registry.js';
-import { cloneJsonValue, readFirstFieldValue } from './fieldAccess.js';
+/**
+ * Contract schema normalization
+ * Transforms raw payloads into normalized domain objects
+ */
 
-function coerceFieldValue(value, fieldDef) {
-  const defaultValue = cloneJsonValue(fieldDef.defaultValue);
+import { toObject, toIsoString, toNumberMap, coerce } from '../utils/types.js';
+import { getByPath, getFirstMatch } from '../utils/paths.js';
+import { TEMPLATE_IDS, getDefinition as getContractDefinition } from '../../config/contracts.js';
 
-  switch (fieldDef.type) {
-    case 'string':
-      return asString(value, asString(defaultValue, ''));
-    case 'number':
-      return asNumber(value, asNumber(defaultValue, 0));
-    case 'boolean':
-      return asBoolean(value, asBoolean(defaultValue, false));
-    case 'isoDate':
-      return asIsoString(value, new Date().toISOString());
-    case 'array':
-      return asArray(value);
-    case 'object':
-      return asObject(value);
-    case 'numberMap':
-      return asNumberMap(value);
-    default:
-      return value ?? defaultValue;
-  }
+function readFirstFieldValue(payload, fieldDef) {
+  const paths = [fieldDef.path, ...(fieldDef.aliases || [])];
+  const { found, value } = getFirstMatch(payload, paths);
+  return { found, value };
 }
 
-function extractContractValues(templateId, payload) {
-  const definition = getContractDefinition(templateId);
-  if (!definition) {
+function extractValues(templateId, payload) {
+  const def = getContractDefinition(templateId);
+  if (!def) {
     throw new Error(`Unknown contract template: ${templateId}`);
   }
 
   const values = {};
-  for (const fieldDef of definition.fields) {
+  for (const fieldDef of def.fields) {
     const { found, value } = readFirstFieldValue(payload, fieldDef);
-    const raw = found ? value : cloneJsonValue(fieldDef.defaultValue);
-    values[fieldDef.key] = coerceFieldValue(raw, fieldDef);
+    const raw = found ? value : JSON.parse(JSON.stringify(fieldDef.defaultValue));
+    values[fieldDef.key] = coerce(raw, fieldDef.type, fieldDef.defaultValue);
   }
 
   return values;
 }
 
-export function normalizeCompletedInteraction(payload) {
-  const values = extractContractValues(TEMPLATE_IDS.COMPLETED_INTERACTION, payload);
-
-  return {
-    platform: values.platform || 'UNKNOWN_PLATFORM',
-    participants: asArray(values.participants).map(String),
-    interactionType: values.interactionType || 'UNKNOWN_INTERACTION',
-    outcome: asObject(values.outcome),
-    completedAt: values.completedAt,
-    configVersion: values.configVersion || 1,
-    evaluated: Boolean(values.evaluated),
-  };
-}
-
-export function normalizeFeedback(payload) {
-  const values = extractContractValues(TEMPLATE_IDS.FEEDBACK, payload);
-
-  return {
-    platform: values.platform || 'UNKNOWN_PLATFORM',
-    interactionId: values.interactionId || 'unknown_interaction',
-    from: values.from || 'UNKNOWN_PARTY',
-    to: values.to || 'UNKNOWN_PARTY',
-    componentRatings: asNumberMap(values.componentRatings),
-    submittedAt: values.submittedAt,
-    phase: values.phase || 'FINAL',
-  };
-}
-
-export function normalizeReputationConfiguration(payload) {
-  const values = extractContractValues(TEMPLATE_IDS.REPUTATION_CONFIGURATION, payload);
-  const systemParametersRaw = asObject(values.systemParameters);
+export function normalizeConfiguration(payload) {
+  const values = extractValues(TEMPLATE_IDS.REPUTATION_CONFIGURATION, payload);
+  const sysParamsRaw = toObject(values.systemParameters);
   const systemParameters = {
-    ...systemParametersRaw,
-    reputationFloor: asNumber(systemParametersRaw.reputationFloor, 0),
-    reputationCeiling: asNumber(systemParametersRaw.reputationCeiling, 100),
+    ...sysParamsRaw,
+    reputationFloor: Number(sysParamsRaw.reputationFloor) || 0,
+    reputationCeiling: Number(sysParamsRaw.reputationCeiling) || 100,
   };
 
   return {
@@ -93,41 +44,72 @@ export function normalizeReputationConfiguration(payload) {
     version: values.version || 1,
     activationTime: values.activationTime,
     systemParameters,
-    components: asArray(values.components).map((item) => {
-      const obj = asObject(item);
+    components: (Array.isArray(values.components) ? values.components : []).map((item) => {
+      const obj = toObject(item);
       return {
-        componentId: asString(obj.componentId),
-        description: asString(obj.description),
-        initialValue: asNumber(obj.initialValue, 70),
+        componentId: String(obj.componentId || ''),
+        description: String(obj.description || ''),
+        initialValue: Number(obj.initialValue) || 70,
       };
     }),
-    roleWeights: asArray(values.roleWeights).map((item) => {
-      const obj = asObject(item);
+    roleWeights: (Array.isArray(values.roleWeights) ? values.roleWeights : []).map((item) => {
+      const obj = toObject(item);
       return {
-        roleId: asString(obj.roleId),
-        componentWeights: asNumberMap(obj.componentWeights),
+        roleId: String(obj.roleId || ''),
+        componentWeights: toNumberMap(obj.componentWeights),
       };
     }),
-    interactionTypes: asArray(values.interactionTypes).map((item) => {
-      const obj = asObject(item);
+    interactionTypes: (Array.isArray(values.interactionTypes) ? values.interactionTypes : []).map((item) => {
+      const obj = toObject(item);
       return {
-        interactionTypeId: asString(obj.interactionTypeId),
-        description: asString(obj.description),
-        ratingRules: asArray(obj.ratingRules).map((rule) => {
-          const ruleObj = asObject(rule);
+        interactionTypeId: String(obj.interactionTypeId || ''),
+        description: String(obj.description || ''),
+        ratingRules: (Array.isArray(obj.ratingRules) ? obj.ratingRules : []).map((rule) => {
+          const r = toObject(rule);
           return {
-            componentId: asString(ruleObj.componentId),
-            conditionField: asString(ruleObj.conditionField),
-            conditionOperator: asString(ruleObj.conditionOperator, 'EQ').toUpperCase(),
-            conditionValue: asNumber(ruleObj.conditionValue, 0),
-            assignedRating: asNumber(ruleObj.assignedRating, 70),
+            componentId: String(r.componentId || ''),
+            conditionField: String(r.conditionField || ''),
+            conditionOperator: String(r.conditionOperator || ''),
+            conditionValue: Number(r.conditionValue) || 0,
+            assignedRating: Number(r.assignedRating) || 70,
           };
         }),
       };
     }),
-    partyRoles: Object.fromEntries(
-      Object.entries(asObject(values.partyRoles)).map(([party, roleId]) => [String(party), String(roleId)])
-    ),
-    defaultRoleId: asString(values.defaultRoleId, ''),
+    partyRoles: toObject(values.partyRoles),
+    defaultRoleId: values.defaultRoleId || 'AGENT',
   };
 }
+
+export function normalizeInteraction(payload) {
+  const values = extractValues(TEMPLATE_IDS.COMPLETED_INTERACTION, payload);
+
+  return {
+    platform: values.platform || 'UNKNOWN_PLATFORM',
+    participants: (Array.isArray(values.participants) ? values.participants : []).map(String),
+    interactionType: values.interactionType || 'UNKNOWN_INTERACTION',
+    outcome: toObject(values.outcome),
+    completedAt: values.completedAt,
+    configVersion: values.configVersion || 1,
+    evaluated: Boolean(values.evaluated),
+  };
+}
+
+export function normalizeFeedback(payload) {
+  const values = extractValues(TEMPLATE_IDS.FEEDBACK, payload);
+
+  return {
+    platform: values.platform || 'UNKNOWN_PLATFORM',
+    interactionId: values.interactionId || 'unknown_interaction',
+    from: values.from || 'UNKNOWN_PARTY',
+    to: values.to || 'UNKNOWN_PARTY',
+    componentRatings: toNumberMap(values.componentRatings),
+    submittedAt: values.submittedAt,
+    phase: values.phase || 'FINAL',
+  };
+}
+
+// Legacy names for backwards compatibility
+export { normalizeConfiguration as normalizeReputationConfiguration };
+export { normalizeInteraction as normalizeCompletedInteraction };
+

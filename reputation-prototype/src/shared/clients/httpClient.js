@@ -1,13 +1,6 @@
-function trimTrailingSlash(value) {
-  return value.endsWith('/') ? value.slice(0, -1) : value;
-}
-
-function createBaseUrl(value) {
-  return trimTrailingSlash(String(value || ''));
-}
-
 export async function requestJson(baseUrl, pathname, options = {}) {
-  const response = await fetch(`${createBaseUrl(baseUrl)}${pathname}`, options);
+  const url = new URL(pathname, String(baseUrl || '').replace(/\/$/, ''));
+  const response = await fetch(url.toString(), options);
 
   if (!response.ok) {
     const text = await response.text();

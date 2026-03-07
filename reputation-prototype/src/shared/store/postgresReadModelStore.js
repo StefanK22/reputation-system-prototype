@@ -1,13 +1,13 @@
 import pg from 'pg';
-import { clamp, round2 } from '../domain/conditions.js';
+import { clamp, round2 } from '../utils/math.js';
 
 const { Pool } = pg;
 
-function createSubjectComponent(component) {
+function createComponent(comp) {
   return {
-    componentId: component.componentId,
-    description: component.description,
-    value: component.initialValue,
+    componentId: comp.componentId,
+    description: comp.description,
+    value: comp.initialValue,
     interactionCount: 0,
     history: [],
   };
@@ -40,7 +40,7 @@ export class PostgresReadModelStore {
     }
   }
 
-  async addConfiguration(configuration) {
+  async addConfiguration(config) {
     const insertResult = await this.pool.query(
       `
       INSERT INTO reputation_configurations (config_id, version, activation_time, payload)
@@ -49,10 +49,10 @@ export class PostgresReadModelStore {
       RETURNING 1
       `,
       [
-        configuration.configId,
-        configuration.version,
-        configuration.activationTime,
-        JSON.stringify(configuration),
+        config.configId,
+        config.version,
+        config.activationTime,
+        JSON.stringify(config),
       ]
     );
 
@@ -62,18 +62,18 @@ export class PostgresReadModelStore {
 
     const subjects = await this.listSubjects();
     for (const subject of subjects) {
-      if (subject.configVersion === configuration.version) {
+      if (subject.configVersion === config.version) {
         continue;
       }
 
-      for (const component of configuration.components) {
-        if (!subject.components?.[component.componentId]) {
-          subject.components[component.componentId] = createSubjectComponent(component);
+      for (const comp of config.components) {
+        if (!subject.components?.[comp.componentId]) {
+          subject.components[comp.componentId] = createComponent(comp);
         }
       }
 
-      subject.configVersion = configuration.version;
-      this.recomputeOverallScore(subject, configuration);
+      subject.configVersion = config.version;
+      this.recomputeOverallScore(subject, config);
       await this.saveSubject(subject);
     }
   }
@@ -177,18 +177,18 @@ export class PostgresReadModelStore {
     return result.rows[0]?.payload;
   }
 
-  async getOrCreateSubject(party, roleId, configuration) {
+  async getOrCreateSubject(party, roleId, config) {
     const existing = await this.getSubject(party);
 
     if (!existing) {
       const components = Object.fromEntries(
-        configuration.components.map((component) => [component.componentId, createSubjectComponent(component)])
+        config.components.map((comp) => [comp.componentId, createComponent(comp)])
       );
 
       const created = {
         party,
         roleId,
-        configVersion: configuration.version,
+        configVersion: config.version,
         overallScore: 0,
         components,
         updatedAt: new Date().toISOString(),
@@ -199,7 +199,7 @@ export class PostgresReadModelStore {
     }
 
     existing.roleId = roleId;
-    existing.configVersion = configuration.version;
+    existing.configVersion = config.version;
     return existing;
   }
 
@@ -257,19 +257,19 @@ export class PostgresReadModelStore {
         party: subject.party,
         roleId: subject.roleId,
         overallScore: subject.overallScore,
-        components: Object.values(subject.components || {}).map((component) => ({
-          componentId: component.componentId,
-          value: component.value,
+        components: Object.values(subject.components || {}).map((comp) => ({
+          componentId: comp.componentId,
+          value: comp.value,
         })),
       };
     });
   }
 
-  recomputeOverallScore(subject, configuration) {
-    const floor = configuration.systemParameters.reputationFloor;
-    const ceiling = configuration.systemParameters.reputationCeiling;
+  recomputeOverallScore(subject, config) {
+    const floor = config.systemParameters.reputationFloor;
+    const ceiling = config.systemParameters.reputationCeiling;
 
-    const roleWeights = configuration.roleWeights.find((item) => item.roleId === subject.roleId);
+    const roleWeights = config.roleWeights.find((item) => item.roleId === subject.roleId);
     const componentIds = Object.keys(subject.components || {});
 
     let weightedSum = 0;
@@ -277,10 +277,10 @@ export class PostgresReadModelStore {
 
     if (roleWeights) {
       for (const componentId of componentIds) {
-        const component = subject.components[componentId];
+        const comp = subject.components[componentId];
         const weight = Number(roleWeights.componentWeights[componentId] ?? 0);
         if (weight > 0) {
-          weightedSum += component.value * weight;
+          weightedSum += comp.value * weight;
           totalWeight += weight;
         }
       }

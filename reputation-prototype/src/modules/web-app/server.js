@@ -2,21 +2,21 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { URL, fileURLToPath } from 'node:url';
-import { validateContractPayload } from '../../shared/contracts/validation.js';
-import { listContractDefinitions } from '../../shared/contracts/registry.js';
+import { validate } from '../../shared/contracts/validation.js';
+import { listDefinitions } from '../../config/contracts.js';
 import { readJsonBody, sendJson, sendText } from '../../shared/runtime/http.js';
 
-function issueReputationCredential({ subject, configuration, disclosedComponentIds = [] }) {
-  const includeAll = disclosedComponentIds.length === 0;
+function issueCredential({ subject, config, disclosed = [] }) {
+  const includeAll = disclosed.length === 0;
 
-  const disclosedComponents = Object.fromEntries(
+  const components = Object.fromEntries(
     Object.entries(subject.components)
-      .filter(([componentId]) => includeAll || disclosedComponentIds.includes(componentId))
-      .map(([componentId, component]) => [
-        componentId,
+      .filter(([id]) => includeAll || disclosed.includes(id))
+      .map(([id, comp]) => [
+        id,
         {
-          value: component.value,
-          interactionCount: component.interactionCount,
+          value: comp.value,
+          interactionCount: comp.interactionCount,
         },
       ])
   );
@@ -24,15 +24,15 @@ function issueReputationCredential({ subject, configuration, disclosedComponentI
   return {
     id: `vc:reputation:${subject.party}:${Date.now()}`,
     type: ['VerifiableCredential', 'ReputationCredential'],
-    issuer: configuration.operator,
+    issuer: config.operator,
     issuanceDate: new Date().toISOString(),
     credentialSubject: {
       id: subject.party,
       roleId: subject.roleId,
       overallScore: subject.overallScore,
-      components: disclosedComponents,
-      configId: configuration.configId,
-      configVersion: configuration.version,
+      components,
+      configId: config.configId,
+      configVersion: config.version,
     },
     proof: {
       type: 'MockProof',
@@ -129,7 +129,7 @@ export function createApiServer({ ledger, store, engine }) {
       }
 
       if (req.method === 'GET' && pathname === '/schema/contracts') {
-        sendJson(res, 200, listContractDefinitions());
+        sendJson(res, 200, listDefinitions());
         return;
       }
 
@@ -202,10 +202,10 @@ export function createApiServer({ ledger, store, engine }) {
           ? body.disclosedComponents.map(String)
           : [];
 
-        const credential = issueReputationCredential({
+        const credential = issueCredential({
           subject,
-          configuration: activeConfig,
-          disclosedComponentIds: disclosed,
+          config: activeConfig,
+          disclosed,
         });
 
         sendJson(res, 201, credential);
@@ -215,7 +215,7 @@ export function createApiServer({ ledger, store, engine }) {
       if (req.method === 'POST' && pathname.startsWith('/mock/contracts/')) {
         const templateId = decodeURIComponent(pathname.replace('/mock/contracts/', ''));
         const body = await readJsonBody(req);
-        const validation = validateContractPayload(templateId, body);
+        const validation = validate(templateId, body);
         if (!validation.ok) {
           sendJson(res, 400, {
             error: 'Payload validation failed',

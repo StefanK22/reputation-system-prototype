@@ -1,13 +1,18 @@
-import { TEMPLATE_IDS } from '../../shared/contracts/constants.js';
-import {
-  normalizeCompletedInteraction,
-  normalizeFeedback,
-  normalizeReputationConfiguration,
-} from '../../shared/contracts/schema.js';
-import { clamp, evaluateCondition, round2 } from '../../shared/domain/conditions.js';
+/**
+ * Async reputation engine
+ * Processes contract events and computes reputation scores
+ */
 
-function evaluateInteractionRatings(interaction, configuration) {
-  const interactionType = configuration.interactionTypes.find(
+import { TEMPLATE_IDS } from '../../config/contracts.js';
+import {
+  normalizeConfiguration,
+  normalizeInteraction,
+  normalizeFeedback,
+} from '../../shared/contracts/schema.js';
+import { clamp, evaluate, round2 } from '../../shared/utils/math.js';
+
+function findRatingsForInteraction(interaction, config) {
+  const interactionType = config.interactionTypes.find(
     (item) => item.interactionTypeId === interaction.interactionType
   );
 
@@ -16,14 +21,11 @@ function evaluateInteractionRatings(interaction, configuration) {
   }
 
   const ratings = {};
-
   for (const rule of interactionType.ratingRules) {
-    if (ratings[rule.componentId] != null) {
-      continue;
-    }
+    if (ratings[rule.componentId] != null) continue;
 
     const observed = interaction.outcome?.[rule.conditionField];
-    if (evaluateCondition(observed, rule.conditionOperator, rule.conditionValue)) {
+    if (evaluate(observed, rule.conditionOperator, rule.conditionValue)) {
       ratings[rule.componentId] = rule.assignedRating;
     }
   }
@@ -65,38 +67,38 @@ export class AsyncReputationEngine {
       try {
         switch (event.templateId) {
           case TEMPLATE_IDS.REPUTATION_CONFIGURATION: {
-            const configuration = normalizeReputationConfiguration(event.payload);
-            await this.store.addConfiguration(configuration);
+            const config = normalizeConfiguration(event.payload);
+            await this.store.addConfiguration(config);
             break;
           }
           case TEMPLATE_IDS.COMPLETED_INTERACTION: {
-            const interaction = normalizeCompletedInteraction(event.payload);
+            const interaction = normalizeInteraction(event.payload);
             if (interaction.evaluated) {
               stats.ignoredEvents += 1;
               break;
             }
 
-            const configuration =
+            const config =
               (await this.store.getConfigurationByVersion(interaction.configVersion)) ||
               (await this.store.getActiveConfiguration(event.createdAt, { fallback: 'none' }));
 
-            if (!configuration) {
+            if (!config) {
               stats.warnings.push(`No active config for interaction event at offset ${event.offset}`);
               stats.ignoredEvents += 1;
               break;
             }
 
-            const ratings = evaluateInteractionRatings(interaction, configuration);
+            const ratings = findRatingsForInteraction(interaction, config);
             if (Object.keys(ratings).length === 0) {
               stats.ignoredEvents += 1;
               break;
             }
 
             for (const party of interaction.participants) {
-              stats.appliedUpdates += await this.applyRatingsToParty({
+              stats.appliedUpdates += await this.applyRatings({
                 party,
                 ratings,
-                configuration,
+                config,
                 reason: 'INTERACTION_RULE',
                 sourceId: event.contractId,
               });
@@ -105,20 +107,20 @@ export class AsyncReputationEngine {
           }
           case TEMPLATE_IDS.FEEDBACK: {
             const feedback = normalizeFeedback(event.payload);
-            const configuration =
+            const config =
               (await this.store.getActiveConfiguration(event.createdAt, { fallback: 'none' })) ||
               (await this.store.getConfigurationByVersion(1));
 
-            if (!configuration) {
+            if (!config) {
               stats.warnings.push(`No active config for feedback event at offset ${event.offset}`);
               stats.ignoredEvents += 1;
               break;
             }
 
-            stats.appliedUpdates += await this.applyRatingsToParty({
+            stats.appliedUpdates += await this.applyRatings({
               party: feedback.to,
               ratings: feedback.componentRatings,
-              configuration,
+              config,
               reason: `FEEDBACK_${feedback.phase}`,
               sourceId: feedback.interactionId,
               from: feedback.from,
@@ -140,11 +142,11 @@ export class AsyncReputationEngine {
     return stats;
   }
 
-  async applyRatingsToParty({ party, ratings, configuration, reason, sourceId, from = '' }) {
-    const roleId = await this.resolveRoleForParty(party, configuration);
-    const subject = await this.store.getOrCreateSubject(party, roleId, configuration);
-    const floor = configuration.systemParameters.reputationFloor;
-    const ceiling = configuration.systemParameters.reputationCeiling;
+  async applyRatings({ party, ratings, config, reason, sourceId, from = '' }) {
+    const roleId = await this.resolveRole(party, config);
+    const subject = await this.store.getOrCreateSubject(party, roleId, config);
+    const floor = config.systemParameters.reputationFloor;
+    const ceiling = config.systemParameters.reputationCeiling;
 
     let applied = 0;
 
@@ -160,7 +162,7 @@ export class AsyncReputationEngine {
       }
 
       const currentValue = Number(component.value);
-      const step = 1 / (component.interactionCount + 2); // Takes initial value into account
+      const step = 1 / (component.interactionCount + 2);
       const rawNext = currentValue + step * (rating - currentValue);
       const nextValue = round2(clamp(rawNext, floor, ceiling));
 
@@ -180,26 +182,26 @@ export class AsyncReputationEngine {
       applied += 1;
     }
 
-    this.store.recomputeOverallScore(subject, configuration);
+    this.store.recomputeOverallScore(subject, config);
     await this.store.saveSubject(subject);
 
     return applied;
   }
 
-  async resolveRoleForParty(party, configuration) {
+  async resolveRole(party, config) {
     const existing = await this.store.getSubject(party);
     if (existing?.roleId) {
       return existing.roleId;
     }
 
-    if (configuration.partyRoles?.[party]) {
-      return configuration.partyRoles[party];
+    if (config.partyRoles?.[party]) {
+      return config.partyRoles[party];
     }
 
-    if (configuration.defaultRoleId) {
-      return configuration.defaultRoleId;
+    if (config.defaultRoleId) {
+      return config.defaultRoleId;
     }
 
-    return configuration.roleWeights[0]?.roleId || 'UNKNOWN_ROLE';
+    return config.roleWeights[0]?.roleId || 'UNKNOWN_ROLE';
   }
 }
