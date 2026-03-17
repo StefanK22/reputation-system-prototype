@@ -35,10 +35,12 @@ export class DB {
         role_id            TEXT          NOT NULL,
         overall_score      NUMERIC(10,2) NOT NULL,
         last_ledger_offset BIGINT        NOT NULL DEFAULT 0,
+        contract_id        TEXT          NOT NULL DEFAULT '',
         payload            JSONB         NOT NULL,
         updated_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW()
       );
       ALTER TABLE reputation_subjects ADD COLUMN IF NOT EXISTS last_ledger_offset BIGINT NOT NULL DEFAULT 0;
+      ALTER TABLE reputation_subjects ADD COLUMN IF NOT EXISTS contract_id        TEXT   NOT NULL DEFAULT '';
       CREATE INDEX IF NOT EXISTS idx_subjects_score ON reputation_subjects (overall_score DESC);
 
       CREATE TABLE IF NOT EXISTS engine_state (
@@ -88,9 +90,18 @@ export class DB {
 
   async getAllConfigs() {
     const res = await this.pool.query(
-      `SELECT payload FROM reputation_configurations ORDER BY activation_time DESC, version DESC`
+      `SELECT config_id, version, activation_time, ledger_offset, contract_id, created_at, payload
+       FROM reputation_configurations ORDER BY activation_time DESC, version DESC`
     );
-    return res.rows.map((r) => r.payload);
+    return res.rows;
+  }
+
+  async getAllSubjects() {
+    const res = await this.pool.query(
+      `SELECT party, role_id, overall_score, last_ledger_offset, contract_id, updated_at, payload
+       FROM reputation_subjects ORDER BY overall_score DESC, party ASC`
+    );
+    return res.rows;
   }
 
   async getConfigByVersion(version) {
@@ -161,14 +172,15 @@ export class DB {
   async saveSubject(subject) {
     subject.updatedAt = new Date().toISOString();
     const lastOffset  = Number(subject.lastLedgerOffset || 0);
+    const contractId  = String(subject.contractId || '');
     await this.pool.query(
-      `INSERT INTO reputation_subjects (party, role_id, overall_score, last_ledger_offset, payload, updated_at)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+      `INSERT INTO reputation_subjects (party, role_id, overall_score, last_ledger_offset, contract_id, payload, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
        ON CONFLICT (party) DO UPDATE SET
          role_id = EXCLUDED.role_id, overall_score = EXCLUDED.overall_score,
-         last_ledger_offset = EXCLUDED.last_ledger_offset,
+         last_ledger_offset = EXCLUDED.last_ledger_offset, contract_id = EXCLUDED.contract_id,
          payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at`,
-      [subject.party, subject.roleId, Number(subject.overallScore || 0), lastOffset, JSON.stringify(subject), subject.updatedAt]
+      [subject.party, subject.roleId, Number(subject.overallScore || 0), lastOffset, contractId, JSON.stringify(subject), subject.updatedAt]
     );
   }
 

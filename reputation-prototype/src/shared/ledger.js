@@ -23,24 +23,31 @@ export class LedgerClient {
     this.userId  = userId;
   }
 
-  async publish(templateId, payload) {
+  async _submit(commands) {
     const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const res = await fetchJson(this.baseUrl, '/v2/commands/submit-and-wait-for-transaction', {
+    return fetchJson(this.baseUrl, '/v2/commands/submit-and-wait-for-transaction', {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        commands: {
-          commands: [{ CreateCommand: { templateId, createArguments: payload } }],
-          userId: this.userId,
-          commandId,
-          actAs: [this.party],
-        },
-      }),
+      body:    JSON.stringify({ commands: { commands, userId: this.userId, commandId, actAs: [this.party] } }),
     });
+  }
 
-    const events = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
+  // Submit a CreateCommand. Returns the created event.
+  async create(templateId, payload) {
+    const res     = await this._submit([{ CreateCommand: { templateId, createArguments: payload } }]);
+    const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
     const created = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
     if (!created) throw new Error('Canton did not return a created event.');
+    return toEvent(created, res.transaction?.offset);
+  }
+
+  // Submit an ExerciseCommand on an existing contract.
+  // Archives the current contract; returns the new created event from the choice result.
+  async exercise(contractId, templateId, choiceName, choiceArgument = {}) {
+    const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choiceName, choiceArgument } }]);
+    const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
+    const created = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
+    if (!created) throw new Error(`Exercise ${choiceName} did not return a created event.`);
     return toEvent(created, res.transaction?.offset);
   }
 

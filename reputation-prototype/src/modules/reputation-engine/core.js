@@ -14,6 +14,17 @@ function ratingsFromInteraction(interaction, config) {
   return ratings;
 }
 
+function tokenPayload(subject) {
+  return {
+    party:         subject.party,
+    roleId:        subject.roleId,
+    overallScore:  subject.overallScore,
+    components:    subject.components,
+    configVersion: subject.configVersion,
+    updatedAt:     subject.updatedAt,
+  };
+}
+
 export class ReputationEngine {
   constructor({ ledger, db }) {
     this.ledger     = ledger;
@@ -42,11 +53,19 @@ export class ReputationEngine {
           case TEMPLATES.CONFIG: {
             const config = normalizeConfig(event.payload);
             await this.db.addConfig(config, event.offset, event.contractId);
+            // Create initial ReputationTokens for all known parties in this config
+            for (const [party, roleId] of Object.entries(config.partyRoles ?? {})) {
+              const subject = await this.db.getOrCreateSubject(party, roleId, config);
+              if (!subject.contractId) {
+                const token = await this.ledger.create(TEMPLATES.TOKEN, tokenPayload(subject));
+                subject.contractId = token.contractId;
+                await this.db.saveSubject(subject);
+              }
+            }
             break;
           }
           case TEMPLATES.INTERACTION: {
             const interaction = normalizeInteraction(event.payload);
-            if (interaction.evaluated) { stats.ignored++; break; }
 
             const config =
               (await this.db.getConfigByVersion(interaction.configVersion)) ||
@@ -72,6 +91,7 @@ export class ReputationEngine {
             stats.applied += await this.applyRatings({ party: fb.to, ratings: fb.componentRatings, config, reason: `FEEDBACK_${fb.phase}`, sourceId: fb.interactionId, from: fb.from, ledgerOffset: event.offset });
             break;
           }
+          case TEMPLATES.TOKEN:  // written by this engine; skip on replay
           default:
             stats.ignored++;
         }
@@ -108,6 +128,14 @@ export class ReputationEngine {
 
     subject.lastLedgerOffset = ledgerOffset;
     this.db.recomputeScore(subject, config);
+
+    // Exercise UpdateScore on the existing token (archives old, returns new contractId).
+    // If no token exists yet (party not in partyRoles, first encounter), create one instead.
+    const token = subject.contractId
+      ? await this.ledger.exercise(subject.contractId, TEMPLATES.TOKEN, 'UpdateScore', tokenPayload(subject))
+      : await this.ledger.create(TEMPLATES.TOKEN, tokenPayload(subject));
+    subject.contractId = token.contractId;
+
     await this.db.saveSubject(subject);
     return applied;
   }

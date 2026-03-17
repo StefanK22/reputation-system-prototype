@@ -4,9 +4,10 @@
  */
 
 export const TEMPLATES = Object.freeze({
-  CONFIG: 'ReputationConfiguration',
+  CONFIG:      'ReputationConfiguration',
   INTERACTION: 'CompletedInteraction',
-  FEEDBACK: 'Feedback',
+  FEEDBACK:    'Feedback',
+  TOKEN:       'ReputationToken',
 });
 
 // ─── Field definitions ────────────────────────────────────────────────────────
@@ -55,7 +56,6 @@ const INTERACTION_SAMPLE = {
   outcome: { closedSuccessfully: 1, cancelled: 0, documentRejections: 0 },
   completedAt: '2026-02-27T10:00:00Z',
   configVersion: 1,
-  evaluated: false,
 };
 
 const FEEDBACK_SAMPLE = {
@@ -99,7 +99,6 @@ export const REGISTRY = Object.freeze({
       field('outcome',         'object'),
       field('completedAt',     'isoDate'),
       field('configVersion',   'number',  { defaultValue: 1 }),
-      field('evaluated',       'boolean', { defaultValue: false }),
     ],
     sample: INTERACTION_SAMPLE,
   },
@@ -247,7 +246,6 @@ export function normalizeInteraction(payload) {
     outcome:        v.outcome ?? {},
     completedAt:    v.completedAt,
     configVersion:  Number(v.configVersion) || 1,
-    evaluated:      Boolean(v.evaluated),
   };
 }
 

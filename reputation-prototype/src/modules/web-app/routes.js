@@ -63,6 +63,9 @@ export function createServer({ db, ledger, engineUrl }) {
       if (req.method === 'GET' && pathname === '/config/all')
         return sendJson(res, 200, await db.getAllConfigs());
 
+      if (req.method === 'GET' && pathname === '/subjects')
+        return sendJson(res, 200, await db.getAllSubjects());
+
       if (req.method === 'GET' && pathname === '/rankings') {
         const limit = Number(url.searchParams.get('limit') || 10);
         return sendJson(res, 200, await db.getRankings(limit));
@@ -99,7 +102,7 @@ export function createServer({ db, ledger, engineUrl }) {
         const { ok, errors } = validate(templateId, body);
         if (!ok) return sendJson(res, 400, { error: 'Validation failed', details: errors });
 
-        const event = await ledger.publish(templateId, body);
+        const event = await ledger.create(templateId, body);
         const autoProcess = url.searchParams.get('autoProcess') !== 'false';
         const processResult = autoProcess
           ? await fetchJson(engineUrl, '/process', { method: 'POST', headers: { 'content-type': 'application/json' } })
