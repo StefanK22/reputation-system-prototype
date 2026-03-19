@@ -22,7 +22,6 @@ const post = (path, data) => request(path, {
 });
 
 export const api = {
-  health:     ()                          => request('/health'),
   contracts:  ()                          => request('/schema/contracts'),
   config:     ()                          => request('/config'),
   allConfigs:  ()                          => request('/config/all'),
@@ -30,8 +29,7 @@ export const api = {
   rankings:   (limit = 20)               => request(`/rankings?limit=${limit}`),
   reputation: (party)                    => request(`/reputation/${encodeURIComponent(party)}`),
   events:     (from = 0)                 => request(`/events?from=${from}`),
-  deploy:     (tid, payload, auto = true) => post(`/mock/contracts/${encodeURIComponent(tid)}?autoProcess=${auto}`, payload),
-  process:    ()                          => post('/engine/process', {}),
+  deploy:     (tid, payload) => post(`/mock/contracts/${encodeURIComponent(tid)}`, payload),
   issueVC:    (party, disc = [])         => post('/vc/request', { party, disclosedComponents: disc }),
 };
 

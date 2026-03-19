@@ -45,8 +45,6 @@ services:
     container_name: reputation-engine
     command: ["npm", "run", "start:engine"]
     environment:
-      PORT: 9091
-      POLL_INTERVAL_MS: 3000
       CANTON_API_URL: http://canton-node:7575
       DATABASE_URL: postgresql://reputation:reputation_password@database:5432/reputation
       CANTON_PARTY: OPERATOR
@@ -56,37 +54,48 @@ services:
         condition: service_healthy
       canton-node:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9091/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
     networks:
       - reputation-network
 
-  web-app:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: reputation-web-app
-    command: ["npm", "run", "start:web"]
+    container_name: reputation-api
+    command: ["npm", "run", "start:api"]
     environment:
       PORT: 8080
-      CANTON_API_URL: http://canton-node:7575
-      ENGINE_API_URL: http://reputation-engine:9091
       DATABASE_URL: postgresql://reputation:reputation_password@database:5432/reputation
-      CANTON_PARTY: OPERATOR
-      CANTON_USER_ID: operator-user
     ports:
       - "8080:8080"
     depends_on:
       database:
         condition: service_healthy
+    networks:
+      - reputation-network
+
+  console:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reputation-console
+    command: ["npm", "run", "start:console"]
+    environment:
+      PORT: 3000
+      CANTON_API_URL: http://canton-node:7575
+      DATABASE_URL: postgresql://reputation:reputation_password@database:5432/reputation
+      CANTON_PARTY: OPERATOR
+      CANTON_USER_ID: operator-user
+      API_URL: http://api:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      database:
+        condition: service_healthy
       canton-node:
         condition: service_healthy
-      reputation-engine:
-        condition: service_healthy
+      api:
+        condition: service_started
     networks:
       - reputation-network
 

@@ -38,10 +38,10 @@ export class ReputationEngine {
     console.log('Engine: read model reset — will rebuild from ledger offset 0');
   }
 
-  getCheckpoint() { return this.checkpoint; }
-
-  async processNewEvents() {
-    const events = await this.ledger.streamFrom(this.checkpoint);
+  // Accepts an AbortSignal forwarded from the worker so in-flight long-poll
+  // requests can be cancelled cleanly on shutdown.
+  async processNewEvents(signal) {
+    const events = await this.ledger.streamFrom(this.checkpoint, { signal });
     const stats  = { fromOffset: this.checkpoint, toOffset: this.checkpoint, consumed: 0, applied: 0, ignored: 0, warnings: [] };
 
     for (const event of events) {
@@ -53,7 +53,6 @@ export class ReputationEngine {
           case TEMPLATES.CONFIG: {
             const config = normalizeConfig(event.payload);
             await this.db.addConfig(config, event.offset, event.contractId);
-            // Create initial ReputationTokens for all known parties in this config
             for (const [party, roleId] of Object.entries(config.partyRoles ?? {})) {
               const subject = await this.db.getOrCreateSubject(party, roleId, config);
               if (!subject.contractId) {
@@ -66,7 +65,6 @@ export class ReputationEngine {
           }
           case TEMPLATES.INTERACTION: {
             const interaction = normalizeInteraction(event.payload);
-
             const config =
               (await this.db.getConfigByVersion(interaction.configVersion)) ||
               (await this.db.getActiveConfig(event.createdAt, { fallback: 'none' }));
@@ -91,7 +89,7 @@ export class ReputationEngine {
             stats.applied += await this.applyRatings({ party: fb.to, ratings: fb.componentRatings, config, reason: `FEEDBACK_${fb.phase}`, sourceId: fb.interactionId, from: fb.from, ledgerOffset: event.offset });
             break;
           }
-          case TEMPLATES.TOKEN:  // written by this engine; skip on replay
+          case TEMPLATES.TOKEN:
           default:
             stats.ignored++;
         }
@@ -100,7 +98,6 @@ export class ReputationEngine {
       }
 
       this.checkpoint = event.offset;
-      await this.db.setCheckpoint(this.checkpoint);
     }
 
     return stats;
@@ -129,8 +126,6 @@ export class ReputationEngine {
     subject.lastLedgerOffset = ledgerOffset;
     this.db.recomputeScore(subject, config);
 
-    // Exercise UpdateScore on the existing token (archives old, returns new contractId).
-    // If no token exists yet (party not in partyRoles, first encounter), create one instead.
     const token = subject.contractId
       ? await this.ledger.exercise(subject.contractId, TEMPLATES.TOKEN, 'UpdateScore', tokenPayload(subject))
       : await this.ledger.create(TEMPLATES.TOKEN, tokenPayload(subject));

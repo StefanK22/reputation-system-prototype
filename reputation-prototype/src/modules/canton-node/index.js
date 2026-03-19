@@ -4,8 +4,10 @@ import { sendJson, readBody } from '../../shared/http.js';
 import { createPort, runService } from '../../shared/lifecycle.js';
 import { seed } from './seed.js';
 
+const LONG_POLL_MAX_MS = 30_000;
+
 function toAlias(templateId) {
-  const s = String(templateId || '');
+  const s    = String(templateId || '');
   const tail = s.split(':').pop() || s;
   return tail.includes('.') ? tail.split('.').pop() || tail : tail;
 }
@@ -22,15 +24,23 @@ class CantonNodeService {
     this.port     = port;
     this.seedData = seedData;
     this.events   = [];
-    this.archived = new Set(); // contractIds that have been consumed by an ExerciseCommand
+    this.archived = new Set();
     this.next     = 1;
     this.server   = null;
+
+    // Pending long-poll requests: { from, res, timer }
+    // Each entry represents an engine connection waiting for new events.
+    this.pending  = [];
   }
 
   _create(templateId, payload) {
     const offset = this.next++;
-    const event  = { offset, contractId: `${toAlias(templateId)}#${offset}`, templateId: toAlias(templateId), payload, createdAt: new Date().toISOString() };
+    const event  = {
+      offset, contractId: `${toAlias(templateId)}#${offset}`,
+      templateId: toAlias(templateId), payload, createdAt: new Date().toISOString(),
+    };
     this.events.push(event);
+    this._flushPending(); // notify any waiting long-poll connections
     return event;
   }
 
@@ -39,8 +49,46 @@ class CantonNodeService {
     if (!existing || this.archived.has(contractId))
       throw new Error(`Contract ${contractId} not found or already archived`);
     this.archived.add(contractId);
-    // The choice creates a new contract of the same template with the updated payload
     return this._create(existing.templateId, choiceArgument);
+  }
+
+  // Resolve any pending long-poll connections that now have events available.
+  _flushPending() {
+    const still = [];
+    for (const p of this.pending) {
+      const events = this.events
+        .filter((e) => e.offset > p.from)
+        .map((e) => ({ ...e, archived: this.archived.has(e.contractId) }));
+
+      if (events.length > 0) {
+        clearTimeout(p.timer);
+        sendJson(p.res, 200, { events });
+      } else {
+        still.push(p);
+      }
+    }
+    this.pending = still;
+  }
+
+  // Register a long-poll request. Resolves immediately if events already exist,
+  // otherwise holds the connection until _flushPending() is called or the
+  // server-side timeout fires.
+  _waitForEvents(from, res, timeoutMs) {
+    const events = this.events
+      .filter((e) => e.offset > from)
+      .map((e) => ({ ...e, archived: this.archived.has(e.contractId) }));
+
+    if (events.length > 0) {
+      sendJson(res, 200, { events });
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      this.pending = this.pending.filter((p) => p.res !== res);
+      sendJson(res, 200, { events: [] }); // timeout — client reconnects
+    }, Math.min(timeoutMs, LONG_POLL_MAX_MS));
+
+    this.pending.push({ from, res, timer });
   }
 
   async start() {
@@ -59,8 +107,17 @@ class CantonNodeService {
           return sendJson(res, 200, { offset: String(this.next - 1) });
 
         if (method === 'GET'  && pathname === '/v2/events') {
-          const from = Number(url.searchParams.get('from') || 0);
-          return sendJson(res, 200, { events: this.events.filter((e) => e.offset > from).map((e) => ({ ...e, archived: this.archived.has(e.contractId) })) });
+          const from    = Number(url.searchParams.get('from')    || 0);
+          const wait    = url.searchParams.get('wait') === 'true';
+          const timeout = Number(url.searchParams.get('timeout') || LONG_POLL_MAX_MS);
+
+          if (wait) return this._waitForEvents(from, res, timeout);
+
+          return sendJson(res, 200, {
+            events: this.events
+              .filter((e) => e.offset > from)
+              .map((e) => ({ ...e, archived: this.archived.has(e.contractId) })),
+          });
         }
 
         if (method === 'POST' && pathname === '/v2/parties') {
@@ -119,6 +176,9 @@ class CantonNodeService {
 
   async stop(signal = 'SIGTERM') {
     console.log(`Stopping canton node (${signal})`);
+    // Drain pending long-poll connections before closing
+    for (const p of this.pending) { clearTimeout(p.timer); sendJson(p.res, 200, { events: [] }); }
+    this.pending = [];
     if (this.server) await new Promise((r) => this.server.close(r));
   }
 }

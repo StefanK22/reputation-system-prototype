@@ -43,13 +43,6 @@ export class DB {
       ALTER TABLE reputation_subjects ADD COLUMN IF NOT EXISTS contract_id        TEXT   NOT NULL DEFAULT '';
       CREATE INDEX IF NOT EXISTS idx_subjects_score ON reputation_subjects (overall_score DESC);
 
-      CREATE TABLE IF NOT EXISTS engine_state (
-        id                    INTEGER     PRIMARY KEY CHECK (id = 1),
-        last_processed_offset BIGINT      NOT NULL DEFAULT 0,
-        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-      INSERT INTO engine_state (id, last_processed_offset) VALUES (1, 0)
-      ON CONFLICT (id) DO NOTHING;
     `);
   }
 
@@ -59,7 +52,6 @@ export class DB {
     await this.pool.query(`
       DELETE FROM reputation_subjects;
       DELETE FROM reputation_configurations;
-      UPDATE engine_state SET last_processed_offset = 0, updated_at = now() WHERE id = 1;
     `);
   }
 
@@ -230,18 +222,4 @@ export class DB {
     subject.updatedAt    = new Date().toISOString();
   }
 
-  // ── Checkpoint ──────────────────────────────────────────────────────────────
-
-  async getCheckpoint() {
-    const res = await this.pool.query(`SELECT last_processed_offset FROM engine_state WHERE id = 1`);
-    return Number(res.rows[0]?.last_processed_offset ?? 0);
-  }
-
-  async setCheckpoint(offset) {
-    await this.pool.query(
-      `INSERT INTO engine_state (id, last_processed_offset, updated_at) VALUES (1, $1, now())
-       ON CONFLICT (id) DO UPDATE SET last_processed_offset = EXCLUDED.last_processed_offset, updated_at = EXCLUDED.updated_at`,
-      [Number(offset) || 0]
-    );
-  }
 }

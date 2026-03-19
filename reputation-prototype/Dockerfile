@@ -7,6 +7,6 @@ RUN npm install --omit=dev
 
 COPY src ./src
 
-EXPOSE 7575 8080 9091
+EXPOSE 7575 8080 3000
 
 CMD ["npm", "run", "start:web"]

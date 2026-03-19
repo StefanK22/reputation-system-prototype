@@ -53,20 +53,12 @@ function App() {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 function Dashboard({ notify }) {
-  const [health, setHealth]     = useState(null);
   const [rankings, setRankings] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail]     = useState(null);
 
   const refresh = async () => {
-    try {
-      const [h, r] = await Promise.all([api.health(), api.rankings()]);
-      setHealth(h); setRankings(r);
-    } catch (e) { notify(e.message, 'error'); }
-  };
-
-  const processEvents = async () => {
-    try { await api.process(); notify('Events processed', 'success'); await refresh(); }
+    try { setRankings(await api.rankings()); }
     catch (e) { notify(e.message, 'error'); }
   };
 
@@ -82,18 +74,9 @@ function Dashboard({ notify }) {
     <div className="page-header">
       <h1>Dashboard</h1>
       <div className="btn-group">
-        <button className="btn-sm" onClick=${processEvents}>Process Events</button>
         <button className="btn-sm" onClick=${refresh}>Refresh</button>
       </div>
     </div>
-
-    ${health && html`
-      <div className="stats">
-        <div className="stat-card"><span className="stat-label">Status</span><span className="stat-value">${health.status}</span></div>
-        <div className="stat-card"><span className="stat-label">Ledger End</span><span className="stat-value">${health.ledgerEnd}</span></div>
-        <div className="stat-card"><span className="stat-label">Checkpoint</span><span className="stat-value">${health.checkpoint}</span></div>
-      </div>
-    `}
 
     <div className="card">
       <h2>Rankings</h2>
@@ -404,7 +387,6 @@ function ConfigPage({ contracts, notify }) {
 // ─── Deploy ──────────────────────────────────────────────────────────────────
 
 function DeployPage({ contracts, notify }) {
-  const [autoProcess, setAutoProcess] = useState(true);
   const [activeConfig, setActiveConfig] = useState(null);
   const defs = contracts.filter((c) => !c.isConfigTemplate);
 
@@ -418,18 +400,14 @@ function DeployPage({ contracts, notify }) {
   return html`
     <div className="page-header">
       <h1>Deploy Contracts</h1>
-      <label className="toggle-label">
-        <input type="checkbox" checked=${autoProcess} onChange=${(e) => setAutoProcess(e.target.checked)} />
-        Auto-process events
-      </label>
     </div>
     <div className="grid-2">
-      ${defs.map((def) => html`<${ContractForm} key=${def.templateId} def=${def} autoProcess=${autoProcess} notify=${notify} autoFields=${autoFields(def)} activeConfig=${activeConfig} />`)}
+      ${defs.map((def) => html`<${ContractForm} key=${def.templateId} def=${def} notify=${notify} autoFields=${autoFields(def)} activeConfig=${activeConfig} />`)}
     </div>
   `;
 }
 
-function ContractForm({ def, autoProcess, notify, autoFields = {}, activeConfig = null }) {
+function ContractForm({ def, notify, autoFields = {}, activeConfig = null }) {
   const [fields, setFields] = useState(() => fieldState(def));
   const [extras, setExtras] = useState({});
   const [busy, setBusy]     = useState(false);
@@ -501,7 +479,7 @@ function ContractForm({ def, autoProcess, notify, autoFields = {}, activeConfig 
         delete cleanExtras.outcomeEnabled;
       }
       const payload = { ...base, ...cleanExtras, ...autoFields };
-      await api.deploy(def.templateId, payload, autoProcess);
+      await api.deploy(def.templateId, payload);
       notify(`Deployed ${def.title}`, 'success');
     } catch (e) { notify(e.message, 'error'); }
     finally { setBusy(false); }
@@ -755,13 +733,12 @@ function CredentialsPage({ notify }) {
 function DatabasePage({ notify }) {
   const [configs, setConfigs]   = useState([]);
   const [subjects, setSubjects] = useState([]);
-  const [health, setHealth]     = useState(null);
   const [expanded, setExpanded] = useState({});
 
   const refresh = async () => {
     try {
-      const [cfgs, subs, h] = await Promise.all([api.allConfigs(), api.allSubjects(), api.health()]);
-      setConfigs(cfgs); setSubjects(subs); setHealth(h);
+      const [cfgs, subs] = await Promise.all([api.allConfigs(), api.allSubjects()]);
+      setConfigs(cfgs); setSubjects(subs);
     } catch (e) { notify(e.message, 'error'); }
   };
 
@@ -773,19 +750,6 @@ function DatabasePage({ notify }) {
     <div className="page-header">
       <h1>Database</h1>
       <button className="btn-sm" onClick=${refresh}>Refresh</button>
-    </div>
-
-    <!-- engine_state -->
-    <div className="card">
-      <h2 className="db-title">engine_state</h2>
-      ${health ? html`
-        <div className="db-scroll">
-          <table className="db-table">
-            <thead><tr><th>status</th><th>ledger_end</th><th>checkpoint</th></tr></thead>
-            <tbody><tr><td>${health.status}</td><td>${health.ledgerEnd}</td><td>${health.checkpoint}</td></tr></tbody>
-          </table>
-        </div>
-      ` : html`<p className="muted">Loading...</p>`}
     </div>
 
     <!-- reputation_configurations -->

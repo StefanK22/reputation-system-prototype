@@ -32,7 +32,6 @@ export class LedgerClient {
     });
   }
 
-  // Submit a CreateCommand. Returns the created event.
   async create(templateId, payload) {
     const res     = await this._submit([{ CreateCommand: { templateId, createArguments: payload } }]);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
@@ -41,8 +40,6 @@ export class LedgerClient {
     return toEvent(created, res.transaction?.offset);
   }
 
-  // Submit an ExerciseCommand on an existing contract.
-  // Archives the current contract; returns the new created event from the choice result.
   async exercise(contractId, templateId, choiceName, choiceArgument = {}) {
     const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choiceName, choiceArgument } }]);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
@@ -51,9 +48,47 @@ export class LedgerClient {
     return toEvent(created, res.transaction?.offset);
   }
 
-  async streamFrom(offsetExclusive = 0) {
-    const res = await fetchJson(this.baseUrl, `/v2/events?from=${Number(offsetExclusive) || 0}`);
-    return (Array.isArray(res.events) ? res.events : []).map((e) => ({ ...e, offset: Number(e.offset) }));
+  // Fetches events after offsetExclusive from the Canton node.
+  //
+  // wait=true (default, used by the engine): long-polls — the server holds the
+  // connection open until a new event arrives or its 30s timeout elapses, then
+  // the engine loops immediately. This means the engine reacts to events as
+  // they land on the ledger with no arbitrary polling interval.
+  //
+  // wait=false (used by the web app's /events route): returns immediately with
+  // whatever events are currently available, like a normal HTTP GET.
+  //
+  // Accepts an AbortSignal so the engine can cancel in-flight requests on shutdown.
+  async streamFrom(offsetExclusive = 0, { signal, wait = true } = {}) {
+    const from = Number(offsetExclusive) || 0;
+
+    if (!wait) {
+      const res = await fetchJson(this.baseUrl, `/v2/events?from=${from}`);
+      return (Array.isArray(res.events) ? res.events : []).map((e) => ({ ...e, offset: Number(e.offset) }));
+    }
+
+    // Long-poll path: local controller combines the caller's signal with a
+    // client-side timeout set slightly longer than the server's own (30s),
+    // so the server always responds first under normal conditions.
+    const local   = new AbortController();
+    const timer   = setTimeout(() => local.abort(), 35_000);
+    const forward = () => local.abort();
+    signal?.addEventListener('abort', forward, { once: true });
+
+    try {
+      const res = await fetchJson(
+        this.baseUrl,
+        `/v2/events?from=${from}&wait=true&timeout=30000`,
+        { signal: local.signal },
+      );
+      return (Array.isArray(res.events) ? res.events : []).map((e) => ({ ...e, offset: Number(e.offset) }));
+    } catch (e) {
+      if (e.name === 'AbortError') return []; // timeout or shutdown — caller reconnects
+      throw e;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', forward);
+    }
   }
 
   async ledgerEnd() {
