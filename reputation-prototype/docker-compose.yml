@@ -18,6 +18,19 @@ services:
     networks:
       - reputation-network
 
+  canton-sandbox:
+    build:
+      context: ./canton
+      dockerfile: Dockerfile
+    container_name: canton-sandbox
+    volumes:
+      - ./daml/.daml/dist:/app/dist:ro
+    command: ["daml", "sandbox", "--port", "6865", "--dar", "/app/dist/reputation-1.0.0.dar"]
+    ports:
+      - "6865:6865"
+    networks:
+      - reputation-network
+
   canton-node:
     build:
       context: .

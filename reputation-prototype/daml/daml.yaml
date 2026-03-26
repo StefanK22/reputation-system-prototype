@@ -1,7 +1,8 @@
-sdk-version: 3.4.0-rc2
+sdk-version: 3.4.11
 name: reputation
-source: daml
+source: .
 version: 1.0.0
 dependencies:
   - daml-prim
   - daml-stdlib
+  - daml-script
