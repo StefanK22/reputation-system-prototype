@@ -1,7 +1,7 @@
 import fs   from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listContracts, validate } from '../../contracts.js';
+import { TEMPLATES, TEMPLATE_IDS, validate } from '../../contracts.js';
 import { sendJson, sendText, readBody } from '../../shared/http.js';
 
 const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'public');
@@ -21,8 +21,6 @@ export async function handleConsole(req, res, { url, db, ledger, apiUrl }) {
   const { pathname } = url;
 
   if (req.method === 'GET' && await serveStatic(pathname, res)) return true;
-
-  // ── API routes ── served here so the console UI can call them on its own origin
 
   if (req.method === 'GET' && pathname === '/config') {
     const at     = url.searchParams.get('at') || new Date().toISOString();
@@ -52,31 +50,27 @@ export async function handleConsole(req, res, { url, db, ledger, apiUrl }) {
     return true;
   }
 
-  // Contract schema — drives the console's dynamic form generation
-  if (req.method === 'GET' && pathname === '/schema/contracts')
-    return sendJson(res, 200, listContracts());
-
-  // Internal database views — for the console's Database tab
   if (req.method === 'GET' && pathname === '/config/all')
     return sendJson(res, 200, await db.getAllConfigs());
 
   if (req.method === 'GET' && pathname === '/subjects')
     return sendJson(res, 200, await db.getAllSubjects());
 
-  // Raw ledger event stream — for the console's Events tab
   if (req.method === 'GET' && pathname === '/events') {
     const from = Number(url.searchParams.get('from') || 0);
     return sendJson(res, 200, await ledger.streamFrom(from, { wait: false }));
   }
 
-  // Contract submission — lets the console publish contracts to the Canton node
   if (req.method === 'POST' && pathname.startsWith('/mock/contracts/')) {
     const templateId     = decodeURIComponent(pathname.slice('/mock/contracts/'.length));
     const body           = await readBody(req);
     const { ok, errors } = validate(templateId, body);
     if (!ok) return sendJson(res, 400, { error: 'Validation failed', details: errors });
 
-    const event = await ledger.create(templateId, body);
+    const fullId = TEMPLATE_IDS[templateId];
+    if (!fullId) return sendJson(res, 400, { error: `Unknown template: ${templateId}` });
+
+    const event = await ledger.create(fullId, body);
     return sendJson(res, 201, { event });
   }
 

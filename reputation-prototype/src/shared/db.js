@@ -4,7 +4,13 @@ import { clamp, round2 } from './math.js';
 const { Pool } = pg;
 
 function newComponent(comp) {
-  return { componentId: comp.componentId, description: comp.description, value: comp.initialValue, interactionCount: 0, history: [] };
+  return {
+    componentId:      comp.componentId,
+    description:      comp.description,
+    value:            comp.initialValue,
+    interactionCount: 0,
+    history:          [],
+  };
 }
 
 export class DB {
@@ -43,15 +49,20 @@ export class DB {
       ALTER TABLE reputation_subjects ADD COLUMN IF NOT EXISTS contract_id        TEXT   NOT NULL DEFAULT '';
       CREATE INDEX IF NOT EXISTS idx_subjects_score ON reputation_subjects (overall_score DESC);
 
+      CREATE TABLE IF NOT EXISTS party_roles (
+        party       TEXT PRIMARY KEY,
+        role_id     TEXT NOT NULL,
+        assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
   }
 
   // Wipe the read model so the engine can rebuild it cleanly from ledger offset 0.
-  // Called on every engine startup — guarantees DB always reflects the current ledger.
   async reset() {
     await this.pool.query(`
       DELETE FROM reputation_subjects;
       DELETE FROM reputation_configurations;
+      DELETE FROM party_roles;
     `);
   }
 
@@ -63,7 +74,7 @@ export class DB {
     const result = await this.pool.query(
       `INSERT INTO reputation_configurations (config_id, version, activation_time, payload, ledger_offset, contract_id)
        VALUES ($1, $2, $3, $4::jsonb, $5, $6) ON CONFLICT (config_id, version) DO NOTHING RETURNING 1`,
-      [config.configId, config.version, config.activationTime, JSON.stringify(config), ledgerOffset, contractId]
+      [config.configId, config.version, config.activatedAt, JSON.stringify(config), ledgerOffset, contractId]
     );
     if (result.rowCount === 0) return;
 
@@ -136,6 +147,28 @@ export class DB {
     return latest.rows[0]?.payload;
   }
 
+  // ── Party roles ─────────────────────────────────────────────────────────────
+
+  // Persist a party→roleId mapping derived from a PartyRole contract event.
+  async saveRole(party, roleId) {
+    await this.pool.query(
+      `INSERT INTO party_roles (party, role_id)
+       VALUES ($1, $2)
+       ON CONFLICT (party) DO UPDATE SET role_id = EXCLUDED.role_id`,
+      [party, roleId]
+    );
+  }
+
+  // Resolve the role for a party. Falls back to the first role in config
+  // if no PartyRole contract has been seen for this party yet.
+  async getRole(party, config) {
+    const res = await this.pool.query(
+      `SELECT role_id FROM party_roles WHERE party = $1`, [party]
+    );
+    if (res.rows[0]) return res.rows[0].role_id;
+    return config.roleWeights[0]?.roleId || 'UNKNOWN_ROLE';
+  }
+
   // ── Subjects ────────────────────────────────────────────────────────────────
 
   async getSubject(party) {
@@ -147,15 +180,22 @@ export class DB {
 
   async getOrCreateSubject(party, roleId, config) {
     const existing = await this.getSubject(party);
-    if (existing) { existing.roleId = roleId; existing.configVersion = config.version; return existing; }
+    if (existing) {
+      existing.roleId        = roleId;
+      existing.configVersion = config.version;
+      return existing;
+    }
 
     const subject = {
       party,
       roleId,
       configVersion: config.version,
       overallScore:  0,
-      components:    Object.fromEntries(config.components.map((c) => [c.componentId, newComponent(c)])),
-      updatedAt:     new Date().toISOString(),
+      components:    Object.fromEntries(
+        config.components.map((c) => [c.componentId, newComponent(c)])
+      ),
+      createdAt:  new Date().toISOString(),
+      updatedAt:  new Date().toISOString(),
     };
     await this.saveSubject(subject);
     return subject;
@@ -195,13 +235,16 @@ export class DB {
         party:        s.party,
         roleId:       s.roleId,
         overallScore: s.overallScore,
-        components:   Object.values(s.components ?? {}).map((c) => ({ componentId: c.componentId, value: c.value })),
+        components:   Object.values(s.components ?? {}).map((c) => ({
+          componentId: c.componentId,
+          value:       c.value,
+        })),
       };
     });
   }
 
   recomputeScore(subject, config) {
-    const { reputationFloor: floor, reputationCeiling: ceiling } = config.systemParameters;
+    const { reputationScoreFloor: floor, reputationScoreCeiling: ceiling } = config.systemParameters;
     const roleWeights  = config.roleWeights.find((r) => r.roleId === subject.roleId);
     const componentIds = Object.keys(subject.components ?? {});
 
@@ -221,5 +264,4 @@ export class DB {
     subject.overallScore = round2(clamp(totalWeight > 0 ? weightedSum / totalWeight : floor, floor, ceiling));
     subject.updatedAt    = new Date().toISOString();
   }
-
 }

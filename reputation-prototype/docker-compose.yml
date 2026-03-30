@@ -60,7 +60,7 @@ services:
     environment:
       CANTON_API_URL: http://canton-node:7575
       DATABASE_URL: postgresql://reputation:reputation_password@database:5432/reputation
-      CANTON_PARTY: OPERATOR
+      CANTON_PARTY: Operator
       CANTON_USER_ID: operator-user
     depends_on:
       database:

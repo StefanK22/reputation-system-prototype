@@ -1,4 +1,4 @@
-module TestScript where
+module Main where
 
 import Daml.Script
 import DA.Map qualified as Map

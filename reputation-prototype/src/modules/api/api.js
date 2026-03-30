@@ -13,8 +13,12 @@ function issueVC({ subject, config, disclosed = [] }) {
     issuer:       config.operator,
     issuanceDate: new Date().toISOString(),
     credentialSubject: {
-      id: subject.party, roleId: subject.roleId, overallScore: subject.overallScore,
-      components, configId: config.configId, configVersion: config.version,
+      id:           subject.party,
+      roleId:       subject.roleId,
+      overallScore: subject.overallScore,
+      components,
+      configId:      config.configId,
+      configVersion: config.version,
     },
     proof: { type: 'MockProof', purpose: 'prototype-only' },
   };

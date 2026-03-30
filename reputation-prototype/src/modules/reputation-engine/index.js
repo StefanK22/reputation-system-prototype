@@ -4,24 +4,30 @@ import { DB } from '../../shared/db.js';
 import { runService } from '../../shared/lifecycle.js';
 
 class EngineWorker {
-  constructor({ cantonApiUrl, databaseUrl, cantonParty, cantonUserId }) {
-    this.db      = new DB({ connectionString: databaseUrl });
-    this.ledger  = new LedgerClient({ baseUrl: cantonApiUrl, party: cantonParty, userId: cantonUserId });
-    this.engine  = new ReputationEngine({ ledger: this.ledger, db: this.db });
-    this.stopped = false;
-    this.abort   = null;
+  constructor({ cantonApiUrl, databaseUrl, cantonPartyName, cantonUserId }) {
+    this.cantonApiUrl    = cantonApiUrl;
+    this.databaseUrl     = databaseUrl;
+    this.cantonPartyName = cantonPartyName;  // display name e.g. "Operator"
+    this.cantonUserId    = cantonUserId;
+    this.db              = null;
+    this.ledger          = null;
+    this.engine          = null;
+    this.stopped         = false;
+    this.abort           = null;
   }
 
   async start() {
+    this.db     = new DB({ connectionString: this.databaseUrl });
+    const partyId = await LedgerClient.getOperatorPartyId(this.cantonApiUrl);
+    this.ledger = new LedgerClient({ baseUrl: this.cantonApiUrl, party: partyId, userId: this.cantonUserId });
+    this.engine = new ReputationEngine({ ledger: this.ledger, db: this.db, operator: partyId });
+
     await this.db.ensureReady();
     await this.engine.init();
     console.log('Engine worker started — listening to Canton event stream');
-    this._run(); // fire-and-forget; process stays alive via signal handlers
+    this._run();
   }
 
-  // Core event loop. Calls streamFrom() which blocks until events arrive
-  // (long-poll) or the 30s server timeout elapses, then loops immediately.
-  // No timer, no arbitrary interval — the cadence is driven by ledger activity.
   async _run() {
     while (!this.stopped) {
       this.abort = new AbortController();
@@ -31,7 +37,6 @@ class EngineWorker {
       } catch (e) {
         if (this.stopped) break;
         console.error('Stream error:', e.message);
-        // Brief pause only on unexpected errors, not on normal empty responses
         await new Promise((r) => setTimeout(r, 1_000));
       } finally {
         this.abort = null;
@@ -43,17 +48,17 @@ class EngineWorker {
   async stop(signal = 'SIGTERM') {
     console.log(`Stopping engine worker (${signal})`);
     this.stopped = true;
-    this.abort?.abort(); // cancel any in-flight long-poll
-    await this.db.close();
+    this.abort?.abort();
+    await this.db?.close();
   }
 }
 
 runService({
   createConfig: (env) => ({
-    cantonApiUrl:  env.CANTON_API_URL,
-    databaseUrl:   env.DATABASE_URL,
-    cantonParty:   env.CANTON_PARTY,
-    cantonUserId:  env.CANTON_USER_ID
+    cantonApiUrl:    env.CANTON_API_URL,
+    databaseUrl:     env.DATABASE_URL,
+    cantonPartyName: env.CANTON_PARTY,
+    cantonUserId:    env.CANTON_USER_ID
   }),
   createService: (config) => new EngineWorker(config),
 });
