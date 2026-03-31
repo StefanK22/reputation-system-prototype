@@ -11,6 +11,10 @@ class ApiService {
     this.db   = new DB({ connectionString: databaseUrl });
 
     this.server = http.createServer(async (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
       try {
         const url = new URL(req.url, 'http://localhost');
         const ctx = { url, db: this.db };

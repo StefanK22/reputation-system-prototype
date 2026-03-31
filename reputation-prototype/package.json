@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "start:api": "node src/modules/api/index.js",
-    "start:console": "node src/modules/console/index.js",
     "start:engine": "node src/modules/reputation-engine/index.js",
     "start:canton-mock": "node src/modules/canton-node/index.js"
   },

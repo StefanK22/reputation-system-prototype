@@ -23,33 +23,12 @@ services:
       context: ./canton
       dockerfile: Dockerfile
     container_name: canton-sandbox
-    volumes:
-      - ./daml/.daml/dist:/app/dist:ro
-    command: ["daml", "sandbox", "--port", "6865", "--dar", "/app/dist/reputation-1.0.0.dar"]
     ports:
       - "6865:6865"
+      - "7575:7575"
     networks:
       - reputation-network
 
-  canton-node:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: reputation-canton-node
-    command: ["npm", "run", "start:canton-mock"]
-    environment:
-      PORT: 7575
-      SEED_CONTRACTS: 1
-    ports:
-      - "7575:7575"
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:7575/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - reputation-network
 
   reputation-engine:
     build:
@@ -58,15 +37,14 @@ services:
     container_name: reputation-engine
     command: ["npm", "run", "start:engine"]
     environment:
-      CANTON_API_URL: http://canton-node:7575
+      CANTON_API_URL: http://canton-sandbox:7575
       DATABASE_URL: postgresql://reputation:reputation_password@database:5432/reputation
       CANTON_PARTY: Operator
       CANTON_USER_ID: operator-user
     depends_on:
       database:
         condition: service_healthy
-      canton-node:
-        condition: service_healthy
+    restart: on-failure
     networks:
       - reputation-network
 
@@ -89,24 +67,15 @@ services:
 
   console:
     build:
-      context: .
+      context: ./src/modules/console
       dockerfile: Dockerfile
     container_name: reputation-console
-    command: ["npm", "run", "start:console"]
     environment:
-      PORT: 3000
-      CANTON_API_URL: http://canton-node:7575
-      DATABASE_URL: postgresql://reputation:reputation_password@database:5432/reputation
-      CANTON_PARTY: OPERATOR
-      CANTON_USER_ID: operator-user
       API_URL: http://api:8080
+      CANTON_API_URL: http://canton-sandbox:7575
     ports:
       - "3000:3000"
     depends_on:
-      database:
-        condition: service_healthy
-      canton-node:
-        condition: service_healthy
       api:
         condition: service_started
     networks:

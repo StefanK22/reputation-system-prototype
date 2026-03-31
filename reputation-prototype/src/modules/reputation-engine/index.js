@@ -17,8 +17,19 @@ class EngineWorker {
   }
 
   async start() {
-    this.db     = new DB({ connectionString: this.databaseUrl });
-    const partyId = await LedgerClient.getOperatorPartyId(this.cantonApiUrl);
+    this.db = new DB({ connectionString: this.databaseUrl });
+
+    let partyId;
+    while (true) {
+      try {
+        partyId = await LedgerClient.getOperatorPartyId(this.cantonApiUrl);
+        break;
+      } catch (e) {
+        console.log(`Waiting for Canton JSON API (${e.message}) — retrying in 3s`);
+        await new Promise((r) => setTimeout(r, 3_000));
+      }
+    }
+
     this.ledger = new LedgerClient({ baseUrl: this.cantonApiUrl, party: partyId, userId: this.cantonUserId });
     this.engine = new ReputationEngine({ ledger: this.ledger, db: this.db, operator: partyId });
 

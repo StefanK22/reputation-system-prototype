@@ -1,6 +1,10 @@
-import { fetchJson } from './http.js';
+// Browser mirror of src/shared/ledger.js.
+// Identical API: same class name, same methods, same signatures, same HTTP calls.
+// Uses browser-native fetch instead of Node's http module.
+// Adds rawTemplateId to parsed contracts (needed to re-submit to the ledger).
+// Adds queryAll() for AllFilter queries (no template restriction).
 
-const OPERATOR_PARTY_ID = 'Operator'
+const OPERATOR_PARTY_ID = 'Operator';
 
 function normalizeTemplateId(id) {
   const s     = String(id || '');
@@ -26,6 +30,7 @@ function parseContracts(response) {
         contractId:    event.contractId,
         payload:       event.createArgument || event.payload,
         templateId:    normalizeTemplateId(event.templateId),
+        rawTemplateId: event.templateId,
         signatories:   event.signatories   || [],
         observers:     event.observers     || [],
         agreementText: event.agreementText || '',
@@ -41,22 +46,29 @@ function parseContracts(response) {
   return [];
 }
 
+async function fetchJson(baseUrl, pathname, options = {}) {
+  const url  = String(baseUrl).replace(/\/$/, '') + pathname;
+  const res  = await fetch(url, options);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text}`);
+  return text ? JSON.parse(text) : {};
+}
 
 export class LedgerClient {
-  constructor({ baseUrl, party = 'OPERATOR', userId = 'operator-user'}) {
+  constructor({ baseUrl, party = 'OPERATOR', userId = 'operator-user' }) {
     this.baseUrl = baseUrl;
     this.party   = party;
     this.userId  = userId;
   }
-  
+
   static async getOperatorPartyId(baseUrl) {
-    const res = await fetchJson(baseUrl, '/v2/parties');
+    const res     = await fetchJson(baseUrl, '/v2/parties');
     const parties = res.partyDetails || [];
-    const operator = parties.find((p) => p.party.startsWith(OPERATOR_PARTY_ID))
+    const operator = parties.find((p) => p.party.startsWith(OPERATOR_PARTY_ID));
     if (!operator) throw new Error('No operator party was found.');
     return operator.party;
   }
-  
+
   async _submit(commands) {
     const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     return fetchJson(this.baseUrl, '/v2/commands/submit-and-wait-for-transaction', {
@@ -82,7 +94,7 @@ export class LedgerClient {
   async createUser(userId, primaryParty) {
     return fetchJson(this.baseUrl, '/v2/users', {
       method:  'POST',
-      headers: { 'content-type': 'application/json'},
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         user: {
           id: userId,
@@ -91,18 +103,17 @@ export class LedgerClient {
           readAs: [],
           isDeactivated: false,
           metadata: {
-            resourceVersion: "",
-            annotations: {}
+            resourceVersion: '',
+            annotations: {},
           },
-          identityProviderId: ""
-        }
-      })
+          identityProviderId: '',
+        },
+      }),
     });
   }
 
   // ── Contract operations ─────────────────────────────────────────────────────
 
-  // templateId must be a fully-qualified ID from TEMPLATE_IDS in contracts.js
   async create(templateId, payload) {
     const res     = await this._submit([{ CreateCommand: { templateId, createArguments: payload } }]);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
@@ -111,7 +122,6 @@ export class LedgerClient {
     return toEvent(created, res.transaction?.offset);
   }
 
-  // templateId must be a fully-qualified ID from TEMPLATE_IDS in contracts.js
   async exercise(contractId, templateId, choiceName, choiceArgument = {}) {
     const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choice: choiceName, choiceArgument } }]);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
@@ -120,9 +130,6 @@ export class LedgerClient {
     return toEvent(created, res.transaction?.offset);
   }
 
-  // Active-contracts snapshot — not used by the engine (which replays from offset 0)
-  // but useful for the web app and admin tools.
-  // templateId must be a fully-qualified ID from TEMPLATE_IDS in contracts.js
   async query(templateId, activeAtOffset) {
     const offset = activeAtOffset || await this._ledgerOffset();
     const res    = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
@@ -149,16 +156,13 @@ export class LedgerClient {
     return parseContracts(res);
   }
 
-  // ── Event stream (engine) ───────────────────────────────────────────────────
+  // ── Event stream ────────────────────────────────────────────────────────────
 
-  // wait=true  (engine): long-polls — server holds the connection open until a
-  //            new event arrives or its 30s timeout elapses, then engine loops.
-  // wait=false (web app /events route): returns immediately with current events.
   async streamFrom(offsetExclusive = 0, { signal, wait = true } = {}) {
     const from = Number(offsetExclusive) || 0;
 
     if (!wait) {
-      const res = await fetchJson(this.baseUrl, `/v2/events?from=${from}`)
+      const res = await fetchJson(this.baseUrl, `/v2/events?from=${from}`);
       return (Array.isArray(res.events) ? res.events : []).map((e) => ({ ...e, offset: Number(e.offset) }));
     }
 
@@ -256,9 +260,31 @@ export class LedgerClient {
     ]);
     return {
       parties,
-      packages:            packagesRes.packageIds || [],
       contractsByTemplate: {},
     };
   }
-}
 
+  // ── Browser-only ────────────────────────────────────────────────────────────
+
+  // Query all active contracts for a party without filtering by template.
+  // Used by the console to discover rawTemplateIds and show all ledger state.
+  async queryAll(party) {
+    const offset = await this._ledgerOffset();
+    const res    = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({
+        filter: {
+          filtersByParty: {
+            [party || this.party]: {
+              cumulative: [{ identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: true } } } }],
+            },
+          },
+        },
+        verbose:        true,
+        activeAtOffset: offset,
+      }),
+    });
+    return parseContracts(res);
+  }
+}

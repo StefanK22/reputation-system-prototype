@@ -46,7 +46,8 @@ export class ReputationEngine {
   }
 
   async processNewEvents(signal) {
-    const events = await this.ledger.streamFrom(this.checkpoint, { signal });
+    //const events = await this.ledger.streamFrom(this.checkpoint, { signal });
+    const events = [];
     const stats  = {
       fromOffset: this.checkpoint,
       toOffset:   this.checkpoint,
