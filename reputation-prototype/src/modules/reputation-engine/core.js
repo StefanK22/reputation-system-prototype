@@ -1,4 +1,4 @@
-import { TEMPLATES, TEMPLATE_IDS, CHOICES, normalizeConfig, normalizeInteraction, normalizeFeedback, normalizePartyRole } from '../../contracts.js';
+import { TEMPLATES, CHOICES, normalizeConfig, normalizeInteraction, normalizeFeedback, normalizePartyRole } from '../../contracts.js';
 import { clamp, round2, evaluate } from '../../shared/math.js';
 
 function ratingsFromInteraction(interaction, config) {
@@ -42,7 +42,7 @@ export class ReputationEngine {
     await this.db.reset();
     this.checkpoint      = 0;
     this.seenContractIds = new Set();
-    console.log('Engine: read model reset — will rebuild from ledger offset 0');
+    this.templateIds     = await this.ledger.discoverTemplateIds();
   }
 
   async processNewEvents(signal) {
@@ -148,13 +148,16 @@ export class ReputationEngine {
     this.db.recomputeScore(subject, config);
 
     const payload = tokenPayload(this.operator, subject);
-    const token   = subject.contractId
-      ? await this.ledger.exercise(subject.contractId, TEMPLATE_IDS[TEMPLATES.TOKEN], CHOICES.TOKEN.UPDATE_SCORE, {
+    const tokenTemplateId = this.templateIds[TEMPLATES.TOKEN];
+    if (!tokenTemplateId) throw new Error(`ReputationToken template ID not discovered. Is the init script complete?`);
+
+    const token = subject.contractId
+      ? await this.ledger.exercise(subject.contractId, tokenTemplateId, CHOICES.TOKEN.UPDATE_SCORE, {
           newComponents: payload.components,
           newScore:      payload.score,
           newUpdatedAt:  payload.updateAt,
         })
-      : await this.ledger.create(TEMPLATE_IDS[TEMPLATES.TOKEN], payload);
+      : await this.ledger.create(tokenTemplateId, payload);
 
     subject.contractId = token.contractId;
     await this.db.saveSubject(subject);

@@ -292,6 +292,41 @@ export class LedgerClient {
     return { byParty, allContracts };
   }
 
+  // Discover current fully-qualified template IDs by scanning all active contracts.
+  // Returns { shortName: rawTemplateId, ... } — e.g. { ReputationToken: "pkg::Reputation:ReputationToken" }.
+  // The engine calls this at startup so it never relies on stale codegen package hashes.
+  async discoverTemplateIds() {
+    const offset = await this._ledgerOffset();
+    const res    = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({
+        filter: {
+          filtersByParty: {
+            [this.party]: {
+              cumulative: [{ identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: true } } } }],
+            },
+          },
+        },
+        verbose:        true,
+        activeAtOffset: offset,
+      }),
+    });
+
+    const ids   = {};
+    const items = Array.isArray(res) ? res
+                : Array.isArray(res?.result) ? res.result
+                : [];
+    for (const item of items) {
+      const event = item.contractEntry?.JsActiveContract?.createdEvent || item.createdEvent;
+      if (event?.templateId) {
+        const short = normalizeTemplateId(event.templateId);
+        ids[short]  = event.templateId;
+      }
+    }
+    return ids;
+  }
+
   async getFullLedgerState() {
     const [{ parties }, packagesRes] = await Promise.all([
       this.listAllParties(),

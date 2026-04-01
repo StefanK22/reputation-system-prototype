@@ -92,13 +92,14 @@ export class LedgerClient {
     return operator.party;
   }
 
-  async _submit(commands) {
+  async _submit(commands, extraActAs = []) {
     const commandId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const actAs     = extraActAs.length ? [this.party, ...extraActAs] : [this.party];
     return fetchJson(this.baseUrl, '/v2/commands/submit-and-wait-for-transaction', {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({
-        commands: { commands, userId: this.userId, commandId, actAs: [this.party] },
+        commands: { commands, userId: this.userId, commandId, actAs },
       }),
     });
   }
@@ -137,10 +138,10 @@ export class LedgerClient {
 
   // ── Contract operations ─────────────────────────────────────────────────────
 
-  async create(templateId, payload) {
+  async create(templateId, payload, { actAs = [] } = {}) {
     const name    = normalizeTemplateId(templateId);
     const encoded = applyMaps(payload, PAYLOAD_MAPS[name]);
-    const res     = await this._submit([{ CreateCommand: { templateId, createArguments: encoded } }]);
+    const res     = await this._submit([{ CreateCommand: { templateId, createArguments: encoded } }], actAs);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
     const created = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
     if (!created) throw new Error('Canton did not return a created event.');

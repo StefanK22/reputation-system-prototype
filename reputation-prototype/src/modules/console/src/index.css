@@ -138,6 +138,75 @@ pre {
 .stat .stat-label { font-size: 10px; color: #999; text-transform: uppercase; margin-bottom: 6px; }
 .stat .stat-value { font-size: 20px; color: #1a1a1a; }
 
+/* ── Config sections ── */
+.config-section {
+  border: 1px solid #e8e8e8;
+  border-radius: 3px;
+  margin-bottom: 12px;
+}
+
+.config-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: #fafafa;
+}
+
+.config-section-header:hover { background: #f3f3f3; }
+
+.config-section-header h2 {
+  font-size: 12px;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.config-section-body { padding: 14px 16px; }
+
+.config-sub {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 3px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Contract deploy grid ── */
+.contracts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.contract-card {
+  background: #fafafa;
+  border: 1px solid #e8e8e8;
+  border-radius: 3px;
+  padding: 20px;
+}
+
+.contract-card h2 {
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #1a1a1a;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #555;
+  cursor: pointer;
+}
+
 /* ── Misc ── */
 .score { font-size: 16px; font-weight: bold; color: #1a6abf; }
 

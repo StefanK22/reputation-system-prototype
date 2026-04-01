@@ -15,7 +15,7 @@ main = do
   now <- getTime
 
   -- ReputationConfiguration
-  _ <- submit operator do
+  repConfigCid <- submit operator do
     createCmd ReputationConfiguration with
       operator
       configId         = "REAL_ESTATE_CONFIG"
