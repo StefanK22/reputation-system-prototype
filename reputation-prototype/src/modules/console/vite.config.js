@@ -5,8 +5,8 @@ const API_URL    = process.env.API_URL        ?? 'http://localhost:8080';
 const LEDGER_URL = process.env.CANTON_API_URL ?? 'http://localhost:7575';
 
 const proxy = {
-  '/api':    { target: API_URL,    rewrite: (p) => p.replace(/^\/api/, '')    },
-  '/ledger': { target: LEDGER_URL, rewrite: (p) => p.replace(/^\/ledger/, '') },
+  '/api':        { target: API_URL,    rewrite: (p) => p.replace(/^\/api/, '')        },
+  '/canton-api': { target: LEDGER_URL, rewrite: (p) => p.replace(/^\/canton-api/, '') },
 };
 
 export default defineConfig({

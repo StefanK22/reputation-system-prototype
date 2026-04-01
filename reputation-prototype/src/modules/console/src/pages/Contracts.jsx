@@ -2,50 +2,52 @@ import { useState, useEffect } from 'react';
 import { useLedger } from '../LedgerContext.jsx';
 import { TEMPLATES, REQUIRED_FIELDS } from '../api/contracts.js';
 
-const DEFAULT_PAYLOADS = {
-  [TEMPLATES.CONFIG]: {
-    operator:         'Operator',
-    configId:         'CONFIG-1',
-    version:          1,
-    activatedAt:      new Date().toISOString(),
-    systemParameters: { reputationScoreFloor: 0, reputationScoreCeiling: 100 },
-    components:       [{ componentId: 'reliability', description: 'Reliability score', initialValue: 70 }],
-    roleWeights:      [{ roleId: 'default', componentWeights: { reliability: 1.0 } }],
-    interactionTypes: [],
-  },
-  [TEMPLATES.INTERACTION]: {
-    operator:        'Operator',
-    interactionId:   `int-${Date.now()}`,
-    interactionType: 'TRANSACTION',
-    participants:    [],
-    outcome:         {},
-    completedAt:     new Date().toISOString(),
-    processed:       false,
-  },
-  [TEMPLATES.FEEDBACK]: {
-    operator:      'Operator',
-    interactionId: '',
-    from:          '',
-    to:            '',
-    ratings:       {},
-    submittedAt:   new Date().toISOString(),
-    publicFeedback: false,
-  },
-  [TEMPLATES.TOKEN]: {
-    operator:   'Operator',
-    owner:      '',
-    score:      0,
-    components: {},
-    issuedAt:   new Date().toISOString(),
-    updatedAt:  new Date().toISOString(),
-  },
-  [TEMPLATES.PARTY_ROLE]: {
-    operator:   'Operator',
-    party:      '',
-    roleId:     '',
-    assignedAt: new Date().toISOString(),
-  },
-};
+function defaultPayloads(operator) {
+  return {
+    [TEMPLATES.CONFIG]: {
+      operator,
+      configId:         'CONFIG-1',
+      version:          1,
+      activatedAt:      new Date().toISOString(),
+      systemParameters: { reputationScoreFloor: 0, reputationScoreCeiling: 100 },
+      components:       [{ componentId: 'reliability', description: 'Reliability score', initialValue: 70 }],
+      roleWeights:      [{ roleId: 'default', componentWeights: { reliability: 1.0 } }],
+      interactionTypes: [],
+    },
+    [TEMPLATES.INTERACTION]: {
+      operator,
+      interactionId:   `int-${Date.now()}`,
+      interactionType: 'TRANSACTION',
+      participants:    [],
+      outcome:         {},
+      completedAt:     new Date().toISOString(),
+      processed:       false,
+    },
+    [TEMPLATES.FEEDBACK]: {
+      operator,
+      interactionId:  '',
+      from:           '',
+      to:             '',
+      ratings:        {},
+      submittedAt:    new Date().toISOString(),
+      publicFeedback: false,
+    },
+    [TEMPLATES.TOKEN]: {
+      operator,
+      owner:      '',
+      score:      0,
+      components: {},
+      issuedAt:   new Date().toISOString(),
+      updatedAt:  new Date().toISOString(),
+    },
+    [TEMPLATES.PARTY_ROLE]: {
+      operator,
+      party:      '',
+      roleId:     '',
+      assignedAt: new Date().toISOString(),
+    },
+  };
+}
 
 export default function Contracts() {
   const ledger = useLedger();
@@ -65,9 +67,9 @@ export default function Contracts() {
   }, [ledger, template]);
 
   useEffect(() => {
-    setPayload(JSON.stringify(DEFAULT_PAYLOADS[template] ?? {}, null, 2));
+    setPayload(JSON.stringify(defaultPayloads(ledger.party)[template] ?? {}, null, 2));
     setResult(null);
-  }, [template]);
+  }, [template, ledger.party]);
 
   async function handleSubmit() {
     setSubmitting(true);

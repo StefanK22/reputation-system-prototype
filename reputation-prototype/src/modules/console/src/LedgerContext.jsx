@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { LedgerClient } from './api/ledger.js';
 
-const LEDGER_URL = '/ledger';
+const LEDGER_URL = '/canton-api';
 
 export const LedgerContext = createContext(null);
 

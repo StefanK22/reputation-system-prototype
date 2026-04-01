@@ -19,6 +19,19 @@ export const CHOICES = Object.freeze({
   PARTY_ROLE:  { ARCHIVE: 'Archive' },
 });
 
+// ─── Daml Map field schema (mirrors src/contracts.js PAYLOAD_MAPS / CHOICE_MAPS)
+export const PAYLOAD_MAPS = Object.freeze({
+  [TEMPLATES.CONFIG]:      { roleWeights: { componentWeights: '*' } },
+  [TEMPLATES.TOKEN]:       { components: '*' },
+  [TEMPLATES.INTERACTION]: { outcome: '*' },
+  [TEMPLATES.FEEDBACK]:    { ratings: '*' },
+});
+
+export const CHOICE_MAPS = Object.freeze({
+  [CHOICES.TOKEN.UPDATE_SCORE]:  { newComponents: '*' },
+  [CHOICES.CONFIG.UPDATE]:       { newRoleWeights: { componentWeights: '*' } },
+});
+
 export const REQUIRED_FIELDS = Object.freeze({
   [TEMPLATES.CONFIG]:      ['operator', 'configId', 'activatedAt'],
   [TEMPLATES.INTERACTION]: ['operator', 'interactionId', 'interactionType', 'participants', 'completedAt'],

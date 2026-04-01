@@ -3,8 +3,8 @@
 body {
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
   font-size: 13px;
-  background: #0f0f0f;
-  color: #e0e0e0;
+  background: #fff;
+  color: #1a1a1a;
   height: 100vh;
 }
 
@@ -44,13 +44,13 @@ nav a:hover       { color: #fff; background: #222; }
 nav a.active      { color: #fff; background: #222; border-left: 2px solid #4a9eff; }
 
 /* ── Typography ── */
-h1 { font-size: 16px; font-weight: normal; margin-bottom: 20px; color: #fff; }
+h1 { font-size: 16px; font-weight: normal; margin-bottom: 20px; color: #1a1a1a; }
 
 h2 {
   font-size: 11px;
   font-weight: normal;
   margin: 24px 0 10px;
-  color: #555;
+  color: #999;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -58,19 +58,19 @@ h2 {
 /* ── Tables ── */
 table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
 
-th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #1e1e1e; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }
 
-th { color: #555; font-weight: normal; font-size: 11px; text-transform: uppercase; }
+th { color: #999; font-weight: normal; font-size: 11px; text-transform: uppercase; }
 
-td { color: #ccc; }
+td { color: #333; }
 
-tbody tr:hover td { background: #161616; cursor: pointer; }
+tbody tr:hover td { background: #f7f7f7; cursor: pointer; }
 
 /* ── Buttons ── */
 button {
-  background: #222;
-  border: 1px solid #333;
-  color: #ccc;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  color: #333;
   padding: 6px 14px;
   font-size: 12px;
   font-family: inherit;
@@ -78,16 +78,16 @@ button {
   border-radius: 3px;
 }
 
-button:hover            { background: #2a2a2a; border-color: #444; }
+button:hover            { background: #ebebeb; border-color: #ccc; }
 button:disabled         { opacity: 0.4; cursor: not-allowed; }
-button.primary          { background: #0d2a4a; border-color: #2a6aba; color: #4a9eff; }
-button.primary:hover    { background: #0f3560; }
+button.primary          { background: #1a6abf; border-color: #1a6abf; color: #fff; }
+button.primary:hover    { background: #155299; }
 
 /* ── Inputs ── */
 input, textarea, select {
-  background: #161616;
-  border: 1px solid #2a2a2a;
-  color: #ccc;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  color: #1a1a1a;
   padding: 6px 10px;
   font-size: 12px;
   font-family: inherit;
@@ -99,26 +99,26 @@ textarea { resize: vertical; }
 
 input:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: #2a6aba;
+  border-color: #1a6abf;
 }
 
 /* ── Forms ── */
 .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 
-.form-row label { color: #555; font-size: 11px; text-transform: uppercase; }
+.form-row label { color: #999; font-size: 11px; text-transform: uppercase; }
 
 /* ── Feedback ── */
-.error   { color: #e06c6c; margin: 10px 0; }
-.success { color: #6ec97a; margin: 10px 0; }
-.muted   { color: #555; }
+.error   { color: #c0392b; margin: 10px 0; }
+.success { color: #27ae60; margin: 10px 0; }
+.muted   { color: #aaa; }
 
 /* ── Pre / JSON ── */
 pre {
-  background: #141414;
-  border: 1px solid #222;
+  background: #f7f9fb;
+  border: 1px solid #e0e7ef;
   padding: 16px;
   overflow: auto;
-  color: #6ec4d8;
+  color: #1a5c8a;
   font-size: 12px;
   border-radius: 3px;
   margin-top: 12px;
@@ -128,30 +128,30 @@ pre {
 .stat-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
 
 .stat {
-  background: #161616;
-  border: 1px solid #222;
+  background: #f7f7f7;
+  border: 1px solid #e8e8e8;
   padding: 14px 18px;
   border-radius: 3px;
   min-width: 110px;
 }
 
-.stat .stat-label { font-size: 10px; color: #555; text-transform: uppercase; margin-bottom: 6px; }
-.stat .stat-value { font-size: 20px; color: #e0e0e0; }
+.stat .stat-label { font-size: 10px; color: #999; text-transform: uppercase; margin-bottom: 6px; }
+.stat .stat-value { font-size: 20px; color: #1a1a1a; }
 
 /* ── Misc ── */
-.score { font-size: 16px; font-weight: bold; color: #4a9eff; }
+.score { font-size: 16px; font-weight: bold; color: #1a6abf; }
 
 .tag {
   display: inline-block;
-  background: #1e1e1e;
-  border: 1px solid #2a2a2a;
-  color: #888;
+  background: #f0f0f0;
+  border: 1px solid #e0e0e0;
+  color: #666;
   padding: 2px 7px;
   font-size: 11px;
   border-radius: 2px;
 }
 
-.party { font-size: 11px; color: #444; }
+.party { font-size: 11px; color: #bbb; }
 
 /* ── Init states ── */
 .init-loading, .init-error {
@@ -159,7 +159,7 @@ pre {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  color: #555;
+  color: #aaa;
 }
 
-.init-error { color: #e06c6c; }
+.init-error { color: #c0392b; }

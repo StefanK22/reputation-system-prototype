@@ -36,6 +36,23 @@ export const CHOICES = Object.freeze({
   PARTY_ROLE:  { ARCHIVE: 'Archive' },
 });
 
+// ─── Daml Map field schema ────────────────────────────────────────────────────
+// '*' marks a Daml DA.Map leaf (serialize as [[key,value],...]).
+// A nested object marks a record or list whose items contain Map fields.
+// Used by LedgerClient.create() / exercise() to encode payloads generically.
+
+export const PAYLOAD_MAPS = Object.freeze({
+  [TEMPLATES.CONFIG]:      { roleWeights: { componentWeights: '*' } },
+  [TEMPLATES.TOKEN]:       { components: '*' },
+  [TEMPLATES.INTERACTION]: { outcome: '*' },
+  [TEMPLATES.FEEDBACK]:    { ratings: '*' },
+});
+
+export const CHOICE_MAPS = Object.freeze({
+  [CHOICES.TOKEN.UPDATE_SCORE]:  { newComponents: '*' },
+  [CHOICES.CONFIG.UPDATE]:       { newRoleWeights: { componentWeights: '*' } },
+});
+
 // ─── Primitive coercions ──────────────────────────────────────────────────────
 
 function str(v, fallback = '')     { return typeof v === 'string' ? v : String(fallback); }
@@ -45,7 +62,8 @@ function num(v, fallback = 0)      { const n = Number(v); return Number.isFinite
 function bool(v, fallback = false) { return typeof v === 'boolean' ? v : fallback; }
 function arr(v)                    { return Array.isArray(v) ? v : []; }
 function numericMap(v) {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+  if (Array.isArray(v)) return Object.fromEntries(v.map(([k, val]) => [String(k), num(val)]));
+  if (!v || typeof v !== 'object') return {};
   return Object.fromEntries(Object.entries(v).map(([k, val]) => [String(k), num(val)]));
 }
 function toIso(v) {
@@ -149,15 +167,15 @@ export function normalizeFeedback(p) {
 }
 
 export function normalizeToken(p) {
-  const rawComponents = (p?.components && typeof p.components === 'object' && !Array.isArray(p.components))
-    ? p.components : {};
+  const raw = p?.components;
+  const entries = Array.isArray(raw)
+    ? raw.map(([k, v]) => [String(k), normalizeComponent(v)])
+    : Object.entries(raw && typeof raw === 'object' ? raw : {}).map(([k, v]) => [String(k), normalizeComponent(v)]);
   return {
     operator:   str(p?.operator,  'Operator'),
     owner:      str(p?.owner,     'UNKNOWN'),
     score:      num(p?.score,     0),
-    components: Object.fromEntries(
-      Object.entries(rawComponents).map(([k, v]) => [String(k), normalizeComponent(v)])
-    ),
+    components: Object.fromEntries(entries),
     issuedAt:   toIso(p?.issuedAt),
     updateAt:   toIso(p?.updateAt),
   };

@@ -19,13 +19,11 @@ function tokenPayload(operator, subject) {
     operator,
     owner:      subject.party,
     score:      subject.overallScore,
-    components: Object.fromEntries(
-      Object.entries(subject.components).map(([id, c]) => [id, {
-        componentId:      c.componentId,
-        value:            c.value,
-        interactionCount: c.interactionCount,
-      }])
-    ),
+    components: Object.entries(subject.components).map(([id, c]) => [id, {
+      componentId:      c.componentId,
+      value:            c.value,
+      interactionCount: c.interactionCount,
+    }]),
     issuedAt: subject.createdAt || new Date().toISOString(),
     updateAt: subject.updatedAt || new Date().toISOString(),
   };
@@ -33,21 +31,23 @@ function tokenPayload(operator, subject) {
 
 export class ReputationEngine {
   constructor({ ledger, db, operator }) {
-    this.ledger   = ledger;
-    this.db       = db;
-    this.operator = operator;
-    this.checkpoint = 0;
+    this.ledger          = ledger;
+    this.db              = db;
+    this.operator        = operator;
+    this.checkpoint      = 0;
+    this.seenContractIds = new Set();
   }
 
   async init() {
     await this.db.reset();
-    this.checkpoint = 0;
+    this.checkpoint      = 0;
+    this.seenContractIds = new Set();
     console.log('Engine: read model reset — will rebuild from ledger offset 0');
   }
 
   async processNewEvents(signal) {
-    //const events = await this.ledger.streamFrom(this.checkpoint, { signal });
-    const events = [];
+    const all    = await this.ledger.streamFrom(this.checkpoint, { signal });
+    const events = all.filter((e) => !this.seenContractIds.has(e.contractId));
     const stats  = {
       fromOffset: this.checkpoint,
       toOffset:   this.checkpoint,
@@ -114,6 +114,7 @@ export class ReputationEngine {
         stats.warnings.push(`Event ${event.offset} failed: ${e.message}`);
       }
 
+      this.seenContractIds.add(event.contractId);
       this.checkpoint = event.offset;
     }
 

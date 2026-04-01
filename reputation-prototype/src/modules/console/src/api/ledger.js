@@ -4,7 +4,30 @@
 // Adds rawTemplateId to parsed contracts (needed to re-submit to the ledger).
 // Adds queryAll() for AllFilter queries (no template restriction).
 
+import { PAYLOAD_MAPS, CHOICE_MAPS } from './contracts.js';
+
 const OPERATOR_PARTY_ID = 'Operator';
+
+function toLedgerMap(v) {
+  if (Array.isArray(v)) return v;
+  if (!v || typeof v !== 'object') return [];
+  return Object.entries(v);
+}
+
+function applyMaps(obj, schema) {
+  if (!schema || !obj || typeof obj !== 'object') return obj;
+  const result = Array.isArray(obj) ? [...obj] : { ...obj };
+  for (const [key, rule] of Object.entries(schema)) {
+    if (!(key in result)) continue;
+    if (rule === '*') {
+      result[key] = toLedgerMap(result[key]);
+    } else {
+      const v = result[key];
+      result[key] = Array.isArray(v) ? v.map((item) => applyMaps(item, rule)) : applyMaps(v, rule);
+    }
+  }
+  return result;
+}
 
 function normalizeTemplateId(id) {
   const s     = String(id || '');
@@ -115,7 +138,9 @@ export class LedgerClient {
   // ── Contract operations ─────────────────────────────────────────────────────
 
   async create(templateId, payload) {
-    const res     = await this._submit([{ CreateCommand: { templateId, createArguments: payload } }]);
+    const name    = normalizeTemplateId(templateId);
+    const encoded = applyMaps(payload, PAYLOAD_MAPS[name]);
+    const res     = await this._submit([{ CreateCommand: { templateId, createArguments: encoded } }]);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
     const created = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
     if (!created) throw new Error('Canton did not return a created event.');
@@ -123,7 +148,8 @@ export class LedgerClient {
   }
 
   async exercise(contractId, templateId, choiceName, choiceArgument = {}) {
-    const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choice: choiceName, choiceArgument } }]);
+    const encoded = applyMaps(choiceArgument, CHOICE_MAPS[choiceName]);
+    const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choice: choiceName, choiceArgument: encoded } }]);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
     const created = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
     if (!created) throw new Error(`Exercise ${choiceName} did not return a created event.`);

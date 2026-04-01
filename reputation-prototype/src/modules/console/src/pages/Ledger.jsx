@@ -80,7 +80,7 @@ export default function Ledger() {
         </thead>
         <tbody>
           {contracts.map((c) => (
-            <tr key={c.contractId}>w
+            <tr key={c.contractId}>
               <td><span className="tag">{c.templateId}</span></td>
               <td className="party">{c.contractId}</td>
               <td className="muted">{c.signatories?.join(', ')}</td>

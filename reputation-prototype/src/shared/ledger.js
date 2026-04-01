@@ -1,6 +1,32 @@
 import { fetchJson } from './http.js';
+import { PAYLOAD_MAPS, CHOICE_MAPS } from '../contracts.js';
 
 const OPERATOR_PARTY_ID = 'Operator'
+
+// Convert a plain object to a Daml DA.Map array [[key,value],...].
+// Already-serialized arrays pass through unchanged.
+function toLedgerMap(v) {
+  if (Array.isArray(v)) return v;
+  if (!v || typeof v !== 'object') return [];
+  return Object.entries(v);
+}
+
+// Recursively apply the PAYLOAD_MAPS / CHOICE_MAPS schema to a payload,
+// converting Map-typed fields to the [[key,value],...] format Canton expects.
+function applyMaps(obj, schema) {
+  if (!schema || !obj || typeof obj !== 'object') return obj;
+  const result = Array.isArray(obj) ? [...obj] : { ...obj };
+  for (const [key, rule] of Object.entries(schema)) {
+    if (!(key in result)) continue;
+    if (rule === '*') {
+      result[key] = toLedgerMap(result[key]);
+    } else {
+      const v = result[key];
+      result[key] = Array.isArray(v) ? v.map((item) => applyMaps(item, rule)) : applyMaps(v, rule);
+    }
+  }
+  return result;
+}
 
 function normalizeTemplateId(id) {
   const s     = String(id || '');
@@ -104,16 +130,19 @@ export class LedgerClient {
 
   // templateId must be a fully-qualified ID from TEMPLATE_IDS in contracts.js
   async create(templateId, payload) {
-    const res     = await this._submit([{ CreateCommand: { templateId, createArguments: payload } }]);
-    const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
-    const created = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
+    const name     = normalizeTemplateId(templateId);
+    const encoded  = applyMaps(payload, PAYLOAD_MAPS[name]);
+    const res      = await this._submit([{ CreateCommand: { templateId, createArguments: encoded } }]);
+    const events   = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
+    const created  = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
     if (!created) throw new Error('Canton did not return a created event.');
     return toEvent(created, res.transaction?.offset);
   }
 
   // templateId must be a fully-qualified ID from TEMPLATE_IDS in contracts.js
   async exercise(contractId, templateId, choiceName, choiceArgument = {}) {
-    const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choice: choiceName, choiceArgument } }]);
+    const encoded = applyMaps(choiceArgument, CHOICE_MAPS[choiceName]);
+    const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choice: choiceName, choiceArgument: encoded } }]);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
     const created = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
     if (!created) throw new Error(`Exercise ${choiceName} did not return a created event.`);
@@ -151,35 +180,49 @@ export class LedgerClient {
 
   // ── Event stream (engine) ───────────────────────────────────────────────────
 
-  // wait=true  (engine): long-polls — server holds the connection open until a
-  //            new event arrives or its 30s timeout elapses, then engine loops.
-  // wait=false (web app /events route): returns immediately with current events.
-  async streamFrom(offsetExclusive = 0, { signal, wait = true } = {}) {
-    const from = Number(offsetExclusive) || 0;
-
-    if (!wait) {
-      const res = await fetchJson(this.baseUrl, `/v2/events?from=${from}`)
-      return (Array.isArray(res.events) ? res.events : []).map((e) => ({ ...e, offset: Number(e.offset) }));
+  // wait=true  (engine): polls every pollIntervalMs — sleeps then fetches a
+  //            snapshot of active contracts, honours abort signal.
+  // wait=false (web app /events route): returns active contracts immediately.
+  async streamFrom(_offsetExclusive = 0, { signal, wait = true, pollIntervalMs = 5_000 } = {}) {
+    if (wait) {
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, pollIntervalMs);
+        signal?.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+      });
+      if (signal?.aborted) return [];
     }
 
-    const local   = new AbortController();
-    const timer   = setTimeout(() => local.abort(), 35_000);
-    const forward = () => local.abort();
-    signal?.addEventListener('abort', forward, { once: true });
-
     try {
-      const res = await fetchJson(
-        this.baseUrl,
-        `/v2/events?from=${from}&wait=true&timeout=30000`,
-        { signal: local.signal },
-      );
-      return (Array.isArray(res.events) ? res.events : []).map((e) => ({ ...e, offset: Number(e.offset) }));
+      const offset = await this._ledgerOffset();
+      const res    = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
+        method:  'POST',
+        headers: { 'content-type': 'application/json' },
+        body:    JSON.stringify({
+          filter: {
+            filtersByParty: {
+              [this.party]: {
+                cumulative: [{
+                  identifierFilter: {
+                    WildcardFilter: { value: { includeCreatedEventBlob: true } },
+                  },
+                }],
+              },
+            },
+          },
+          verbose:        true,
+          activeAtOffset: offset,
+        }),
+      });
+      return parseContracts(res).map((c) => ({
+        offset:     Number(c.offset ?? 0),
+        contractId: c.contractId,
+        templateId: c.templateId,
+        payload:    c.payload,
+        createdAt:  c.createdAt || new Date().toISOString(),
+      }));
     } catch (e) {
-      if (e.name === 'AbortError') return [];
+      if (signal?.aborted || e.name === 'AbortError') return [];
       throw e;
-    } finally {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', forward);
     }
   }
 
