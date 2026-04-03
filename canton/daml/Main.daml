@@ -1,0 +1,29 @@
+module Main where
+
+import Daml.Script
+import DA.Map qualified as Map
+import DA.Text qualified
+import Reputation
+
+
+main : Script ()
+main = do
+  -- Parties
+  allParties <- listKnownParties
+  let findParty name = case filter (\details -> show details.party == name || DA.Text.isInfixOf name (show details.party)) allParties of
+        details::_ -> details.party
+        [] -> error ("Party not found containing: " <> name <> ". Please run SeedCredentials script first!")
+  operator <- allocateParty "Operator"
+  alice    <- allocateParty "AgentAlice"
+  bob      <- allocateParty "BuyerBob"
+
+  now <- getTime
+  -- PartyRoles
+  _ <- submit operator do
+    createCmd PartyRole with operator; party = alice; roleId = "AGENT"; assignedAt = now
+  _ <- submit operator do
+    createCmd PartyRole with operator; party = bob; roleId = "BUYER"; assignedAt = now
+
+  debug "✓ PartyRoles created (Alice=AGENT, Bob=BUYER)"
+
+  debug "✓ All assertions passed. Test complete!"

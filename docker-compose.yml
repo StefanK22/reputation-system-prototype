@@ -1,0 +1,87 @@
+services:
+  database:
+    image: postgres:17.6
+    container_name: reputation-db
+    environment:
+      POSTGRES_DB: reputation
+      POSTGRES_USER: reputation
+      POSTGRES_PASSWORD: reputation_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reputation -d reputation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - reputation-network
+
+  canton-sandbox:
+    build:
+      context: ./canton
+      dockerfile: Dockerfile
+    image: canton-sandbox
+    container_name: canton-sandbox
+    ports:
+      - "6865:6865"
+      - "7575:7575"
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q 'canton-init-complete' /tmp/sandbox.log || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    networks:
+      - reputation-network
+
+  reputation-engine:
+    build:
+      context: ./reputation-system
+      dockerfile: Dockerfile
+      additional_contexts:
+        canton: docker-image://canton-sandbox
+    container_name: reputation-engine
+    environment:
+      CANTON_HOST: canton-sandbox
+      CANTON_JSON_PORT: "7575"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/reputation
+      SPRING_DATASOURCE_USERNAME: reputation
+      SPRING_DATASOURCE_PASSWORD: reputation_password
+      CANTON_GRPC_HOST: canton-sandbox
+      CANTON_GRPC_PORT: "6865"
+    depends_on:
+      database:
+        condition: service_healthy
+      canton-sandbox:
+        condition: service_healthy
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    networks:
+      - reputation-network
+
+  console:
+    build:
+      context: ./console
+      dockerfile: Dockerfile
+    container_name: reputation-console
+    environment:
+      API_URL: http://reputation-engine:8080
+      CANTON_API_URL: http://canton-sandbox:7575
+    ports:
+      - "3000:3000"
+    depends_on:
+      reputation-engine:
+        condition: service_started
+    networks:
+      - reputation-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  reputation-network:
+    driver: bridge
