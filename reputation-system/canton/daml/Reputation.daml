@@ -74,7 +74,7 @@ template CompletedInteraction
             interactionType /= "" &&
             not (null participants)
 
-        choice SetProcessed : ContractId CompletedInteraction
+        choice ProcessInteraction : ContractId CompletedInteraction
             controller operator
             do
                 create this with 
@@ -92,6 +92,7 @@ template Feedback
         comments        : Optional Text
         submittedAt     : Time
         publicFeedback  : Bool
+        processed       : Bool
     where
         signatory operator, from
 
@@ -105,6 +106,12 @@ template Feedback
             do
                 create this with 
                     publicFeedback = visible 
+
+        choice ProcessFeedback : ContractId Feedback
+            controller operator
+            do
+                create this with 
+                    processed = True
 
 
 -- Reputation Configuration --

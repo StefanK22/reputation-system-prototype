@@ -4,3 +4,5 @@ log
 codegen
 dist
 target
+.vscode
+.DS_Store

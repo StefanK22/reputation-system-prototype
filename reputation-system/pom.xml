@@ -19,7 +19,7 @@
         <maven.compiler.target>17</maven.compiler.target>
         <daml.version>3.4.11</daml.version>
         <daml-codegen-java.output>${project.build.directory}/generated-sources/daml</daml-codegen-java.output>
-        <daml.dar.path>${project.basedir}/../canton/.daml/dist/reputation-0.0.1.dar</daml.dar.path>
+        <daml.dar.path>${project.basedir}/canton/.daml/dist/reputation-0.0.1.dar</daml.dar.path>
     </properties>
 
     <dependencies>

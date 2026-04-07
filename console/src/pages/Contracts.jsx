@@ -35,15 +35,15 @@ function FormResult({ result }) {
     : <p className="error"   style={{ marginTop: 10 }}>{result.error}</p>;
 }
 
-function ParticipantList({ value, onChange }) {
+function ParticipantList({ value, onChange, parties }) {
   return (
     <div>
       {value.map((p, i) => (
         <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-          <input
+          <PartySelect
+            parties={parties}
             value={p}
-            placeholder="Party ID"
-            onChange={e => { const next = [...value]; next[i] = e.target.value; onChange(next); }}
+            onChange={v => { const next = [...value]; next[i] = v; onChange(next); }}
           />
           <button style={{ flexShrink: 0, width: 32 }} onClick={() => onChange(value.filter((_, j) => j !== i))}>−</button>
         </div>
@@ -145,7 +145,7 @@ function PartyRoleCard({ templateIds, parties, ledger }) {
 
 // ─── CompletedInteraction ─────────────────────────────────────────────────────
 
-function CompletedInteractionCard({ templateIds, config, ledger }) {
+function CompletedInteractionCard({ templateIds, config, parties, ledger }) {
   const { busy, result, submit } = useDeployForm(TEMPLATES.INTERACTION, templateIds, ledger);
   const interactionTypes = config?.interactionTypes ?? [];
 
@@ -153,7 +153,6 @@ function CompletedInteractionCard({ templateIds, config, ledger }) {
   const [itype,          setItype]          = useState(interactionTypes[0]?.interactionTypeId ?? '');
   const [participants,   setParticipants]   = useState(['', '']);
   const [outcome,        setOutcome]        = useState({});
-  const [processed,      setProcessed]      = useState(false);
 
   // Rebuild outcome keys from ratingRules whenever interaction type changes
   useEffect(() => {
@@ -184,17 +183,11 @@ function CompletedInteractionCard({ templateIds, config, ledger }) {
       </div>
       <div className="form-row">
         <label>Participants</label>
-        <ParticipantList value={participants} onChange={setParticipants} />
+        <ParticipantList value={participants} onChange={setParticipants} parties={parties} />
       </div>
       <div className="form-row">
         <label>Outcome {Object.keys(outcome).length === 0 && <span className="muted">(select a type to see fields)</span>}</label>
         <NumberMap keys={Object.keys(outcome)} values={outcome} onChange={setOutcome} />
-      </div>
-      <div className="form-row">
-        <label className="toggle-label">
-          <input type="checkbox" style={{ width: 'auto' }} checked={processed} onChange={e => setProcessed(e.target.checked)} />
-          Processed
-        </label>
       </div>
       <button className="primary" disabled={busy} onClick={() => submit(() => ({
         operator:        ledger.party,
@@ -332,6 +325,54 @@ function ReputationTokenCard({ templateIds, config, parties, ledger }) {
   );
 }
 
+// ─── AllocateParty ────────────────────────────────────────────────────────────
+
+function AllocatePartyCard({ ledger, onAllocated }) {
+  const [displayName, setDisplayName] = useState('');
+  const [busy,        setBusy]        = useState(false);
+  const [result,      setResult]      = useState(null);
+
+  async function handleAllocate() {
+    if (!displayName.trim()) return;
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await ledger.allocateParty(displayName.trim());
+      const party = res.partyDetails?.party || res.party;
+      setResult({ ok: true, party });
+      setDisplayName('');
+      onAllocated?.();
+    } catch (e) {
+      setResult({ ok: false, error: e.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="contract-card">
+      <h2>Allocate Party</h2>
+      <div className="form-row">
+        <label>Display Name</label>
+        <input
+          value={displayName}
+          onChange={e => setDisplayName(e.target.value)}
+          placeholder="e.g. Alice"
+          onKeyDown={e => e.key === 'Enter' && handleAllocate()}
+        />
+      </div>
+      <button className="primary" disabled={busy || !displayName.trim()} onClick={handleAllocate}>
+        {busy ? 'Allocating...' : 'Allocate'}
+      </button>
+      {result && (
+        result.ok
+          ? <p className="success" style={{ marginTop: 10 }}>Allocated — <span className="party">{result.party}</span></p>
+          : <p className="error"   style={{ marginTop: 10 }}>{result.error}</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Contracts() {
@@ -378,6 +419,7 @@ export default function Contracts() {
         </p>
       )}
       <div className="contracts-grid">
+        <AllocatePartyCard          {...shared} onAllocated={reload} />
         <PartyRoleCard              {...shared} />
         <CompletedInteractionCard   {...shared} />
         <FeedbackCard               {...shared} />

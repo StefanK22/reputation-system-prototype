@@ -20,6 +20,14 @@ export function getConfig(at) {
   return fetchJson(at ? `/config?at=${encodeURIComponent(at)}` : '/config');
 }
 
+export function getAllSubjects() {
+  return fetchJson('/debug/subjects');
+}
+
+export function getAllConfigurations() {
+  return fetchJson('/debug/configurations');
+}
+
 export function requestVC(party, disclosedComponents = []) {
   return fetchJson('/vc/request', {
     method:  'POST',

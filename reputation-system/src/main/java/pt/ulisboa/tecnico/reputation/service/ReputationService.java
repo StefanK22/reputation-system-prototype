@@ -92,6 +92,14 @@ public class ReputationService {
         ).stream().limit(limit).toList();
     }
 
+    public List<Subject> getAllSubjects() {
+        return subjectRepo.findAll(Sort.by(Sort.Direction.ASC, "party"));
+    }
+
+    public List<Configuration> getAllConfigurations() {
+        return configRepo.findAll(Sort.by(Sort.Direction.DESC, "version"));
+    }
+
     // Recomputes overall score as an equal-weight average of all component values,
     // rounded to 2 decimal places.
     public void recomputeScore(Subject subject) {

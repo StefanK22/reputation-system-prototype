@@ -8,8 +8,6 @@ services:
       POSTGRES_PASSWORD: reputation_password
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U reputation -d reputation"]
       interval: 10s
@@ -20,7 +18,7 @@ services:
 
   canton-sandbox:
     build:
-      context: ./canton
+      context: ./reputation-system/canton
       dockerfile: Dockerfile
     image: canton-sandbox
     container_name: canton-sandbox
@@ -77,10 +75,6 @@ services:
         condition: service_started
     networks:
       - reputation-network
-
-volumes:
-  postgres_data:
-    driver: local
 
 networks:
   reputation-network:

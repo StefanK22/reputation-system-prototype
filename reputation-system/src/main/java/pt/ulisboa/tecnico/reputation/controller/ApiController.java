@@ -9,11 +9,11 @@ import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import java.util.List;
 
 @RestController
-public class ReputationController {
+public class ApiController {
 
     private final ReputationService service;
 
-    public ReputationController(ReputationService service) {
+    public ApiController(ReputationService service) {
         this.service = service;
     }
 
@@ -22,7 +22,7 @@ public class ReputationController {
         return service.getRanking(limit);
     }
 
-    @GetMapping("subjects/{party}")
+    @GetMapping("/subjects/{party}")
     public Subject getSubject(@PathVariable String party) {
         return service.getSubject(party)
             .orElseThrow(() -> new RuntimeException("Subject not found for party: " + party));

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+
 import pt.ulisboa.tecnico.reputation.ledger.handlers.CompletedInteractionHandler;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.FeedbackHandler;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.PartyRoleHandler;
@@ -139,7 +140,7 @@ public class LedgerListener {
     }
 
     private void processUpdate(GetUpdatesResponse response) {
-        response.getTransaction().ifPresent(transaction -> {
+        response.getTransaction().ifPresentOrElse(transaction -> {
             log.info("Transaction at offset {} with {} event(s)", transaction.getOffset(), transaction.getEvents().size());
             for (Event event : transaction.getEvents()) {
                 if (event instanceof CreatedEvent createdEvent) {
@@ -149,10 +150,7 @@ public class LedgerListener {
                     log.debug("ArchivedEvent templateId={} contractId={}", archivedEvent.getTemplateId(), archivedEvent.getContractId());
                 }
             }
-        });
-        if (response.getTransaction().isEmpty()) {
-            log.debug("Non-transaction update received (checkpoint or reassignment), skipping");
-        }
+        }, () -> log.debug("Non-transaction update received (checkpoint or reassignment), skipping"));
     }
 
     private void dispatch(CreatedEvent event) {

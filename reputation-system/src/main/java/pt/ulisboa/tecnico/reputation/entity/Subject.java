@@ -1,5 +1,6 @@
 package pt.ulisboa.tecnico.reputation.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -21,10 +22,9 @@ public class Subject {
 
     private double overallScore;
 
-    private long lastLedgerOffset;
-
     private String contractId;
 
+    @JsonManagedReference
     @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Component> components = new ArrayList<>();
 

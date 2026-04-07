@@ -79,11 +79,11 @@ export default function Config() {
     setLoading(true);
     setError(null);
     Promise.all([
-      getConfig().catch(() => null),
+      getConfig(),
       ledger.queryAll().then(cs => cs.find(c => c.templateId === TEMPLATES.CONFIG)).catch(() => null),
     ])
       .then(([cfg, contract]) => {
-        if (cfg && contract) loadFromConfig(cfg, contract.contractId, contract.rawTemplateId);
+        if (cfg) loadFromConfig(cfg, cfg.contractId, contract?.rawTemplateId);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -108,10 +108,10 @@ export default function Config() {
       });
       // Reload to pick up the new contractId (exercise archives the old contract)
       const [cfg, contract] = await Promise.all([
-        getConfig().catch(() => null),
+        getConfig(),
         ledger.queryAll().then(cs => cs.find(c => c.templateId === TEMPLATES.CONFIG)).catch(() => null),
       ]);
-      if (cfg && contract) loadFromConfig(cfg, contract.contractId, contract.rawTemplateId);
+      if (cfg) loadFromConfig(cfg, cfg.contractId, contract?.rawTemplateId);
       setResult({ ok: true, contractId: event.contractId });
     } catch (e) {
       setResult({ ok: false, error: e.message });
@@ -191,13 +191,13 @@ export default function Config() {
         </div>
         <div className="stat">
           <div className="stat-label">Activated</div>
-          <div className="stat-value" style={{ fontSize: 12 }}>{new Date(active.activatedAt).toLocaleString()}</div>
+          <div className="stat-value" style={{ fontSize: 12 }}>{new Date(active.activationTime).toLocaleString()}</div>
         </div>
       </div>
 
       {result && (
         result.ok
-          ? <p className="success" style={{ margin: '12px 0' }}>Updated to v{active.version + 1} — contract {result.contractId}</p>
+          ? <p className="success" style={{ margin: '12px 0' }}>Updated to v{active.version} — contract {result.contractId}</p>
           : <p className="error"   style={{ margin: '12px 0' }}>{result.error}</p>
       )}
 

@@ -11,7 +11,7 @@ daml sandbox \
   --log-profile=container \
   2>&1 | tee /tmp/sandbox.log &
 
-until grep -qi 'ready' /tmp/sandbox.log 2>/dev/null; do sleep 1; done
+until curl -sf http://localhost:7575/readyz > /dev/null 2>&1; do sleep 1; done
 echo "Canton sandbox process started"
 
 daml script \

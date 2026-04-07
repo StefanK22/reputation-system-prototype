@@ -1,8 +1,6 @@
 package pt.ulisboa.tecnico.reputation.entity;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
-
-import java.time.Instant;
-import java.util.List;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -24,6 +22,7 @@ public class Component {
 
     private int interactionCount;
 
+    @JsonBackReference
     @ManyToOne
     @JoinColumn(name = "subject_id")
     private Subject subject;

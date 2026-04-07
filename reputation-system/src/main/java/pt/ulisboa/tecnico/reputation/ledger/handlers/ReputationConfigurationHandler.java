@@ -8,6 +8,8 @@ import pt.ulisboa.tecnico.reputation.entity.Configuration;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.ReputationConfiguration;
 
+import java.util.List;
+
 @Component
 public class ReputationConfigurationHandler {
 
@@ -30,6 +32,46 @@ public class ReputationConfigurationHandler {
             config.setVersion(data.version.intValue());
             config.setActivationTime(data.activatedAt);
             config.setContractId(contract.id.contractId);
+
+            Configuration.SystemParameters sp = new Configuration.SystemParameters();
+            sp.setReputationScoreFloor(data.systemParameters.reputationScoreFloor.doubleValue());
+            sp.setReputationScoreCeiling(data.systemParameters.reputationScoreCeiling.doubleValue());
+            config.setSystemParameters(sp);
+
+            config.setComponents(data.components.stream().map(c -> {
+                Configuration.ComponentDefinition cd = new Configuration.ComponentDefinition();
+                cd.setComponentId(c.componentId);
+                cd.setDescription(c.description);
+                cd.setInitialValue(c.initialValue.doubleValue());
+                return cd;
+            }).toList());
+
+            config.setRoleWeights(data.roleWeights.stream().map(r -> {
+                Configuration.RoleWeights rw = new Configuration.RoleWeights();
+                rw.setRoleId(r.roleId);
+                rw.setComponentWeights(r.componentWeights.entrySet().stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                        java.util.Map.Entry::getKey,
+                        e -> e.getValue().doubleValue()
+                    )));
+                return rw;
+            }).toList());
+
+            config.setInteractionTypes(data.interactionTypes.stream().map(t -> {
+                Configuration.InteractionType it = new Configuration.InteractionType();
+                it.setInteractionTypeId(t.interactionTypeId);
+                it.setDescription(t.description);
+                it.setRatingRules(t.ratingRules.stream().map(r -> {
+                    Configuration.RatingRule rr = new Configuration.RatingRule();
+                    rr.setComponentId(r.componentId);
+                    rr.setConditionField(r.conditionField);
+                    rr.setConditionComparator(r.conditionComparator);
+                    rr.setConditionValue(r.conditionValue.doubleValue());
+                    rr.setRatingValue(r.ratingValue.doubleValue());
+                    return rr;
+                }).toList());
+                return it;
+            }).toList());
 
             reputationService.addConfiguration(config);
         } catch (Exception e) {

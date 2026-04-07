@@ -51,6 +51,9 @@ function parseContracts(response) {
         signatories:   event.signatories   || [],
         observers:     event.observers     || [],
         agreementText: event.agreementText || '',
+        createdAt:     event.createdAt     || null,
+        offset:        event.offset        ?? null,
+        raw:           item,
       };
     }
     return item;
@@ -223,6 +226,14 @@ export class LedgerClient {
       isLocal:     p.isLocal,
     }));
     return { parties };
+  }
+
+  async allocateParty(displayName, partyIdHint = '') {
+    return fetchJson(this.baseUrl, '/v2/parties', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({ displayName, partyIdHint: partyIdHint || displayName }),
+    });
   }
 
   async listAllUsers() {
