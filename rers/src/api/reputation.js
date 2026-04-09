@@ -27,11 +27,3 @@ export function getAllSubjects() {
 export function getAllConfigurations() {
   return fetchJson('/debug/configurations');
 }
-
-export function requestVC(party, disclosedComponents = []) {
-  return fetchJson('/vc/request', {
-    method:  'POST',
-    headers: { 'content-type': 'application/json' },
-    body:    JSON.stringify({ party, disclosedComponents }),
-  });
-}

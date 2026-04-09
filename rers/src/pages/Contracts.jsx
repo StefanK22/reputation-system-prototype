@@ -31,8 +31,8 @@ function useDeployForm(templateName, templateIds, ledger) {
 function FormResult({ result }) {
   if (!result) return null;
   return result.ok
-    ? <p className="success" style={{ marginTop: 10 }}>Created — <span className="party">{result.contractId}</span></p>
-    : <p className="error"   style={{ marginTop: 10 }}>{result.error}</p>;
+    ? <p className="success" style={{ marginTop: 10, wordBreak: 'break-all' }}>Created — <span className="party">{result.contractId}</span></p>
+    : <p className="error"   style={{ marginTop: 10, wordBreak: 'break-all' }}>{result.error}</p>;
 }
 
 function ParticipantList({ value, onChange, parties }) {
@@ -196,7 +196,7 @@ function CompletedInteractionCard({ templateIds, config, parties, ledger }) {
         participants:    participants.filter(Boolean),
         outcome,
         completedAt:     new Date().toISOString(),
-        processed,
+        processed:       false,
       }))}>
         {busy ? 'Deploying...' : 'Deploy'}
       </button>
@@ -264,60 +264,9 @@ function FeedbackCard({ templateIds, config, parties, ledger }) {
           comments:      comments.trim() || null,
           submittedAt:   new Date().toISOString(),
           publicFeedback,
+          processed:     false,
         };
       }, { actAs: [from.trim()] })}>
-        {busy ? 'Deploying...' : 'Deploy'}
-      </button>
-      <FormResult result={result} />
-    </div>
-  );
-}
-
-// ─── ReputationToken ──────────────────────────────────────────────────────────
-
-function ReputationTokenCard({ templateIds, config, parties, ledger }) {
-  const { busy, result, submit } = useDeployForm(TEMPLATES.TOKEN, templateIds, ledger);
-  const components = config?.components ?? [];
-
-  const [owner,      setOwner]      = useState('');
-  const [score,      setScore]      = useState(70);
-  const [compValues, setCompValues] = useState({});
-
-  useEffect(() => {
-    setCompValues(Object.fromEntries(components.map(c => [c.componentId, c.initialValue ?? 70])));
-  }, [config]);
-
-  return (
-    <div className="contract-card">
-      <h2>ReputationToken</h2>
-      <div className="form-row">
-        <label>Owner (Party)</label>
-        <PartySelect parties={parties} value={owner} onChange={setOwner} />
-      </div>
-      <div className="form-row">
-        <label>Score</label>
-        <NumberField label="" value={score} onChange={setScore} />
-      </div>
-      <div className="form-row">
-        <label>Component Values</label>
-        <NumberMap keys={components.map(c => c.componentId)} values={compValues} onChange={setCompValues} />
-      </div>
-      <button className="primary" disabled={busy} onClick={() => submit(() => {
-        const now = new Date().toISOString();
-        return {
-          operator:   ledger.party,
-          owner:      owner.trim(),
-          score,
-          components: Object.fromEntries(
-            components.map(c => [
-              c.componentId,
-              { componentId: c.componentId, value: compValues[c.componentId] ?? c.initialValue ?? 70, interactionCount: 0 },
-            ])
-          ),
-          issuedAt: now,
-          updateAt: now,
-        };
-      })}>
         {busy ? 'Deploying...' : 'Deploy'}
       </button>
       <FormResult result={result} />
@@ -423,7 +372,6 @@ export default function Contracts() {
         <PartyRoleCard              {...shared} />
         <CompletedInteractionCard   {...shared} />
         <FeedbackCard               {...shared} />
-        <ReputationTokenCard        {...shared} />
       </div>
     </>
   );

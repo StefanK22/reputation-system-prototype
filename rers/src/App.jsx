@@ -9,7 +9,7 @@ import Config      from './pages/Config.jsx';
 import Contracts   from './pages/Contracts.jsx';
 import Ledger      from './pages/Ledger.jsx';
 import Database    from './pages/Database.jsx';
-import Credentials from './pages/Credentials.jsx';
+import Api         from './pages/Api.jsx';
 import './index.css';
 
 function App() {
@@ -27,7 +27,7 @@ function App() {
               <Route path="/contracts"       element={<Contracts />} />
               <Route path="/ledger"          element={<Ledger />} />
               <Route path="/database"        element={<Database />} />
-              <Route path="/credentials"     element={<Credentials />} />
+              <Route path="/api"             element={<Api />} />
             </Routes>
           </main>
         </div>

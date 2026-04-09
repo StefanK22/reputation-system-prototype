@@ -60,11 +60,11 @@ services:
     networks:
       - reputation-network
 
-  console:
+  rers:
     build:
-      context: ./console
+      context: ./rers
       dockerfile: Dockerfile
-    container_name: reputation-console
+    container_name: rers
     environment:
       API_URL: http://reputation-engine:8080
       CANTON_API_URL: http://canton-sandbox:7575

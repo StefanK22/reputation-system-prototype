@@ -25,6 +25,15 @@ nav {
   flex-shrink: 0;
 }
 
+.nav-section-label {
+  padding: 16px 16px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #444;
+}
+
 .nav-title {
   padding: 8px 16px 20px;
   font-size: 11px;
