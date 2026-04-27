@@ -1,0 +1,36 @@
+module Reputation.Utils where
+
+import Reputation.Types (Event, RecordedEvent)
+import DA.Time (subTime, convertRelTimeToMicroseconds)
+import DA.Optional (mapOptional)
+
+hoursBetween : Time -> Time -> Int
+hoursBetween start end = 
+    let 
+        micros = convertRelTimeToMicroseconds (subTime end start)
+    in 
+        micros / (3600 * 1000000)
+
+findEventHours : Text -> Event -> [Event] -> [RecordedEvent] -> Optional Int     
+findEventHours rid startEvent endEvents allEvents =
+    let 
+        optionalStart = find (\e -> e.event == startEvent && e.resourceId == Some rid) allEvents
+        optionalEnd = find (\e -> e.event `elem` endEvents && e.resourceId == Some rid) allEvents
+    in 
+        case (optionalStart, optionalEnd) of
+            (Some start, Some end)  -> Some (hoursBetween start.occurredAt end.occurredAt)
+            _                       -> None
+
+computePairHours : Event -> [Event] -> [RecordedEvent] -> [RecordedEvent] -> [Int]
+computePairHours startEvent endEvents actorEvents allEvents = 
+    mapOptional (\e -> case e.resourceId of
+        None -> None
+        Some r -> findEventHours r startEvent endEvents allEvents
+    ) (filter (\e -> e.event `elem` endEvents) actorEvents)
+
+mean : [Int] -> Decimal
+mean [] = 0.0
+mean list = intToDecimal (sum list) / intToDecimal (length list)
+
+normalize : Decimal -> Decimal -> Decimal 
+normalize cap value = max 0.0 (1.0 - (value / cap))

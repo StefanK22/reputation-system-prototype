@@ -1,0 +1,25 @@
+module Reputation.Interface.Interaction where
+
+import Reputation.Types (RoleType, RecordedEvent)
+
+type I = Interaction
+type V = View
+
+data View = View
+    with 
+        operator        : Party
+        interactionId   : Text
+        interactionType : Text
+        participants    : [(Party, RoleType)]
+        events          : [RecordedEvent]
+    deriving (Eq, Show)
+
+interface Interaction where
+    viewtype View
+
+    nonconsuming choice GetView : View
+        with
+            viewer : Party
+        controller viewer
+        do
+            pure $ view this

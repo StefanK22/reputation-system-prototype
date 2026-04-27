@@ -1,0 +1,77 @@
+module Reputation.Interaction.InProgress where
+
+import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Interaction.Discarded (DiscardedInteraction(..))
+import Reputation.Interaction.Completed (CompletedInteraction(..))
+import Reputation.Types (RoleType, RecordedEvent)
+type T = InProgressInteraction
+
+template InProgressInteraction 
+    with
+        operator        : Party
+        interactionId   : Text
+        interactionType : Text
+        participants    : [(Party, RoleType)]
+        events          : [RecordedEvent]
+        startedAt       : Time
+    where
+        signatory operator
+        observer map fst participants
+
+        ensure interactionId /= ""
+
+        interface instance Interaction.I for InProgressInteraction where
+            view = Interaction.View with
+                operator
+                interactionId
+                interactionType
+                participants
+                events
+
+        choice Discard : ContractId DiscardedInteraction
+            with
+                discardedAt : Time
+            controller operator
+            do
+                create DiscardedInteraction with
+                    operator
+                    interactionId
+                    interactionType
+                    participants
+                    discardedAt
+
+        choice Complete : ContractId CompletedInteraction
+            with
+                completedAt : Time
+                configCid   : ContractId Configuration.I
+            controller operator
+            do
+                create CompletedInteraction with
+                    operator
+                    interactionId
+                    interactionType
+                    participants
+                    events
+                    startedAt
+                    completedAt
+                    configCid
+
+        choice RecordEvent : ContractId InProgressInteraction
+            with 
+                event : RecordedEvent
+            controller operator
+            do 
+                create this with 
+                    events = events ++ [event]
+
+        choice AddParticipant : ContractId InProgressInteraction
+            with 
+                party       : Party
+                roleType    : RoleType
+            controller operator
+            do
+                create this with
+                    participants = participants ++ [(party, roleType)]
+        
+   

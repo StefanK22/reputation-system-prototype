@@ -1,0 +1,71 @@
+module Reputation.Configuration.Role where
+
+import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
+import Reputation.Interface.Role qualified as Role (I)
+import Reputation.Role.Agent (AgentRole(..))
+import Reputation.Role.Buyer (BuyerRole(..))
+import Reputation.Types (RoleType(Agent, Buyer))
+
+type T = RoleConfiguration
+
+data AgentWeights = AgentWeights
+    with
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    deriving (Eq, Show)
+
+data BuyerWeights = BuyerWeights
+    with
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    deriving (Eq, Show)
+
+template RoleConfiguration 
+    with 
+        operator        : Party
+        configId        : Text
+        createdAt       : Time
+        agentWeights    : AgentWeights
+        buyerWeights    : BuyerWeights
+    where 
+        signatory operator
+
+        ensure configId /= ""
+
+        interface instance Configuration.I for RoleConfiguration where
+            view = Configuration.View with
+                operator
+                configId
+                createdAt
+
+        nonconsuming choice CreateRole : ContractId Role.I
+            with
+                party       : Party
+                roleType    : RoleType
+                assignedAt  : Time
+            controller operator
+            do
+                let configCid = toInterfaceContractId @Configuration.I self
+                case roleType of
+                    Agent ->
+                        toInterfaceContractId <$>
+                            create AgentRole with
+                                operator
+                                party
+                                assignedAt
+                                configCid
+                                reliability = agentWeights.reliability
+                                responsiveness = agentWeights.responsiveness
+                                accuracy = agentWeights.accuracy
+                    Buyer ->
+                        toInterfaceContractId <$>
+                            create BuyerRole with
+                                operator
+                                party
+                                assignedAt
+                                configCid
+                                reliability = buyerWeights.reliability
+                                responsiveness = buyerWeights.responsiveness
+                                accuracy = buyerWeights.accuracy

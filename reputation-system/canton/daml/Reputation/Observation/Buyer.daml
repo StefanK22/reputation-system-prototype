@@ -1,0 +1,70 @@
+module Reputation.Observation.Buyer where
+
+import Reputation.Interface.Observation qualified as Observation (I, View(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Types (BuyerObservationWeights, ComponentId(..))
+import Reputation.Utils (normalize, mean)
+import DA.Map qualified as Map
+
+type T = BuyerObservation 
+
+computeReliability : Int -> Int -> Optional Decimal
+computeReliability 0 0 = None
+computeReliability uploadedD approvedD = 
+    Some (intToDecimal approvedD / intToDecimal uploadedD)
+
+computeResponsiveness : [Int] -> [Int] -> [Int] -> BuyerObservationWeights -> Optional Decimal
+computeResponsiveness [] [] [] _ = None
+computeResponsiveness contractTimes rejectionTimes proposalTimes w = Some (
+    w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean contractTimes) + 
+    w.responsivenessRejectionWeight * normalize w.responsivenessCapHours (mean rejectionTimes) + 
+    w.responsivenessProposalWeight * normalize w.responsivenessCapHours (mean proposalTimes))
+
+computeAccuracy : [Int] -> Optional Decimal
+computeAccuracy [] = None
+computeAccuracy attemptsPerDoc = Some (1.0 / mean attemptsPerDoc)
+
+template BuyerObservation 
+    with
+        operator                : Party
+        interactionId           : Text
+        subject                 : Party
+        -- Reliability
+        uploadedDocs            : Int
+        approvedDocs            : Int
+        -- Responsiveness
+        contractSigningTimes     : [Int]
+        uploadAfterRejectionTimes : [Int]
+        proposalResponseTimes   : [Int]
+        -- Accuracy
+        attemptsPerApprovedDoc   : [Int]
+        -- Weights
+        buyerObsWeights         : BuyerObservationWeights
+        configCid               : ContractId Configuration.I
+        recordedAt              : Time
+    where
+        signatory operator
+        observer subject
+
+        ensure interactionId /= ""
+
+        interface instance Observation.I for BuyerObservation where
+            view = Observation.View with 
+                operator
+                interactionId
+                subject
+                recordedAt
+                componentValues = Map.fromList 
+                    [(Reliability, computeReliability 
+                        uploadedDocs
+                        approvedDocs
+                    ),
+                    (Responsiveness, computeResponsiveness
+                        contractSigningTimes
+                        uploadAfterRejectionTimes
+                        proposalResponseTimes
+                        buyerObsWeights
+                    ),
+                    (Accuracy, computeAccuracy
+                        attemptsPerApprovedDoc
+                    )]

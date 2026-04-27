@@ -1,0 +1,64 @@
+module Reputation.Interaction.Draft where
+
+import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
+import Reputation.Interaction.Discarded(DiscardedInteraction(..))
+import Reputation.Interaction.InProgress(InProgressInteraction(..))
+import Reputation.Types (RoleType)
+
+type T = DraftInteraction
+
+template DraftInteraction
+    with 
+        operator        : Party
+        interactionId   : Text
+        interactionType : Text
+        participants    : [(Party, RoleType)]
+        openedAt        : Time
+    where
+        signatory operator
+        observer map fst participants
+
+        ensure 
+            interactionId /= ""
+        
+        interface instance Interaction.I for DraftInteraction where
+            view = Interaction.View with
+                operator
+                interactionId
+                interactionType
+                participants
+                events = []
+
+        choice AddParticipant : ContractId DraftInteraction
+            with 
+                party       : Party
+                roleType    : RoleType
+            controller operator
+            do
+                create this with
+                    participants = participants ++ [(party, roleType)]
+        
+        choice Begin : ContractId InProgressInteraction
+            with
+                startedAt : Time
+            controller operator
+            do
+                create InProgressInteraction with
+                    operator
+                    interactionId
+                    interactionType
+                    participants
+                    events = []
+                    startedAt
+
+        choice Discard : ContractId DiscardedInteraction
+            with
+                discardedAt : Time
+            controller operator
+            do
+                create DiscardedInteraction with
+                    operator
+                    interactionId
+                    interactionType
+                    participants
+                    discardedAt

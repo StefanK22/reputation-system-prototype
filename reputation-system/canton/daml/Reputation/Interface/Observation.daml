@@ -1,0 +1,26 @@
+module Reputation.Interface.Observation where
+
+import Reputation.Types (ComponentId)
+import DA.Map (Map)
+
+type I = Observation
+type V = View
+
+data View = View
+    with
+        operator        : Party
+        interactionId   : Text
+        subject         : Party
+        componentValues : Map ComponentId (Optional Decimal)
+        recordedAt      : Time
+    deriving (Eq, Show)
+
+interface Observation where
+    viewtype View
+
+    nonconsuming choice GetView : View
+        with
+            viewer : Party
+        controller viewer
+        do
+            pure $ view this

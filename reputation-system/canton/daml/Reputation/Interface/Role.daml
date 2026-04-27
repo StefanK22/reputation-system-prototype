@@ -1,0 +1,26 @@
+module Reputation.Interface.Role where
+
+import DA.Map (Map)
+import Reputation.Types (ComponentId)
+
+type I = Role
+type V = View
+
+data View = View
+    with
+        operator            : Party
+        party               : Party
+        componentWeights    : Map ComponentId Decimal
+        assignedAt          : Time
+    deriving (Eq, Show)
+
+interface Role where
+    viewtype View
+
+    nonconsuming choice GetView : View
+        with 
+            viewer : Party
+        controller viewer
+        do
+            pure $ view this
+

@@ -1,0 +1,34 @@
+module Reputation.Role.Buyer where
+
+import DA.Map qualified as Map
+import Reputation.Interface.Role qualified as Role (I, View(..))
+import Reputation.Interface.Configuration qualified as Config (I)
+import Reputation.Types (ComponentId(..))
+
+type T = BuyerRole
+
+template BuyerRole
+    with
+        operator        : Party 
+        party           : Party
+        assignedAt      : Time
+        configCid       : ContractId Config.I
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    where
+        signatory operator
+        observer party
+
+        ensure reliability + responsiveness + accuracy == 1.0 
+            && all (> 0.0) [reliability, responsiveness, accuracy]
+        
+        interface instance Role.I for BuyerRole where
+            view = Role.View with
+                operator
+                party
+                assignedAt
+                componentWeights = Map.fromList [
+                  (Reliability, reliability), 
+                  (Responsiveness, responsiveness), 
+                  (Accuracy, accuracy)]

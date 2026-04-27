@@ -1,0 +1,47 @@
+events:
+    - TRANSACTION_CREATED
+    - TRANSACTION_STATE_CHANGED
+
+    - PARTICIPANT_ADDED
+    - PARTICIPANT_REMOVED
+
+    - DOCUMENT_UPLOADED
+    - DOCUMENT_APPROVED
+    - DOCUMENT_REJECTED_WITH_NOTES
+
+    - CONTRACT_UPLOADED
+    - CONTRACT_SIGNED
+    - CONTRACT_VOIDED
+    
+    - PROPOSAL_APPROVED
+    - PROPOSAL_REJECTED_WITH_NOTES
+
+    - event       : Event
+    - actor       : Party
+    - occurredAt  : Time
+    - resourceId  : Optional Text
+
+interaction:
+    - ''Property Purchase
+
+    - roles:
+        - Agent
+        - Buyer
+
+        - Buyer sends documents for the Agent
+        - Agents sends contracts for the Buyer to sign
+
+    - metrics:
+        - Reliability:
+            - (AGENT) completes Transaction
+            - (AGENT) voided contract uploaded
+            - (AGENT) participant removal ratio
+            - (BUYER) document followthrough rate
+        - Responsiveness:
+            - (AGENT) median time to evaluate Document
+            - (AGENT) (BUYER) mean time to sign the Contract
+            - (BUYER) median time to upload document after rejected
+            - (BUYER) time to proposal approval response
+        - Accuracy:
+            - (AGENT) proposal acceptance rate
+            - (BUYER) mean attempts per approved document

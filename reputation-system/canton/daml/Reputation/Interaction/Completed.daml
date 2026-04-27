@@ -1,0 +1,33 @@
+module Reputation.Interaction.Completed where
+
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
+import Reputation.Types (RecordedEvent, RoleType)
+type T = CompletedInteraction
+
+template CompletedInteraction
+    with
+        operator        : Party 
+        interactionId   : Text
+        interactionType : Text
+        participants    : [(Party, RoleType)]
+        events          : [RecordedEvent]
+        startedAt       : Time
+        completedAt     : Time
+        configCid       : ContractId Configuration.I
+    where
+        signatory operator
+        observer map fst participants
+
+        ensure
+            interactionId /= "" 
+                && not (null participants)
+                && completedAt >= startedAt
+        
+        interface instance Interaction.I for CompletedInteraction where
+            view = Interaction.View with
+                operator 
+                interactionId
+                interactionType
+                participants
+                events

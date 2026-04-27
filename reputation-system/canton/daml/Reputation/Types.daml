@@ -1,0 +1,54 @@
+module Reputation.Types where
+
+data Event
+    = DocumentUploaded
+    | DocumentApproved
+    | DocumentRejectedWithNotes
+    | ContractUploaded
+    | ContractSigned
+    | ContractVoided
+    | ProposalApproved
+    | ProposalRejectedWithNotes
+    | TransactionClosed
+    | TransactionCanceled
+    | TransactionStateChanged
+    | ParticipantsAdded
+    | ParticipantsRemoved
+    deriving (Eq, Show)
+
+data ComponentId
+    = Reliability
+    | Responsiveness
+    | Accuracy
+    deriving (Eq, Ord, Show)
+
+data RoleType
+    = Agent
+    | Buyer
+    deriving (Eq, Show)
+
+data RecordedEvent = RecordedEvent
+    with
+        event       : Event
+        actor       : Party
+        occurredAt  : Time
+        resourceId  : Optional Text
+    deriving (Eq, Show)
+
+data AgentObservationWeights = AgentObservationWeights
+    with
+        reliabilityVoidedWeight         : Decimal
+        reliabilityRemovalWeight        : Decimal
+        reliabilityCompletionWeight     : Decimal
+        responsivenessDocWeight         : Decimal
+        responsivenessContractWeight    : Decimal
+        responsivenessCapHours          : Decimal
+    deriving (Eq, Show)
+
+data BuyerObservationWeights = BuyerObservationWeights
+    with
+        responsivenessContractWeight    : Decimal
+        responsivenessRejectionWeight   : Decimal
+        responsivenessProposalWeight    : Decimal
+        responsivenessCapHours          : Decimal
+    deriving (Eq, Show)

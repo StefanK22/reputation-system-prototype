@@ -1,0 +1,156 @@
+module Scripts.TestPropertyPurchaseFlow where
+
+import Daml.Script
+import DA.List (head)
+import DA.Time (time)
+import DA.Date (date, Month(..))
+
+import Reputation.Configuration.PropertyPurchase (PropertyPurchaseConfiguration(..), CreateObservation(..))
+import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
+import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Observation.Agent (AgentObservation)
+import Reputation.Types
+
+
+-- | Simple end-to-end test:
+--   Operator sets up a config, runs a property purchase interaction,
+--   records events, completes it, then generates an AgentObservation.
+testPropertyPurchaseFlow : Script ()
+testPropertyPurchaseFlow = do
+
+  -- ── Parties ──────────────────────────────────────────────────────────────
+  operator <- allocateParty "Operator"
+  alice    <- allocateParty "AgentAlice"
+  bob      <- allocateParty "BuyerBob"
+
+  -- ── Timestamps ───────────────────────────────────────────────────────────
+  let t0 = time (date 2024 Jan 10) 9 0 0   -- interaction starts
+      t1 = time (date 2024 Jan 10) 10 0 0  -- doc uploaded  (+1h)
+      t2 = time (date 2024 Jan 10) 12 0 0  -- doc approved  (+2h from upload)
+      t3 = time (date 2024 Jan 11) 9 0 0   -- contract uploaded
+      t4 = time (date 2024 Jan 11) 10 0 0  -- contract signed (+1h)
+      t5 = time (date 2024 Jan 12) 9 0 0   -- proposal approved
+      t6 = time (date 2024 Jan 13) 9 0 0   -- transaction closed
+      t7 = time (date 2024 Jan 13) 10 0 0  -- interaction completed
+
+  -- ── 1. Configuration ─────────────────────────────────────────────────────
+  configCid <- submit operator do
+    createCmd PropertyPurchaseConfiguration with
+      operator
+      configId  = "PP-CONFIG-001"
+      createdAt = t0
+      agentObsWeights = AgentObservationWeights with
+        reliabilityVoidedWeight      = 0.2
+        reliabilityRemovalWeight     = 0.3
+        reliabilityCompletionWeight  = 0.5
+        responsivenessDocWeight      = 0.6
+        responsivenessContractWeight = 0.4
+        responsivenessCapHours       = 24.0
+
+  debug "✓ PropertyPurchaseConfiguration created"
+
+  let iConfigCid : ContractId Configuration.I = toInterfaceContractId configCid
+
+  -- ── 2. Draft → InProgress ─────────────────────────────────────────────────
+  draftCid <- submit operator do
+    createCmd DraftInteraction with
+      operator
+      interactionId   = "TX-001"
+      interactionType = "PropertyPurchase"
+      participants    = [(alice, Agent), (bob, Buyer)]
+      openedAt        = t0
+
+  inProgressCid <- submit operator do
+    exerciseCmd draftCid Begin with startedAt = t0
+
+  debug "✓ Interaction started (DraftInteraction → InProgressInteraction)"
+
+  -- ── 3. Record events ──────────────────────────────────────────────────────
+
+  -- Agent uploads a document
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event      = DocumentUploaded
+        actor      = alice
+        occurredAt = t1
+        resourceId = Some "doc-001"
+
+  -- Agent approves the document (self-review in this simple example)
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event      = DocumentApproved
+        actor      = alice
+        occurredAt = t2
+        resourceId = Some "doc-001"
+
+  -- Agent uploads contract
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event      = ContractUploaded
+        actor      = alice
+        occurredAt = t3
+        resourceId = Some "contract-001"
+
+  -- Agent signs the contract
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event      = ContractSigned
+        actor      = alice
+        occurredAt = t4
+        resourceId = Some "contract-001"
+
+  -- Agent approves a proposal
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event      = ProposalApproved
+        actor      = alice
+        occurredAt = t5
+        resourceId = Some "proposal-001"
+
+  -- Agent records the sale closing
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event      = TransactionStateChanged
+        actor      = alice
+        occurredAt = t6
+        resourceId = Some "SELL_CLOSED"
+
+  debug "✓ Events recorded (doc upload/approve, contract upload/sign, proposal approve, close)"
+
+  -- ── 4. Complete the interaction ───────────────────────────────────────────
+  completedCid <- submit operator do
+    exerciseCmd inProgressCid Complete with
+      completedAt = t7
+      configCid   = iConfigCid
+
+  debug "✓ Interaction completed"
+
+  -- ── 5. Generate observations ──────────────────────────────────────────────
+  obsCids <- submit operator do
+    exerciseCmd configCid CreateObservation with completedCid
+
+  debug "✓ Observations created"
+
+  -- ── 6. Verify ─────────────────────────────────────────────────────────────
+  assertMsg "Expected exactly 1 observation (agent only)" (length obsCids == 1)
+
+  agentObs <- query @AgentObservation operator
+  assertMsg "Expected 1 AgentObservation on ledger" (length agentObs == 1)
+
+  let (_, obs) = head agentObs
+  assertMsg "Transaction should be marked completed" obs.transactionCompleted
+  assertMsg "No voided contracts"                    (obs.contractVoided == 0)
+  assertMsg "1 proposal approved"                    (obs.proposalApprovedCount == 1)
+  assertMsg "0 proposals rejected"                   (obs.proposalRejectedCount == 0)
+  assertMsg "1 doc evaluation time recorded"         (length obs.documentEvaluationTimes == 1)
+  assertMsg "1 contract signing time recorded"       (length obs.contractSigningTimes == 1)
+
+  debug "✓ All assertions passed"
+  pure ()

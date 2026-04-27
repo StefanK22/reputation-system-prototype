@@ -1,0 +1,136 @@
+module Reputation.Configuration.PropertyPurchase where
+
+import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
+import Reputation.Interface.Observation qualified as Observation (I)
+import Reputation.Interaction.Completed (CompletedInteraction(..))
+import Reputation.Observation.Agent (AgentObservation(..))
+import Reputation.Observation.Buyer (BuyerObservation(..))
+import Reputation.Utils (computePairHours)
+import Reputation.Types (Event(..), AgentObservationWeights, BuyerObservationWeights, RoleType(Agent, Buyer))
+
+type T = PropertyPurchaseConfiguration
+
+template PropertyPurchaseConfiguration  
+    with 
+        operator        : Party
+        configId        : Text
+        createdAt       : Time
+        agentObsWeights : AgentObservationWeights
+    where 
+        signatory operator
+        
+        ensure 
+            configId /= "" &&
+            agentObsWeights.reliabilityVoidedWeight + 
+                agentObsWeights.reliabilityRemovalWeight + 
+                    agentObsWeights.reliabilityCompletionWeight == 1.0 &&
+            agentObsWeights.responsivenessDocWeight + 
+                agentObsWeights.responsivenessContractWeight == 1.0 &&
+            agentObsWeights.responsivenessCapHours > 0.0
+
+        interface instance Configuration.I for PropertyPurchaseConfiguration where
+            view = Configuration.View with
+                operator
+                configId
+                createdAt
+
+        nonconsuming choice CreateObservation : [ContractId Observation.I]
+            with
+                completedCid : ContractId CompletedInteraction
+            controller operator
+            do
+                completed <- fetch completedCid
+                let configCid = toInterfaceContractId @Configuration.I self
+                fmap concat $ forA completed.participants $ \(subject, roleType) ->
+                    case roleType of
+                        Agent -> do
+                            obs <- createAgentObservation completed subject agentObsWeights operator configCid
+                            pure [obs]
+                        Buyer -> do
+                            pure []
+
+
+createAgentObservation : CompletedInteraction -> Party -> AgentObservationWeights -> Party -> ContractId Configuration.I -> Update (ContractId Observation.I)
+createAgentObservation completed subject weights operator configCid = do
+    let 
+        allEvents = completed.events
+        agentEvents = filter (\e -> e.actor == subject) completed.events
+        
+        -- Reliability
+        transactionCompleted    = any (\e -> e.event == TransactionStateChanged 
+                                                && e.resourceId == Some "SELL_CLOSED") agentEvents
+        contractVoided          = length (filter (\e -> e.event == ContractVoided) agentEvents)
+        participantAddition     = length (filter (\e -> e.event == ParticipantsAdded) agentEvents)
+        participantRemoval      = length (filter (\e -> e.event == ParticipantsRemoved) agentEvents)
+
+        -- Responsiveness
+        documentEvaluationTimes = computePairHours DocumentUploaded 
+            [DocumentApproved, DocumentRejectedWithNotes] agentEvents allEvents
+
+        contractSigningTimes    = computePairHours ContractUploaded
+            [ContractSigned] agentEvents allEvents
+
+        -- Accuracy
+        proposalApprovedCount   = length (filter (\e -> e.event == ProposalApproved) agentEvents)
+        proposalRejectedCount   = length (filter (\e -> e.event == ProposalRejectedWithNotes) agentEvents)    
+
+    toInterfaceContractId <$> 
+        create AgentObservation with 
+            operator                = operator
+            interactionId           = completed.interactionId
+            subject
+            transactionCompleted
+            contractVoided
+            participantAddition
+            participantRemoval
+            documentEvaluationTimes
+            contractSigningTimes
+            proposalApprovedCount
+            proposalRejectedCount
+            agentObsWeights         = weights
+            configCid               = configCid
+            recordedAt              = completed.completedAt
+
+createBuyerObservation : CompletedInteraction -> Party -> BuyerObservationWeights -> Party -> ContractId Configuration.I -> Update (ContractId Observation.I)
+createBuyerObservation completed subject weights operator configCid = do
+    let
+        allEvents = completed.events
+        buyerEvents = filter (\e -> e.actor == subject) completed.events
+        
+        -- Reliability
+        uploadedDocs                = length ((filter (\e -> e.event == DocumentUploaded)) buyerEvents)
+        approvedDocsList            = (filter (\e -> e.event == DocumentApproved)) allEvents
+        approvedDocs                = length approvedDocsList
+        
+        -- Responsiveness
+        contractSigningTimes        = computePairHours ContractUploaded
+            [ContractSigned] buyerEvents allEvents
+
+        uploadAfterRejectionTimes   = computePairHours DocumentRejectedWithNotes 
+            [DocumentUploaded] buyerEvents allEvents
+
+        proposalResponseTimes = computePairHours ContractUploaded 
+            [ProposalApproved] buyerEvents allEvents
+
+        -- Accuracy 
+        approvedDocsResourceIds     = map (\e -> e.resourceId) approvedDocsList
+        attemptsPerApprovedDoc      = map (\rid -> length (filter (\e -> e.event == DocumentUploaded && e.resourceId == rid) buyerEvents)) approvedDocsResourceIds
+
+    toInterfaceContractId <$> 
+        create BuyerObservation with 
+            operator                = operator
+            interactionId           = completed.interactionId
+            subject
+
+            uploadedDocs
+            approvedDocs
+
+            contractSigningTimes
+            uploadAfterRejectionTimes
+            proposalResponseTimes
+
+            attemptsPerApprovedDoc
+
+            buyerObsWeights         = weights
+            configCid               = configCid
+            recordedAt              = completed.completedAt

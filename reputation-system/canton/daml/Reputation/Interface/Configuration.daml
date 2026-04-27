@@ -1,0 +1,21 @@
+module Reputation.Interface.Configuration where
+
+type I = Configuration
+type V = View
+
+data View = View
+    with
+        operator    : Party
+        configId    : Text
+        createdAt   : Time
+    deriving (Eq, Show)
+
+interface Configuration where
+    viewtype View
+
+    nonconsuming choice GetView : View
+        with
+            viewer : Party
+        controller viewer
+        do
+            pure $ view this

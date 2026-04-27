@@ -1,0 +1,92 @@
+module Reputation.Observation.Agent where
+
+import Reputation.Interface.Observation qualified as Observation (I, View(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Types (AgentObservationWeights, ComponentId(..))
+import Reputation.Utils (normalize, mean)
+import DA.Map qualified as Map
+
+
+type T = AgentObservation 
+
+computeReliability : Bool -> Int -> Int -> Int -> AgentObservationWeights -> Decimal
+computeReliability transactionCompleted contractVoided participantAddition participantRemoval w = 
+    let 
+        completionScore = if transactionCompleted then 1.0 else 0.0
+        remTotal        = intToDecimal (participantAddition + participantRemoval)
+        removalRatio    = if participantAddition > 0
+                            then intToDecimal participantRemoval / remTotal
+                            else 0.0
+        removalScore    = 1.0 - removalRatio
+        voidedScore     = 1.0 / (1.0 + intToDecimal contractVoided) 
+    in
+        w.reliabilityCompletionWeight * completionScore +
+        w.reliabilityRemovalWeight * removalScore+
+        w.reliabilityVoidedWeight * voidedScore
+
+computeResponsiveness : [Int] -> [Int] -> AgentObservationWeights -> Optional Decimal
+computeResponsiveness [] [] _ = None
+computeResponsiveness docTimes contractTimes w = Some (
+    (w.responsivenessDocWeight * normalize w.responsivenessCapHours (mean (docTimes)))
+     + (w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean (contractTimes))))
+    
+    
+computeAccuracy : Int -> Int -> Optional Decimal
+computeAccuracy 0 0 = None
+computeAccuracy approved rejected =
+    let 
+        total = intToDecimal (approved + rejected)
+    in 
+        Some (intToDecimal approved / total)
+
+
+
+template AgentObservation 
+    with
+        operator                : Party
+        interactionId           : Text
+        subject                 : Party
+        -- Reliability
+        transactionCompleted    : Bool
+        contractVoided          : Int
+        participantAddition     : Int
+        participantRemoval      : Int
+        -- Responsiveness
+        documentEvaluationTimes : [Int]
+        contractSigningTimes     : [Int]
+        -- Accuracy
+        proposalApprovedCount   : Int
+        proposalRejectedCount   : Int
+        -- Weights
+        agentObsWeights         : AgentObservationWeights
+        configCid               : ContractId Configuration.I
+        recordedAt              : Time
+    where
+        signatory operator
+        observer subject
+
+        ensure interactionId /= ""
+
+        interface instance Observation.I for AgentObservation where
+            view = Observation.View with 
+                operator
+                interactionId
+                subject
+                recordedAt
+                componentValues = Map.fromList 
+                    [(Reliability, Some (computeReliability 
+                        transactionCompleted
+                        contractVoided
+                        participantAddition
+                        participantRemoval
+                        agentObsWeights)
+                    ),
+                    (Responsiveness, computeResponsiveness
+                        documentEvaluationTimes
+                        contractSigningTimes
+                        agentObsWeights
+                    ),
+                    (Accuracy, computeAccuracy
+                        proposalApprovedCount
+                        proposalRejectedCount
+                    )]

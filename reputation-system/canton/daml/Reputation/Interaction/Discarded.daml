@@ -1,0 +1,29 @@
+module Reputation.Interaction.Discarded where
+
+import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
+import Reputation.Types (RoleType)
+
+type T = DiscardedInteraction
+
+template DiscardedInteraction
+    with
+        operator        : Party
+        interactionId   : Text
+        interactionType : Text
+        participants    : [(Party, RoleType)]
+        discardedAt : Time
+    where
+        signatory operator
+        observer map fst participants
+
+        ensure interactionId /= ""
+
+        interface instance Interaction.I for DiscardedInteraction where
+            view = Interaction.View with
+                operator
+                interactionId
+                interactionType
+                participants
+                events = []
+
+                        
