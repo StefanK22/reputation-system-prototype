@@ -3,8 +3,7 @@
 
 sdk-version: 3.4.11
 name: reputation
-source: daml
-#init-script: Main:main
+source: .
 version: 0.0.1
 dependencies:
   - daml-prim

@@ -16,12 +16,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import pt.ulisboa.tecnico.reputation.ledger.handlers.CompletedInteractionHandler;
-import pt.ulisboa.tecnico.reputation.ledger.handlers.FeedbackHandler;
-import pt.ulisboa.tecnico.reputation.ledger.handlers.PartyRoleHandler;
-import pt.ulisboa.tecnico.reputation.ledger.handlers.ReputationConfigurationHandler;
-import pt.ulisboa.tecnico.reputation.ledger.handlers.ReputationTokenHandler;
-
 import java.util.Map;
 import java.util.Optional;
 
@@ -39,24 +33,9 @@ public class LedgerListener {
     @Value("${canton.operator-party-id}")
     String operatorPartyId;
 
-    private final PartyRoleHandler partyRoleHandler;
-    private final ReputationConfigurationHandler configHandler;
-    private final CompletedInteractionHandler completedInteractionHandler;
-    private final FeedbackHandler feedbackHandler;
-    private final ReputationTokenHandler reputationTokenHandler;
-
     private ManagedChannel channel;
 
-    public LedgerListener(PartyRoleHandler partyRoleHandler,
-                          ReputationConfigurationHandler configHandler,
-                          CompletedInteractionHandler completedInteractionHandler,
-                          FeedbackHandler feedbackHandler,
-                          ReputationTokenHandler reputationTokenHandler) {
-        this.partyRoleHandler = partyRoleHandler;
-        this.configHandler = configHandler;
-        this.completedInteractionHandler = completedInteractionHandler;
-        this.feedbackHandler = feedbackHandler;
-        this.reputationTokenHandler = reputationTokenHandler;
+    public LedgerListener() {
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -155,19 +134,7 @@ public class LedgerListener {
 
     private void dispatch(CreatedEvent event) {
         Identifier templateId = event.getTemplateId();
-
-        if (reputation.PartyRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            partyRoleHandler.handle(event);
-        } else if (reputation.ReputationConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            configHandler.handle(event);
-        } else if (reputation.CompletedInteraction.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            completedInteractionHandler.handle(event);
-        } else if (reputation.Feedback.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            feedbackHandler.handle(event);
-        } else if (reputation.ReputationToken.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            reputationTokenHandler.handle(event);
-        } else {
-            log.warn("Unknown template (not dispatched): {}", templateId);
-        }
+        // Handlers will be registered here in Phase 2
+        log.warn("No handler registered for template: {}", templateId);
     }
 }
