@@ -31,29 +31,31 @@ export default function Subject() {
         </div>
         <div className="stat">
           <div className="stat-label">Role</div>
-          <div className="stat-value">{subject.roleId || '—'}</div>
+          <div className="stat-value">{subject.roleType || '—'}</div>
         </div>
       </div>
       <div className="party" style={{ marginBottom: 20 }}>{subject.party}</div>
 
       <h2>Components</h2>
-      {Object.keys(subject.components || {}).length === 0 ? (
+      {!(subject.components?.length) ? (
         <p className="muted">No components.</p>
       ) : (
         <table>
           <thead>
             <tr>
               <th>Component</th>
-              <th>Value</th>
-              <th>Interactions</th>
+              <th>Weight</th>
+              <th>Score</th>
+              <th>Observations</th>
             </tr>
           </thead>
           <tbody>
-            {Object.entries(subject.components).map(([id, c]) => (
-              <tr key={id}>
-                <td>{id}</td>
-                <td>{typeof c.value === 'number' ? c.value.toFixed(2) : '—'}</td>
-                <td className="muted">{c.interactionCount ?? 0}</td>
+            {subject.components.map((c) => (
+              <tr key={c.componentId}>
+                <td>{c.componentId}</td>
+                <td className="muted">{typeof c.weight === 'number' ? c.weight.toFixed(2) : '—'}</td>
+                <td>{typeof c.score === 'number' ? c.score.toFixed(3) : '—'}</td>
+                <td className="muted">{c.count ?? 0}</td>
               </tr>
             ))}
           </tbody>

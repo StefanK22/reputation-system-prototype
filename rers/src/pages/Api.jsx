@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getRankings, getSubject, getConfig } from '../api/reputation.js';
+import { getRankings, getSubject } from '../api/reputation.js';
 
 function ApiCard({ title, params, onCall }) {
   const [values,  setValues]  = useState(() => Object.fromEntries(params.map(p => [p.name, p.default ?? ''])));
@@ -70,12 +70,6 @@ export default function Api() {
             if (!party.trim()) throw new Error('Party is required.');
             return getSubject(party.trim());
           }}
-        />
-
-        <ApiCard
-          title="GET /config"
-          params={[{ name: 'at', label: 'At (optional)', placeholder: 'ISO timestamp' }]}
-          onCall={({ at }) => getConfig(at.trim() || undefined)}
         />
 
       </div>

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLedger } from '../LedgerContext.jsx';
 import { TEMPLATES } from '../api/contracts.js';
-import { getConfig } from '../api/reputation.js';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -341,10 +340,9 @@ export default function Contracts() {
         cs.forEach(c => { if (c.rawTemplateId) ids[c.templateId] = c.rawTemplateId; });
         return ids;
       }),
-      getConfig().catch(() => null),
       ledger.listAllParties().then(r => r.parties || []).catch(() => []),
     ])
-      .then(([ids, cfg, pts]) => { setTemplateIds(ids); setConfig(cfg); setParties(pts); })
+      .then(([ids, pts]) => { setTemplateIds(ids); setParties(pts); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }

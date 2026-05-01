@@ -6,7 +6,7 @@ RUN curl -sSL https://get.daml.com/ | sh -s -- ${DAML_VERSION}
 ENV PATH="/root/.daml/bin:$PATH"
 
 WORKDIR /build/reputation-system/canton
-COPY --from=canton /app/daml/.daml/dist/reputation-0.0.1.dar .daml/dist/reputation-0.0.1.dar
+COPY --from=canton /app/daml/.daml/dist/reputation-0.0.1.dar daml/.daml/dist/reputation-0.0.1.dar
 
 WORKDIR /build/reputation-system
 COPY pom.xml .

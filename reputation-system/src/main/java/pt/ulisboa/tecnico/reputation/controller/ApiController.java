@@ -1,9 +1,8 @@
 package pt.ulisboa.tecnico.reputation.controller;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import pt.ulisboa.tecnico.reputation.entity.*;
+import pt.ulisboa.tecnico.reputation.entity.Subject;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 
 import java.util.List;
@@ -26,12 +25,5 @@ public class ApiController {
     public Subject getSubject(@PathVariable String party) {
         return service.getSubject(party)
             .orElseThrow(() -> new RuntimeException("Subject not found for party: " + party));
-    }
-
-    @GetMapping("/config")
-    public ResponseEntity<Configuration> getConfig() {
-        return service.getLatestConfig()
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
     }
 }

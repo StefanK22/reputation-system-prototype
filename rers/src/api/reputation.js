@@ -13,17 +13,13 @@ export function getRankings(limit = 10) {
 }
 
 export function getSubject(party) {
-  return fetchJson(`/reputation/${encodeURIComponent(party)}`);
-}
-
-export function getConfig(at) {
-  return fetchJson(at ? `/config?at=${encodeURIComponent(at)}` : '/config');
+  return fetchJson(`/subjects/${encodeURIComponent(party)}`);
 }
 
 export function getAllSubjects() {
   return fetchJson('/debug/subjects');
 }
 
-export function getAllConfigurations() {
-  return fetchJson('/debug/configurations');
+export function getInterfaceIds() {
+  return fetchJson('/debug/interface-ids');
 }

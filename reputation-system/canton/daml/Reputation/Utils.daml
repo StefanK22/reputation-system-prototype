@@ -11,11 +11,15 @@ hoursBetween start end =
     in 
         micros / (3600 * 1000000)
 
-findEventHours : Text -> Event -> [Event] -> [RecordedEvent] -> Optional Int     
-findEventHours rid startEvent endEvents allEvents =
-    let 
-        optionalStart = find (\e -> e.event == startEvent && e.resourceId == Some rid) allEvents
-        optionalEnd = find (\e -> e.event `elem` endEvents && e.resourceId == Some rid) allEvents
+findEventHours : Text -> Event -> [Event] -> Time -> [RecordedEvent] -> Optional Int     
+findEventHours rid startEvent endEvents endTime allEvents =
+    let
+        optionalStart = find (\e -> e.event == startEvent 
+                            && e.resourceId == Some rid
+                            && e.occurredAt <= endTime) (reverse allEvents)
+        optionalEnd = find (\e -> e.event `elem` endEvents 
+                            && e.resourceId == Some rid
+                            && e.occurredAt == endTime) allEvents
     in 
         case (optionalStart, optionalEnd) of
             (Some start, Some end)  -> Some (hoursBetween start.occurredAt end.occurredAt)
@@ -25,7 +29,7 @@ computePairHours : Event -> [Event] -> [RecordedEvent] -> [RecordedEvent] -> [In
 computePairHours startEvent endEvents actorEvents allEvents = 
     mapOptional (\e -> case e.resourceId of
         None -> None
-        Some r -> findEventHours r startEvent endEvents allEvents
+        Some r -> findEventHours r startEvent endEvents e.occurredAt allEvents
     ) (filter (\e -> e.event `elem` endEvents) actorEvents)
 
 mean : [Int] -> Decimal

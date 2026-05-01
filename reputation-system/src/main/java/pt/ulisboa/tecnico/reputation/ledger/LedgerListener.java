@@ -16,6 +16,13 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import pt.ulisboa.tecnico.reputation.ledger.handlers.ConfigurationHandler;
+import pt.ulisboa.tecnico.reputation.ledger.handlers.ObservationHandler;
+import pt.ulisboa.tecnico.reputation.ledger.handlers.RoleHandler;
+import reputation.interface$.configuration.Configuration;
+import reputation.interface$.observation.Observation;
+import reputation.interface$.role.Role;
+
 import java.util.Map;
 import java.util.Optional;
 
@@ -33,9 +40,18 @@ public class LedgerListener {
     @Value("${canton.operator-party-id}")
     String operatorPartyId;
 
+    private final ConfigurationHandler configurationHandler;
+    private final RoleHandler roleHandler;
+    private final ObservationHandler observationHandler;
+
     private ManagedChannel channel;
 
-    public LedgerListener() {
+    public LedgerListener(ConfigurationHandler configurationHandler,
+                          RoleHandler roleHandler,
+                          ObservationHandler observationHandler) {
+        this.configurationHandler = configurationHandler;
+        this.roleHandler = roleHandler;
+        this.observationHandler = observationHandler;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -68,13 +84,18 @@ public class LedgerListener {
 
             log.info("Ledger end offset: {}. Streaming all contracts from offset 0", ledgerEnd);
 
-            var wildcardFilter = new CumulativeFilter(
-                    Map.of(),
+            var interfaceFilters = Map.of(
+                    Configuration.INTERFACE_ID_WITH_PACKAGE_ID, Filter.Interface.INCLUDE_VIEW_HIDE_CREATED_EVENT_BLOB,
+                    Role.INTERFACE_ID_WITH_PACKAGE_ID,           Filter.Interface.INCLUDE_VIEW_HIDE_CREATED_EVENT_BLOB,
+                    Observation.INTERFACE_ID_WITH_PACKAGE_ID,    Filter.Interface.INCLUDE_VIEW_HIDE_CREATED_EVENT_BLOB
+            );
+            var cumulativeFilter = new CumulativeFilter(
+                    interfaceFilters,
                     Map.of(),
                     Optional.of(Filter.Wildcard.HIDE_CREATED_EVENT_BLOB)
             );
             var eventFormat = new EventFormat(
-                    Map.<String, Filter>of(operatorPartyId, wildcardFilter),
+                    Map.<String, Filter>of(operatorPartyId, cumulativeFilter),
                     Optional.empty(),
                     false
             );
@@ -93,7 +114,7 @@ public class LedgerListener {
                         @Override
                         public void onNext(UpdateServiceOuterClass.GetUpdatesResponse response) {
                             try {
-                                processUpdate(GetUpdatesResponse.fromProto(response));
+                                processResponse(GetUpdatesResponse.fromProto(response));
                             } catch (Exception e) {
                                 log.error("Error processing update: {}", e.getMessage(), e);
                             }
@@ -118,23 +139,38 @@ public class LedgerListener {
         }
     }
 
-    private void processUpdate(GetUpdatesResponse response) {
+    private void processResponse(GetUpdatesResponse response) {
         response.getTransaction().ifPresentOrElse(transaction -> {
-            log.info("Transaction at offset {} with {} event(s)", transaction.getOffset(), transaction.getEvents().size());
             for (Event event : transaction.getEvents()) {
                 if (event instanceof CreatedEvent createdEvent) {
-                    log.info("CreatedEvent templateId={} contractId={}", createdEvent.getTemplateId(), createdEvent.getContractId());
-                    dispatch(createdEvent);
+                    log.info("+ {} [{}]", shortTemplate(createdEvent.getTemplateId()), shortId(createdEvent.getContractId()));
+                    processNewEvent(createdEvent);
                 } else if (event instanceof ArchivedEvent archivedEvent) {
-                    log.debug("ArchivedEvent templateId={} contractId={}", archivedEvent.getTemplateId(), archivedEvent.getContractId());
+                    log.info("- {} [{}]", shortTemplate(archivedEvent.getTemplateId()), shortId(archivedEvent.getContractId()));
                 }
             }
-        }, () -> log.debug("Non-transaction update received (checkpoint or reassignment), skipping"));
+        }, () -> {});
     }
 
-    private void dispatch(CreatedEvent event) {
-        Identifier templateId = event.getTemplateId();
-        // Handlers will be registered here in Phase 2
-        log.warn("No handler registered for template: {}", templateId);
+    private static String shortTemplate(Identifier id) {
+        return id.getEntityName();
+    }
+
+    private static String shortId(String contractId) {
+        return contractId.length() > 8 ? contractId.substring(0, 8) + "…" : contractId;
+    }
+
+    private void processNewEvent(CreatedEvent event) {
+        var views = event.getInterfaceViews();
+
+        if (views.containsKey(Configuration.INTERFACE_ID_WITH_PACKAGE_ID)) {
+            configurationHandler.handle(event);
+        } else if (views.containsKey(Role.INTERFACE_ID_WITH_PACKAGE_ID)) {
+            roleHandler.handle(event);
+        } else if (views.containsKey(Observation.INTERFACE_ID_WITH_PACKAGE_ID)) {
+            observationHandler.handle(event);
+        } else {
+            log.debug("No handler for template: {}", event.getTemplateId());
+        }
     }
 }

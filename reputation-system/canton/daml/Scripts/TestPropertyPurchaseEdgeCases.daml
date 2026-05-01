@@ -1,0 +1,499 @@
+module Scripts.TestPropertyPurchaseEdgeCases where
+
+import Daml.Script
+import DA.List (head)
+import DA.Time (time)
+import DA.Date (date, Month(..))
+
+import Reputation.Configuration.PropertyPurchase (PropertyPurchaseConfiguration(..), CreateObservations(..))
+import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), CreateRole(..))
+import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
+import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Observation.Agent (AgentObservation)
+import Reputation.Observation.Buyer (BuyerObservation)
+import Reputation.Types
+
+
+-- ── Shared setup ─────────────────────────────────────────────────────────────
+-- Returns (operator, alice, bob, ppConfigCid, iPPConfigCid)
+
+data Setup = Setup
+  with
+    operator     : Party
+    alice        : Party
+    bob          : Party
+    ppConfigCid  : ContractId PropertyPurchaseConfiguration
+    iPPConfigCid : ContractId Configuration.I
+
+setupEnv : Script Setup
+setupEnv = do
+  operator <- allocateParty "Operator"
+  alice    <- allocateParty "AgentAlice"
+  bob      <- allocateParty "BuyerBob"
+
+  let t0 = time (date 2024 Jan 10) 9 0 0
+
+  roleConfigCid <- submit operator do
+    createCmd RoleConfiguration with
+      operator
+      configId     = "ROLE-CONFIG-001"
+      createdAt    = t0
+      agentWeights = AgentWeights with
+        reliability    = 0.5
+        responsiveness = 0.3
+        accuracy       = 0.2
+      buyerWeights = BuyerWeights with
+        reliability    = 0.5
+        responsiveness = 0.3
+        accuracy       = 0.2
+
+  _ <- submit operator do
+    exerciseCmd roleConfigCid CreateRole with
+      party = alice; roleType = Agent; assignedAt = t0
+
+  _ <- submit operator do
+    exerciseCmd roleConfigCid CreateRole with
+      party = bob; roleType = Buyer; assignedAt = t0
+
+  ppConfigCid <- submit operator do
+    createCmd PropertyPurchaseConfiguration with
+      operator
+      configId  = "PP-CONFIG-001"
+      createdAt = t0
+      agentObsWeights = AgentObservationWeights with
+        reliabilityVoidedWeight      = 0.2
+        reliabilityRemovalWeight     = 0.3
+        reliabilityCompletionWeight  = 0.5
+        responsivenessDocWeight      = 0.6
+        responsivenessContractWeight = 0.4
+        responsivenessCapHours       = 24.0
+      buyerObsWeights = BuyerObservationWeights with
+        responsivenessContractWeight  = 0.5
+        responsivenessRejectionWeight = 0.3
+        responsivenessProposalWeight  = 0.2
+        responsivenessCapHours        = 24.0
+
+  let iPPConfigCid : ContractId Configuration.I = toInterfaceContractId ppConfigCid
+
+  pure Setup with { operator, alice, bob, ppConfigCid, iPPConfigCid }
+
+
+-- ── Test 1: No document cycle ─────────────────────────────────────────────────
+-- Scenario: buyer and agent skip all document uploads — straight to contract
+-- signing then a proposal rejected once before approval.
+--
+-- Verifies that document-related fields are all empty/zero when no document
+-- events are ever recorded, and that contract + proposal metrics still resolve.
+--
+-- Expected agent:
+--   transactionCompleted  = True
+--   contractVoided        = 0
+--   participantAddition   = 0
+--   participantRemoval    = 0
+--   documentEvaluationTimes = []
+--   contractSigningTimes  = [12]   (09:00 → 21:00)
+--   proposalApprovedCount = 1
+--   proposalRejectedCount = 1
+--
+-- Expected buyer:
+--   uploadedDocs              = 0
+--   approvedDocs              = 0
+--   contractSigningTimes      = [12]
+--   uploadAfterRejectionTimes = []
+--   attemptsPerApprovedDoc    = []
+
+testNoDocumentCycle : Script ()
+testNoDocumentCycle = do
+  s <- setupEnv
+  let Setup{operator, alice, bob, ppConfigCid, iPPConfigCid} = s
+
+  let t0  = time (date 2024 Jan 10) 9  0 0   -- interaction starts
+      t1  = time (date 2024 Jan 10) 9  0 0   -- contracts uploaded (agent + buyer)
+      t2  = time (date 2024 Jan 10) 21 0 0   -- contracts signed   (12h)
+      t3  = time (date 2024 Jan 11) 9  0 0   -- proposal rejected  (bob)
+      t4  = time (date 2024 Jan 12) 9  0 0   -- proposal approved  (bob)
+      t5  = time (date 2024 Jan 12) 14 0 0   -- transaction closed
+      t6  = time (date 2024 Jan 12) 15 0 0   -- interaction completed
+
+  draftCid <- submit operator do
+    createCmd DraftInteraction with
+      operator
+      interactionId   = "TX-NODOCS"
+      interactionType = "PropertyPurchase"
+      participants    = [(alice, Agent), (bob, Buyer)]
+      openedAt        = t0
+
+  inProgressCid <- submit operator do
+    exerciseCmd draftCid Begin with startedAt = t0
+
+  -- No document uploads at all — straight to contracts
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = alice; occurredAt = t1
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = bob; occurredAt = t1
+        resourceId = Some "contract-buyer-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = alice; occurredAt = t2
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = bob; occurredAt = t2
+        resourceId = Some "contract-buyer-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = bob; occurredAt = t3
+        resourceId = Some "proposal-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved; actor = bob; occurredAt = t4
+        resourceId = Some "proposal-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged; actor = alice; occurredAt = t5
+        resourceId = Some "SELL_CLOSED"
+
+  completedCid <- submit operator do
+    exerciseCmd inProgressCid Complete with
+      completedAt = t6; configCid = iPPConfigCid
+
+  _ <- submit operator do
+    exerciseCmd ppConfigCid CreateObservations with completedCid
+
+  agentObs <- query @AgentObservation operator
+  assertMsg "testNoDocumentCycle: expected 1 AgentObservation" (length agentObs == 1)
+  let (_, agentOb) = head agentObs
+  assertMsg "Agent: transaction completed"                  agentOb.transactionCompleted
+  assertMsg "Agent: no voided contracts"                    (agentOb.contractVoided == 0)
+  assertMsg "Agent: no participant additions"               (agentOb.participantAddition == 0)
+  assertMsg "Agent: no participant removals"                (agentOb.participantRemoval == 0)
+  assertMsg "Agent: no document evaluation times"           (null agentOb.documentEvaluationTimes)
+  assertMsg "Agent: 1 contract signing time"                (length agentOb.contractSigningTimes == 1)
+  assertMsg "Agent: 1 proposal approved"                    (agentOb.proposalApprovedCount == 1)
+  assertMsg "Agent: 1 proposal rejected"                    (agentOb.proposalRejectedCount == 1)
+
+  buyerObs <- query @BuyerObservation operator
+  assertMsg "testNoDocumentCycle: expected 1 BuyerObservation" (length buyerObs == 1)
+  let (_, buyerOb) = head buyerObs
+  assertMsg "Buyer: 0 docs uploaded"                        (buyerOb.uploadedDocs == 0)
+  assertMsg "Buyer: 0 docs approved"                        (buyerOb.approvedDocs == 0)
+  assertMsg "Buyer: 1 contract signing time"                (length buyerOb.contractSigningTimes == 1)
+  assertMsg "Buyer: no upload-after-rejection times"        (null buyerOb.uploadAfterRejectionTimes)
+  assertMsg "Buyer: no attempts-per-approved-doc entries"   (null buyerOb.attemptsPerApprovedDoc)
+
+  assertMsg "Agent: contract signing time is 12h"          (agentOb.contractSigningTimes == [12])
+  assertMsg "Buyer: contract signing time is 12h"          (buyerOb.contractSigningTimes == [12])
+
+  debug "✓ testNoDocumentCycle passed"
+  pure ()
+
+
+-- ── Test 2: Multiple rejections of the same document ─────────────────────────
+-- Scenario: buyer uploads the same resource ID ("buyer-doc-001") three times.
+-- The agent rejects it twice before finally approving on the third upload.
+-- No agent-side doc uploads — isolates the buyer doc tracking logic.
+--
+-- Timeline:
+--   t1  buyer uploads buyer-doc-001  (attempt 1)
+--   t2  alice rejects buyer-doc-001  (12h eval)
+--   t3  buyer re-uploads buyer-doc-001  (10h after rejection — attempt 2)
+--   t4  alice rejects buyer-doc-001  (24h eval, at cap)
+--   t5  buyer re-uploads buyer-doc-001  (10h after rejection — attempt 3)
+--   t6  alice approves buyer-doc-001  (24h eval, at cap)
+--
+-- Expected agent:
+--   documentEvaluationTimes = [12, 24, 24]  (one per eval event)
+--   contractSigningTimes    = [12]
+--   proposalApprovedCount   = 1
+--   proposalRejectedCount   = 0
+--
+-- Expected buyer:
+--   uploadedDocs              = 3
+--   approvedDocs              = 1
+--   uploadAfterRejectionTimes = [10, 10]  (two rejections each followed by a re-upload)
+--   attemptsPerApprovedDoc    = [3]       (three uploads share the approved resource ID)
+--   contractSigningTimes      = [12]
+
+testMultipleRejectionsBeforeApproval : Script ()
+testMultipleRejectionsBeforeApproval = do
+  s <- setupEnv
+  let Setup{operator, alice, bob, ppConfigCid, iPPConfigCid} = s
+
+  let t0  = time (date 2024 Jan 10) 9  0 0   -- interaction starts
+      t1  = time (date 2024 Jan 10) 11 0 0   -- buyer: doc attempt 1 uploaded
+      t2  = time (date 2024 Jan 10) 23 0 0   -- alice rejects (12h eval)
+      t3  = time (date 2024 Jan 11) 9  0 0   -- buyer: doc attempt 2 uploaded (10h after rejection)
+      t4  = time (date 2024 Jan 12) 9  0 0   -- alice rejects again (24h eval, at cap)
+      t5  = time (date 2024 Jan 12) 19 0 0   -- buyer: doc attempt 3 uploaded (10h after rejection)
+      t6  = time (date 2024 Jan 13) 19 0 0   -- alice approves (24h eval, at cap)
+      t7  = time (date 2024 Jan 14) 9  0 0   -- contracts uploaded
+      t8  = time (date 2024 Jan 14) 21 0 0   -- contracts signed (12h)
+      t9  = time (date 2024 Jan 15) 9  0 0   -- proposal approved (bob)
+      t10 = time (date 2024 Jan 15) 14 0 0   -- transaction closed
+      t11 = time (date 2024 Jan 15) 15 0 0   -- interaction completed
+
+  draftCid <- submit operator do
+    createCmd DraftInteraction with
+      operator
+      interactionId   = "TX-MULTIREJ"
+      interactionType = "PropertyPurchase"
+      participants    = [(alice, Agent), (bob, Buyer)]
+      openedAt        = t0
+
+  inProgressCid <- submit operator do
+    exerciseCmd draftCid Begin with startedAt = t0
+
+  -- Buyer doc cycle: three uploads of the same resource ID
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentUploaded; actor = bob; occurredAt = t1
+        resourceId = Some "buyer-doc-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentRejectedWithNotes; actor = alice; occurredAt = t2
+        resourceId = Some "buyer-doc-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentUploaded; actor = bob; occurredAt = t3
+        resourceId = Some "buyer-doc-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentRejectedWithNotes; actor = alice; occurredAt = t4
+        resourceId = Some "buyer-doc-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentUploaded; actor = bob; occurredAt = t5
+        resourceId = Some "buyer-doc-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentApproved; actor = alice; occurredAt = t6
+        resourceId = Some "buyer-doc-001"
+
+  -- Contracts
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = alice; occurredAt = t7
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = bob; occurredAt = t7
+        resourceId = Some "contract-buyer-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = alice; occurredAt = t8
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = bob; occurredAt = t8
+        resourceId = Some "contract-buyer-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved; actor = bob; occurredAt = t9
+        resourceId = Some "proposal-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged; actor = alice; occurredAt = t10
+        resourceId = Some "SELL_CLOSED"
+
+  completedCid <- submit operator do
+    exerciseCmd inProgressCid Complete with
+      completedAt = t11; configCid = iPPConfigCid
+
+  _ <- submit operator do
+    exerciseCmd ppConfigCid CreateObservations with completedCid
+
+  agentObs <- query @AgentObservation operator
+  assertMsg "testMultipleRejections: expected 1 AgentObservation" (length agentObs == 1)
+  let (_, agentOb) = head agentObs
+  assertMsg "Agent: transaction completed"                  agentOb.transactionCompleted
+  assertMsg "Agent: 3 document evaluation times"           (length agentOb.documentEvaluationTimes == 3)
+  assertMsg "Agent: 1 contract signing time"               (length agentOb.contractSigningTimes == 1)
+  assertMsg "Agent: 1 proposal approved"                   (agentOb.proposalApprovedCount == 1)
+  assertMsg "Agent: 0 proposals rejected"                  (agentOb.proposalRejectedCount == 0)
+
+  buyerObs <- query @BuyerObservation operator
+  assertMsg "testMultipleRejections: expected 1 BuyerObservation" (length buyerObs == 1)
+  let (_, buyerOb) = head buyerObs
+  assertMsg "Buyer: 3 docs uploaded"                       (buyerOb.uploadedDocs == 3)
+  assertMsg "Buyer: 1 doc approved"                        (buyerOb.approvedDocs == 1)
+  assertMsg "Buyer: 2 upload-after-rejection times"        (length buyerOb.uploadAfterRejectionTimes == 2)
+  assertMsg "Buyer: attempts for 1 approved doc"           (length buyerOb.attemptsPerApprovedDoc == 1)
+  assertMsg "Buyer: 3 attempts for that approved doc"      (head buyerOb.attemptsPerApprovedDoc == 3)
+  assertMsg "Buyer: 1 contract signing time"               (length buyerOb.contractSigningTimes == 1)
+
+  assertMsg "Agent: eval times are [12, 24, 24]"           (agentOb.documentEvaluationTimes == [12, 24, 24])
+  assertMsg "Agent: contract signing time is 12h"          (agentOb.contractSigningTimes == [12])
+  assertMsg "Buyer: upload-after-rejection times [10, 10]" (buyerOb.uploadAfterRejectionTimes == [10, 10])
+  assertMsg "Buyer: contract signing time is 12h"          (buyerOb.contractSigningTimes == [12])
+
+
+  debug "✓ testMultipleRejectionsBeforeApproval passed"
+  pure ()
+
+
+-- ── Test 3: Voided contract, transaction not completed ────────────────────────
+-- Scenario: a contract is uploaded and signed, then voided. The interaction is
+-- completed without a TransactionStateChanged SELL_CLOSED event.
+--
+-- Verifies that transactionCompleted = False and contractVoided = 1 are
+-- recorded correctly, and that existing approved docs are still counted.
+--
+-- Expected agent:
+--   transactionCompleted    = False
+--   contractVoided          = 1
+--   participantAddition     = 0
+--   participantRemoval      = 0
+--   documentEvaluationTimes = [12]
+--   contractSigningTimes    = [12]
+--   proposalApprovedCount   = 0
+--   proposalRejectedCount   = 0
+--
+-- Expected buyer:
+--   uploadedDocs              = 1
+--   approvedDocs              = 1
+--   contractSigningTimes      = [12]
+--   uploadAfterRejectionTimes = []
+--   attemptsPerApprovedDoc    = [1]
+
+testVoidedContract : Script ()
+testVoidedContract = do
+  s <- setupEnv
+  let Setup{operator, alice, bob, ppConfigCid, iPPConfigCid} = s
+
+  let t0 = time (date 2024 Jan 10) 9  0 0   -- interaction starts
+      t1 = time (date 2024 Jan 10) 11 0 0   -- buyer uploads buyer-doc-001
+      t2 = time (date 2024 Jan 10) 23 0 0   -- alice approves buyer-doc-001 (12h)
+      t3 = time (date 2024 Jan 11) 9  0 0   -- contracts uploaded
+      t4 = time (date 2024 Jan 11) 21 0 0   -- contracts signed (12h)
+      t5 = time (date 2024 Jan 12) 9  0 0   -- contract voided (alice)
+      t6 = time (date 2024 Jan 12) 10 0 0   -- interaction completed without SELL_CLOSED
+
+  draftCid <- submit operator do
+    createCmd DraftInteraction with
+      operator
+      interactionId   = "TX-VOIDED"
+      interactionType = "PropertyPurchase"
+      participants    = [(alice, Agent), (bob, Buyer)]
+      openedAt        = t0
+
+  inProgressCid <- submit operator do
+    exerciseCmd draftCid Begin with startedAt = t0
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentUploaded; actor = bob; occurredAt = t1
+        resourceId = Some "buyer-doc-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentApproved; actor = alice; occurredAt = t2
+        resourceId = Some "buyer-doc-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = alice; occurredAt = t3
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = bob; occurredAt = t3
+        resourceId = Some "contract-buyer-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = alice; occurredAt = t4
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = bob; occurredAt = t4
+        resourceId = Some "contract-buyer-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractVoided; actor = alice; occurredAt = t5
+        resourceId = Some "contract-001"
+
+  -- No TransactionStateChanged SELL_CLOSED — transaction did not complete
+  completedCid <- submit operator do
+    exerciseCmd inProgressCid Complete with
+      completedAt = t6; configCid = iPPConfigCid
+
+  _ <- submit operator do
+    exerciseCmd ppConfigCid CreateObservations with completedCid
+
+  agentObs <- query @AgentObservation operator
+  assertMsg "testVoidedContract: expected 1 AgentObservation" (length agentObs == 1)
+  let (_, agentOb) = head agentObs
+  assertMsg "Agent: transaction NOT completed"              (not agentOb.transactionCompleted)
+  assertMsg "Agent: 1 voided contract"                     (agentOb.contractVoided == 1)
+  assertMsg "Agent: no participant additions"               (agentOb.participantAddition == 0)
+  assertMsg "Agent: no participant removals"                (agentOb.participantRemoval == 0)
+  assertMsg "Agent: 1 document evaluation time"            (length agentOb.documentEvaluationTimes == 1)
+  assertMsg "Agent: 1 contract signing time"               (length agentOb.contractSigningTimes == 1)
+  assertMsg "Agent: 0 proposals approved"                  (agentOb.proposalApprovedCount == 0)
+  assertMsg "Agent: 0 proposals rejected"                  (agentOb.proposalRejectedCount == 0)
+
+  buyerObs <- query @BuyerObservation operator
+  assertMsg "testVoidedContract: expected 1 BuyerObservation" (length buyerObs == 1)
+  let (_, buyerOb) = head buyerObs
+  assertMsg "Buyer: 1 doc uploaded"                        (buyerOb.uploadedDocs == 1)
+  assertMsg "Buyer: 1 doc approved"                        (buyerOb.approvedDocs == 1)
+  assertMsg "Buyer: 1 contract signing time"               (length buyerOb.contractSigningTimes == 1)
+  assertMsg "Buyer: no upload-after-rejection times"       (null buyerOb.uploadAfterRejectionTimes)
+  assertMsg "Buyer: 1 attempt for the approved doc"        (head buyerOb.attemptsPerApprovedDoc == 1)
+  
+  assertMsg "Agent: eval time is 12h"                     (agentOb.documentEvaluationTimes == [12])
+  assertMsg "Agent: contract signing time is 12h"         (agentOb.contractSigningTimes == [12])
+  assertMsg "Buyer: contract signing time is 12h"         (buyerOb.contractSigningTimes == [12])
+  assertMsg "Buyer: 1 attempt for the approved doc"       (buyerOb.attemptsPerApprovedDoc == [1])
+
+  debug "✓ testVoidedContract passed"
+  pure ()

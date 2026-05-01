@@ -43,17 +43,27 @@ function parseContracts(response) {
   const unwrap = (item) => {
     const event = item.contractEntry?.JsActiveContract?.createdEvent || item.createdEvent;
     if (event) {
+      const rawViews = event.interfaceViews || [];
+      const interfaceViews = rawViews.reduce((acc, v) => {
+        const name = normalizeTemplateId(v.interfaceId);
+        if (v.viewStatus === 'OK' || v.viewValue) {
+          acc[name] = v.viewValue || v.value || v;
+        }
+        return acc;
+      }, {});
+
       return {
-        contractId:    event.contractId,
-        payload:       event.createArgument || event.payload,
-        templateId:    normalizeTemplateId(event.templateId),
-        rawTemplateId: event.templateId,
-        signatories:   event.signatories   || [],
-        observers:     event.observers     || [],
-        agreementText: event.agreementText || '',
-        createdAt:     event.createdAt     || null,
-        offset:        event.offset        ?? null,
-        raw:           item,
+        contractId:     event.contractId,
+        payload:        event.createArgument || event.payload,
+        templateId:     normalizeTemplateId(event.templateId),
+        rawTemplateId:  event.templateId,
+        signatories:    event.signatories   || [],
+        observers:      event.observers     || [],
+        agreementText:  event.agreementText || '',
+        createdAt:      event.createdAt     || null,
+        offset:         event.offset        ?? null,
+        interfaceViews,
+        raw:            item,
       };
     }
     return item;
@@ -299,17 +309,29 @@ export class LedgerClient {
   // ── Browser-only ────────────────────────────────────────────────────────────
 
   // Query all active contracts for a party without filtering by template.
-  // Used by the console to discover rawTemplateIds and show all ledger state.
-  async queryAll(party) {
+  // Optionally includes interface views when interfaceIds map is provided.
+  async queryAll(party, interfaceIds = {}) {
     const offset = await this._ledgerOffset();
-    const res    = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
+
+    const interfaceFilters = Object.values(interfaceIds).map(id => ({
+      identifierFilter: {
+        InterfaceFilter: {
+          value: { interfaceId: id, includeInterfaceView: true, includeCreatedEventBlob: false },
+        },
+      },
+    }));
+
+    const res = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({
         filter: {
           filtersByParty: {
             [party || this.party]: {
-              cumulative: [{ identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: true } } } }],
+              cumulative: [
+                { identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: false } } } },
+                ...interfaceFilters,
+              ],
             },
           },
         },

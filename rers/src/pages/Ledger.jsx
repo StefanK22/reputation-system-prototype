@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLedger } from '../LedgerContext.jsx';
+import { getInterfaceIds } from '../api/reputation.js';
 
 function fmt(iso) {
   if (!iso) return '—';
@@ -16,6 +17,9 @@ function PartyList({ items }) {
 }
 
 function ContractDetail({ c }) {
+  const [view, setView] = useState('payload');
+  const interfaceNames  = Object.keys(c.interfaceViews || {});
+
   return (
     <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -42,8 +46,31 @@ function ContractDetail({ c }) {
       </section>
 
       <section>
-        <h4 style={{ margin: '0 0 8px' }}>PAYLOAD (JSON)</h4>
-        <pre style={{ margin: 0 }}>{JSON.stringify(c.payload, null, 2)}</pre>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <h4 style={{ margin: 0 }}>DATA</h4>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              className={view === 'payload' ? 'primary' : ''}
+              style={{ fontSize: 11, padding: '2px 8px' }}
+              onClick={() => setView('payload')}
+            >
+              Template
+            </button>
+            {interfaceNames.map(name => (
+              <button
+                key={name}
+                className={view === name ? 'primary' : ''}
+                style={{ fontSize: 11, padding: '2px 8px' }}
+                onClick={() => setView(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <pre style={{ margin: 0 }}>
+          {JSON.stringify(view === 'payload' ? c.payload : c.interfaceViews[view], null, 2)}
+        </pre>
       </section>
 
       <section>
@@ -57,21 +84,22 @@ function ContractDetail({ c }) {
 
 export default function Ledger() {
   const ledger = useLedger();
-  const [tab, setTab]           = useState('contracts');
-  const [parties, setParties]   = useState([]);
+  const [tab, setTab]             = useState('contracts');
+  const [parties, setParties]     = useState([]);
   const [contracts, setContracts] = useState([]);
-  const [offset, setOffset]     = useState(null);
-  const [expanded, setExpanded] = useState(new Set());
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
+  const [offset, setOffset]       = useState(null);
+  const [expanded, setExpanded]   = useState(new Set());
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
+      const interfaceIds = await getInterfaceIds().catch(() => ({}));
       const [{ parties: ps }, cs, off] = await Promise.all([
         ledger.listAllParties(),
-        ledger.queryAll(),
+        ledger.queryAll(undefined, interfaceIds),
         ledger.ledgerEnd(),
       ]);
       setParties(ps);
@@ -118,6 +146,7 @@ export default function Ledger() {
               <tr>
                 <th></th>
                 <th>Template</th>
+                <th>Interfaces</th>
                 <th>Contract ID</th>
                 <th>Created At</th>
                 <th>Offset</th>
@@ -133,13 +162,18 @@ export default function Ledger() {
                       </button>
                     </td>
                     <td><span className="tag">{c.templateId}</span></td>
+                    <td>
+                      {Object.keys(c.interfaceViews || {}).map(name => (
+                        <span key={name} className="tag" style={{ marginRight: 4, opacity: 0.7 }}>{name}</span>
+                      ))}
+                    </td>
                     <td className="party">{c.contractId}</td>
                     <td className="muted">{fmt(c.createdAt)}</td>
                     <td className="muted">{c.offset ?? '—'}</td>
                   </tr>
                   {expanded.has(c.contractId) && (
                     <tr key={c.contractId + '-detail'}>
-                      <td colSpan={5} style={{ background: 'var(--bg-subtle, #f8f8f8)', padding: 0 }}>
+                      <td colSpan={6} style={{ background: 'var(--bg-subtle, #f8f8f8)', padding: 0 }}>
                         <ContractDetail c={c} />
                       </td>
                     </tr>

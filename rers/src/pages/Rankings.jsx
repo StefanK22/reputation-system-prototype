@@ -41,7 +41,7 @@ export default function Rankings() {
                   <div>{r.party.split('::')[0]}</div>
                   <div className="party">{r.party}</div>
                 </td>
-                <td><span className="tag">{r.roleId || '—'}</span></td>
+                <td><span className="tag">{r.roleType || '—'}</span></td>
                 <td className="score">{r.overallScore?.toFixed(1) ?? '—'}</td>
               </tr>
             ))}

@@ -1,117 +1,139 @@
 package pt.ulisboa.tecnico.reputation.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import pt.ulisboa.tecnico.reputation.entity.*;
-import pt.ulisboa.tecnico.reputation.repository.ConfigurationRepository;
+import pt.ulisboa.tecnico.reputation.entity.Subject;
+import pt.ulisboa.tecnico.reputation.entity.SubjectComponent;
 import pt.ulisboa.tecnico.reputation.repository.SubjectRepository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
 public class ReputationService {
 
-    private final SubjectRepository subjectRepo;
-    private final ConfigurationRepository configRepo;
+    private static final Logger log = LoggerFactory.getLogger(ReputationService.class);
 
-    public ReputationService(SubjectRepository subjectRepo, ConfigurationRepository configRepo) {
+    private final SubjectRepository subjectRepo;
+
+    public ReputationService(SubjectRepository subjectRepo) {
         this.subjectRepo = subjectRepo;
-        this.configRepo = configRepo;
     }
 
-    // Wipe the read model so the engine can rebuild it cleanly from ledger offset 0.
     @Transactional
     public void reset() {
         subjectRepo.deleteAll();
-        configRepo.deleteAll();
     }
+
+    // ── Role ──────────────────────────────────────────────────────────────────
 
     @Transactional
-    public Configuration addConfiguration(Configuration config) {
-        return configRepo.save(config);
-    }
-
-    public Optional<Configuration> getLatestConfig() {
-        List<Configuration> configs = configRepo.findAll(
-            Sort.by(Sort.Direction.DESC, "version")
-        );
-        return configs.isEmpty() ? Optional.empty() : Optional.of(configs.get(0));
-    }
-
-
-    @Transactional
-    public Subject updateOrCreateNewSubject(String party, String roleId) {
+    public void upsertRole(String party, String roleType, String contractId, String configContractId,
+                           Map<String, Double> componentWeights) {
         Subject s = subjectRepo.findById(party).orElseGet(() -> {
-            return createSubject(party, roleId);
+            Subject n = new Subject();
+            n.setParty(party);
+            n.setOverallScore(0);
+            n.setCreatedAt(Instant.now());
+            return n;
         });
-        s.setRoleId(roleId);
+        s.setRoleType(roleType);
+        s.setContractId(contractId);
+        s.setConfigContractId(configContractId);
         s.setUpdatedAt(Instant.now());
-        return subjectRepo.save(s);
+
+        componentWeights.forEach((componentId, weight) -> {
+            SubjectComponent sc = s.getComponents().stream()
+                    .filter(c -> c.getComponentId().equals(componentId))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        SubjectComponent c = new SubjectComponent();
+                        c.setComponentId(componentId);
+                        c.setScore(0.0);
+                        c.setCount(0);
+                        c.setSubject(s);
+                        s.getComponents().add(c);
+                        return c;
+                    });
+            sc.setWeight(weight);
+        });
+
+        subjectRepo.save(s);
     }
 
-    // Resolve the role for a party. Returns UNKNOWN_ROLE if no subject exists for the party.
-    public String getRole(String party) {
-        return subjectRepo.findById(party)
-            .map(Subject::getRoleId)
-            .orElse("UNKNOWN_ROLE");
+    // ── Observation ───────────────────────────────────────────────────────────
+
+    @Transactional
+    public void applyObservation(String party, Map<String, Optional<Double>> componentValues) {
+        Subject subject = subjectRepo.findById(party).orElse(null);
+        if (subject == null) {
+            log.warn("applyObservation: no subject found for party {}", party);
+            return;
+        }
+
+        componentValues.forEach((componentId, optValue) ->
+            optValue.ifPresent(value -> {
+                SubjectComponent sc = subject.getComponents().stream()
+                        .filter(c -> c.getComponentId().equals(componentId))
+                        .findFirst()
+                        .orElseGet(() -> {
+                            SubjectComponent c = new SubjectComponent();
+                            c.setComponentId(componentId);
+                            c.setWeight(0.0);
+                            c.setScore(0.0);
+                            c.setCount(0);
+                            c.setSubject(subject);
+                            subject.getComponents().add(c);
+                            return c;
+                        });
+
+                int count = sc.getCount();
+                double updated = (sc.getScore() * count + value) / (count + 1);
+                sc.setScore(Math.round(updated * 100.0) / 100.0);
+                sc.setCount(count + 1);
+            })
+        );
+
+        recomputeScore(subject);
+        subjectRepo.save(subject);
     }
+
+    // ── Score ─────────────────────────────────────────────────────────────────
+
+    private void recomputeScore(Subject subject) {
+        double weightedSum = 0.0;
+        double totalWeight = 0.0;
+
+        for (SubjectComponent sc : subject.getComponents()) {
+            if (sc.getCount() == 0) continue;
+            weightedSum += sc.getWeight() * sc.getScore();
+            totalWeight += sc.getWeight();
+        }
+
+        double score = totalWeight > 0 ? weightedSum / totalWeight : 0.0;
+        subject.setOverallScore(Math.round(score * 100.0) / 100.0);
+        subject.setUpdatedAt(Instant.now());
+    }
+
+    // ── Queries ───────────────────────────────────────────────────────────────
 
     public Optional<Subject> getSubject(String party) {
         return subjectRepo.findById(party);
     }
 
-    @Transactional
-    public Subject createSubject(String party, String roleId) {
-        Subject s = new Subject();
-        s.setParty(party);
-        s.setRoleId(roleId);
-        s.setOverallScore(0);
-        s.setCreatedAt(Instant.now());
-        s.setUpdatedAt(Instant.now());
-        return subjectRepo.save(s);
-    }
-
-    public Subject getOrCreateSubject(String party, String roleId) {
-        return subjectRepo.findById(party)
-            .orElseGet(() -> createSubject(party, roleId));
-    }
-
-    @Transactional
-    public Subject updateSubject(Subject subject) {
-        subject.setUpdatedAt(Instant.now());
-        return subjectRepo.save(subject);
-    }
-
     public List<Subject> getRanking(int limit) {
         return subjectRepo.findAll(
-            Sort.by(Sort.Direction.DESC, "overallScore").and(Sort.by(Sort.Direction.ASC, "party"))
+                Sort.by(Sort.Direction.DESC, "overallScore").and(Sort.by(Sort.Direction.ASC, "party"))
         ).stream().limit(limit).toList();
     }
 
     public List<Subject> getAllSubjects() {
         return subjectRepo.findAll(Sort.by(Sort.Direction.ASC, "party"));
-    }
-
-    public List<Configuration> getAllConfigurations() {
-        return configRepo.findAll(Sort.by(Sort.Direction.DESC, "version"));
-    }
-
-    // Recomputes overall score as an equal-weight average of all component values,
-    // rounded to 2 decimal places.
-    public void recomputeScore(Subject subject) {
-        List<Component> components = subject.getComponents();
-        if (components.isEmpty()) {
-            subject.setOverallScore(0);
-            subject.setUpdatedAt(Instant.now());
-            return;
-        }
-        double sum = components.stream().mapToDouble(Component::getValue).sum();
-        double avg = sum / components.size();
-        subject.setOverallScore(Math.round(avg * 100.0) / 100.0);
-        subject.setUpdatedAt(Instant.now());
     }
 }
