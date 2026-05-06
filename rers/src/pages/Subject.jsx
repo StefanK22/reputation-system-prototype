@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { getSubject } from '../api/reputation.js';
+import { Tag, ScoreGauge, ScoreBar } from '../components/shared.jsx';
+
+const COMP_COLORS = ['#1a6abf', '#7a5abf', '#2a7a6a'];
 
 export default function Subject() {
   const { party }              = useParams();
@@ -19,47 +22,42 @@ export default function Subject() {
   if (error)    return <p className="error">{error}</p>;
   if (!subject) return <p className="muted">Not found.</p>;
 
-  const displayName = subject.party.split('::')[0];
+  const displayName = typeof subject.party === 'string' ? subject.party.split('::')[0] : String(subject.party ?? '');
 
   return (
     <>
       <h1>{displayName}</h1>
-      <div className="stat-row">
-        <div className="stat">
-          <div className="stat-label">Score</div>
-          <div className="stat-value">{subject.overallScore?.toFixed(1) ?? '—'}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Role</div>
-          <div className="stat-value">{subject.roleType || '—'}</div>
+      <div style={{ fontSize: 11, color: '#bbb', marginBottom: 20, wordBreak: 'break-all' }}>{subject.party}</div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+        <ScoreGauge score={subject.overallScore ?? 0} size={64} />
+        <div>
+          <Tag>{subject.roleType || '—'}</Tag>
+          <div style={{ fontSize: 11, color: '#888', marginTop: 8 }}>Overall score</div>
         </div>
       </div>
-      <div className="party" style={{ marginBottom: 20 }}>{subject.party}</div>
 
-      <h2>Components</h2>
-      {!(subject.components?.length) ? (
-        <p className="muted">No components.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Component</th>
-              <th>Weight</th>
-              <th>Score</th>
-              <th>Observations</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subject.components.map((c) => (
-              <tr key={c.componentId}>
-                <td>{c.componentId}</td>
-                <td className="muted">{typeof c.weight === 'number' ? c.weight.toFixed(2) : '—'}</td>
-                <td>{typeof c.score === 'number' ? c.score.toFixed(3) : '—'}</td>
-                <td className="muted">{c.count ?? 0}</td>
-              </tr>
+      {subject.components?.length > 0 && (
+        <>
+          <h2>Components</h2>
+          <div style={{ maxWidth: 480 }}>
+            {subject.components.map((c, i) => (
+              <div key={c.componentId} style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: '#555' }}>{c.componentId}</span>
+                  <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#888' }}>
+                    <span>weight {typeof c.weight === 'number' ? c.weight.toFixed(2) : '—'}</span>
+                    <span style={{ color: '#333', fontWeight: 600 }}>
+                      {typeof c.score === 'number' ? (c.score * 100).toFixed(1) : '—'}
+                    </span>
+                    <span>{c.count ?? 0} obs</span>
+                  </div>
+                </div>
+                <ScoreBar value={c.score ?? 0} color={COMP_COLORS[i % COMP_COLORS.length]} height={6} />
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </>
       )}
     </>
   );

@@ -13,10 +13,13 @@ data View = View
         subject         : Party
         componentValues : Map ComponentId (Optional Decimal)
         recordedAt      : Time
+        processed       : Bool
     deriving (Eq, Show)
 
 interface Observation where
     viewtype View
+
+    setProcessed : Update (ContractId Observation)
 
     nonconsuming choice GetView : View
         with
@@ -24,3 +27,8 @@ interface Observation where
         controller viewer
         do
             pure $ view this
+    
+    choice MarkProcessed : ContractId Observation
+        controller (view this).operator
+        do
+            setProcessed this

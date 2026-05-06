@@ -12,6 +12,7 @@ data View = View
         interactionType : Text
         participants    : [(Party, RoleType)]
         events          : [RecordedEvent]
+        processed       : Bool
     deriving (Eq, Show)
 
 interface Interaction where

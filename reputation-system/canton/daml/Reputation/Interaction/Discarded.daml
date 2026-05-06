@@ -25,5 +25,6 @@ template DiscardedInteraction
                 interactionType
                 participants
                 events = []
+                processed = False
 
                         

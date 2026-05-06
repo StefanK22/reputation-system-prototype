@@ -1,14 +1,16 @@
 import { NavLink } from 'react-router-dom';
 
 const USER_LINKS = [
-  { to: '/rankings',  label: 'Rankings'  },
-  { to: '/api',       label: 'API'       },
-  { to: '/contracts', label: 'Contracts' },
+  { to: '/rankings',     label: 'Rankings'     },
+  { to: '/interactions', label: 'Interactions' },
+  { to: '/contracts',    label: 'Contracts'    },
+  { to: '/observations', label: 'Observations' },
 ];
 
 const DEBUG_LINKS = [
   { to: '/ledger',   label: 'Ledger'   },
   { to: '/database', label: 'Database' },
+  { to: '/api',      label: 'API'      },
 ];
 
 function NavGroup({ links }) {
@@ -22,7 +24,7 @@ function NavGroup({ links }) {
 export default function Nav() {
   return (
     <nav>
-      <div className="nav-title">Real Estate Reputation Simulator</div>
+      <div className="nav-title">Real Estate<br />Reputation System</div>
       <NavGroup links={USER_LINKS} />
       <div className="nav-section-label">Debug</div>
       <NavGroup links={DEBUG_LINKS} />

@@ -34,7 +34,7 @@ public class ObservationHandler {
         Identifier templateId = event.getTemplateId();
 
         if (AgentObservation.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            handleObservation(event);
+            handleAgentObservation(event);
         } else if (BuyerObservation.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
             handleBuyerObservation(event);
         } else {
@@ -42,33 +42,44 @@ public class ObservationHandler {
         }
     }
 
-    private void handleObservation(CreatedEvent event) {
+    private void handleAgentObservation(CreatedEvent event) {
         try {
             var viewRecord = event.getInterfaceViews().get(Observation.INTERFACE_ID_WITH_PACKAGE_ID);
             if (viewRecord == null) {
                 log.warn("Observation interface view missing for contractId={}", event.getContractId());
                 return;
             }
-
             View view = View.valueDecoder().decode(viewRecord);
-
             Map<String, Optional<Double>> componentValues = new HashMap<>();
             view.componentValues.forEach((componentId, optDecimal) ->
                 componentValues.put(componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
             );
-
             log.info("AgentObservation: subject={}, interactionId={}, components={}",
                     view.subject, view.interactionId, componentValues);
-
             reputationService.applyObservation(view.subject, componentValues);
         } catch (Exception e) {
-            log.error("Failed to handle AgentObservation event: {}", e.getMessage(), e);
+            log.error("Failed to handle AgentObservation: {}", e.getMessage(), e);
         }
     }
 
     private void handleBuyerObservation(CreatedEvent event) {
-        // No read-model projection needed for BuyerObservation yet.
-        log.debug("BuyerObservation created (no action): contractId={}", event.getContractId());
+        try {
+            var viewRecord = event.getInterfaceViews().get(Observation.INTERFACE_ID_WITH_PACKAGE_ID);
+            if (viewRecord == null) {
+                log.warn("Observation interface view missing for contractId={}", event.getContractId());
+                return;
+            }
+            View view = View.valueDecoder().decode(viewRecord);
+            Map<String, Optional<Double>> componentValues = new HashMap<>();
+            view.componentValues.forEach((componentId, optDecimal) ->
+                componentValues.put(componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
+            );
+            log.info("BuyerObservation: subject={}, interactionId={}, components={}",
+                    view.subject, view.interactionId, componentValues);
+            reputationService.applyObservation(view.subject, componentValues);
+        } catch (Exception e) {
+            log.error("Failed to handle BuyerObservation: {}", e.getMessage(), e);
+        }
     }
 
     private String componentIdName(ComponentId id) {

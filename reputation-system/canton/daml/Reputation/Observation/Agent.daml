@@ -53,7 +53,7 @@ template AgentObservation
         participantRemoval      : Int
         -- Responsiveness
         documentEvaluationTimes : [Int]
-        contractSigningTimes     : [Int]
+        contractSigningTimes    : [Int]
         -- Accuracy
         proposalApprovedCount   : Int
         proposalRejectedCount   : Int
@@ -61,6 +61,7 @@ template AgentObservation
         agentObsWeights         : AgentObservationWeights
         configCid               : ContractId Configuration.I
         recordedAt              : Time
+        processed               : Bool
     where
         signatory operator
         observer subject
@@ -90,3 +91,6 @@ template AgentObservation
                         proposalApprovedCount
                         proposalRejectedCount
                     )]
+                processed
+            setProcessed = toInterfaceContractId <$> 
+                create this with processed = True

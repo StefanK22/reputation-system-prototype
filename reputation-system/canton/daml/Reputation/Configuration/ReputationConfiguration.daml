@@ -1,0 +1,31 @@
+module Reputation.Configuration.ReputationConfiguration where
+
+import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
+import Reputation.Types (ComponentId)
+import DA.Map (Map)
+import DA.Map qualified as Map
+
+type T = ReputationConfiguration
+
+template ReputationConfiguration 
+    with
+        operator : Party
+        configId : Text
+        scoreFloor : Decimal
+        scoreCeiling : Decimal
+        startValues : Map ComponentId Decimal
+        createdAt : Time
+    where
+        signatory operator
+        
+        ensure
+            configId /= "" &&
+                scoreFloor >= 0.0 &&
+                scoreCeiling > scoreFloor &&
+                not (Map.null startValues)
+        
+        interface instance Configuration.I for ReputationConfiguration where
+            view = Configuration.View with
+                operator
+                configId
+                createdAt

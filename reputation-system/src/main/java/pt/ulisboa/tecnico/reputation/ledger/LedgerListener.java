@@ -16,9 +16,11 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import pt.ulisboa.tecnico.reputation.entity.SystemState;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.ConfigurationHandler;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.ObservationHandler;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.RoleHandler;
+import pt.ulisboa.tecnico.reputation.repository.SystemStateRepository;
 import reputation.interface$.configuration.Configuration;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.role.Role;
@@ -43,15 +45,18 @@ public class LedgerListener {
     private final ConfigurationHandler configurationHandler;
     private final RoleHandler roleHandler;
     private final ObservationHandler observationHandler;
+    private final SystemStateRepository systemStateRepo;
 
     private ManagedChannel channel;
 
     public LedgerListener(ConfigurationHandler configurationHandler,
                           RoleHandler roleHandler,
-                          ObservationHandler observationHandler) {
+                          ObservationHandler observationHandler,
+                          SystemStateRepository systemStateRepo) {
         this.configurationHandler = configurationHandler;
         this.roleHandler = roleHandler;
         this.observationHandler = observationHandler;
+        this.systemStateRepo = systemStateRepo;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -77,12 +82,11 @@ public class LedgerListener {
 
     private void startEventStream() {
         try {
-            StateServiceGrpc.StateServiceBlockingStub stateService = StateServiceGrpc.newBlockingStub(channel);
-            long ledgerEnd = stateService
-                    .getLedgerEnd(StateServiceOuterClass.GetLedgerEndRequest.newBuilder().build())
-                    .getOffset();
+            long resumeOffset = systemStateRepo.findById(1L)
+                    .map(SystemState::getLedgerOffset)
+                    .orElse(0L);
 
-            log.info("Ledger end offset: {}. Streaming all contracts from offset 0", ledgerEnd);
+            log.info("Resuming ledger stream from offset {}", resumeOffset);
 
             var interfaceFilters = Map.of(
                     Configuration.INTERFACE_ID_WITH_PACKAGE_ID, Filter.Interface.INCLUDE_VIEW_HIDE_CREATED_EVENT_BLOB,
@@ -102,7 +106,7 @@ public class LedgerListener {
             var txFormat = new TransactionFormat(eventFormat, TransactionShape.ACS_DELTA);
             var updateFormat = new UpdateFormat(Optional.of(txFormat), Optional.empty(), Optional.empty());
 
-            GetUpdatesRequest request = new GetUpdatesRequest(0L, Optional.empty(), updateFormat);
+            GetUpdatesRequest request = new GetUpdatesRequest(resumeOffset, Optional.empty(), updateFormat);
 
             UpdateServiceGrpc.UpdateServiceStub updateService = UpdateServiceGrpc.newStub(channel);
 
@@ -149,7 +153,14 @@ public class LedgerListener {
                     log.info("- {} [{}]", shortTemplate(archivedEvent.getTemplateId()), shortId(archivedEvent.getContractId()));
                 }
             }
+            saveOffset(transaction.getOffset());
         }, () -> {});
+    }
+
+    private void saveOffset(long offset) {
+        SystemState state = systemStateRepo.findById(1L).orElseGet(SystemState::new);
+        state.setLedgerOffset(offset);
+        systemStateRepo.save(state);
     }
 
     private static String shortTemplate(Identifier id) {

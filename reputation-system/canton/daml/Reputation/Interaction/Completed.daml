@@ -15,6 +15,7 @@ template CompletedInteraction
         startedAt       : Time
         completedAt     : Time
         configCid       : ContractId Configuration.I
+        processed       : Bool
     where
         signatory operator
         observer map fst participants
@@ -31,3 +32,10 @@ template CompletedInteraction
                 interactionType
                 participants
                 events
+                processed
+        
+        choice ProcessInteraction : ContractId CompletedInteraction 
+            controller operator
+            do
+                create this with
+                    processed = True

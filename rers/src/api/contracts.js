@@ -1,41 +1,42 @@
-// Browser-compatible subset of src/contracts.js.
-// TEMPLATES and CHOICES are plain string constants — no Node.js or codegen deps.
-// TEMPLATE_IDS are not included: full IDs are discovered at runtime from the
-// ledger via ledger.queryAll() which returns rawTemplateId on each contract.
+// Interaction lifecycle template short names → status label
+export const INTERACTION_TEMPLATES = Object.freeze({
+  DraftInteraction:      'Draft',
+  InProgressInteraction: 'InProgress',
+  CompletedInteraction:  'Completed',
+  DiscardedInteraction:  'Discarded',
+});
 
+// Role template short names → role type string
+export const ROLE_TEMPLATES = Object.freeze({
+  AgentRole: 'Agent',
+  BuyerRole: 'Buyer',
+});
+
+// Interaction configuration template short names — these implement Configuration interface
+// AND have a CreateObservations choice. RoleConfiguration is excluded (it only has CreateRole).
+export const CONFIGURATION_TEMPLATES = Object.freeze({
+  PropertyPurchaseConfiguration: true,
+});
+
+// Module paths used to derive full package-qualified IDs at runtime from a known package prefix.
+// Key is the template/interface short name; value is "Module.Path:EntityName".
+export const KNOWN_MODULE_PATHS = Object.freeze({
+  DraftInteraction:              'Reputation.Interaction.Draft:DraftInteraction',
+  InProgressInteraction:         'Reputation.Interaction.InProgress:InProgressInteraction',
+  CompletedInteraction:          'Reputation.Interaction.Completed:CompletedInteraction',
+  DiscardedInteraction:          'Reputation.Interaction.Discarded:DiscardedInteraction',
+  PropertyPurchaseConfiguration: 'Reputation.Configuration.PropertyPurchase:PropertyPurchaseConfiguration',
+  ConfigurationInterface:        'Reputation.Interface.Configuration:Configuration',
+});
+
+// Legacy template short names used by Contracts.jsx
 export const TEMPLATES = Object.freeze({
-  CONFIG:      'ReputationConfiguration',
+  PARTY_ROLE:  'PartyRole',
   INTERACTION: 'CompletedInteraction',
   FEEDBACK:    'Feedback',
-  TOKEN:       'ReputationToken',
-  PARTY_ROLE:  'PartyRole',
 });
 
-export const CHOICES = Object.freeze({
-  CONFIG:      { UPDATE: 'UpdateConfig',         ARCHIVE: 'Archive' },
-  INTERACTION: { SET_PROCESSED: 'SetProcessed',  ARCHIVE: 'Archive' },
-  FEEDBACK:    { SET_VISIBILITY: 'SetVisibility', ARCHIVE: 'Archive' },
-  TOKEN:       { UPDATE_SCORE: 'UpdateScore',    ARCHIVE: 'Archive' },
-  PARTY_ROLE:  { ARCHIVE: 'Archive' },
-});
+// ─── DAML Map field schema (used by LedgerClient to serialize map fields before submission)
+export const PAYLOAD_MAPS = Object.freeze({});
 
-// ─── Daml Map field schema (mirrors src/contracts.js PAYLOAD_MAPS / CHOICE_MAPS)
-export const PAYLOAD_MAPS = Object.freeze({
-  [TEMPLATES.CONFIG]:      { roleWeights: { componentWeights: '*' } },
-  [TEMPLATES.TOKEN]:       { components: '*' },
-  [TEMPLATES.INTERACTION]: { outcome: '*' },
-  [TEMPLATES.FEEDBACK]:    { ratings: '*' },
-});
-
-export const CHOICE_MAPS = Object.freeze({
-  [CHOICES.TOKEN.UPDATE_SCORE]:  { newComponents: '*' },
-  [CHOICES.CONFIG.UPDATE]:       { newRoleWeights: { componentWeights: '*' } },
-});
-
-export const REQUIRED_FIELDS = Object.freeze({
-  [TEMPLATES.CONFIG]:      ['operator', 'configId', 'activatedAt'],
-  [TEMPLATES.INTERACTION]: ['operator', 'interactionId', 'interactionType', 'participants', 'completedAt'],
-  [TEMPLATES.FEEDBACK]:    ['operator', 'interactionId', 'from', 'to', 'ratings', 'submittedAt'],
-  [TEMPLATES.TOKEN]:       ['operator', 'owner'],
-  [TEMPLATES.PARTY_ROLE]:  ['operator', 'party', 'roleId'],
-});
+export const CHOICE_MAPS = Object.freeze({});

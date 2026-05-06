@@ -2,7 +2,7 @@ module Reputation.Configuration.PropertyPurchase where
 
 import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
 import Reputation.Interface.Observation qualified as Observation (I)
-import Reputation.Interaction.Completed (CompletedInteraction(..))
+import Reputation.Interaction.Completed (CompletedInteraction(..), ProcessInteraction(..))
 import Reputation.Observation.Agent (AgentObservation(..))
 import Reputation.Observation.Buyer (BuyerObservation(..))
 import Reputation.Utils (computePairHours, hoursBetween)
@@ -45,8 +45,9 @@ template PropertyPurchaseConfiguration
             controller operator
             do
                 completed <- fetch completedCid
+                assertMsg "Interaction already processed" (not completed.processed)
                 let configCid = toInterfaceContractId @Configuration.I self
-                fmap concat $ forA completed.participants $ \(subject, roleType) ->
+                observations <- fmap concat $ forA completed.participants $ \(subject, roleType) ->
                     case roleType of
                         Agent -> do
                             obs <- createAgentObservation completed subject agentObsWeights operator configCid
@@ -54,6 +55,8 @@ template PropertyPurchaseConfiguration
                         Buyer -> do
                             obs <- createBuyerObservation completed subject buyerObsWeights operator configCid
                             pure [obs]
+                exercise completedCid ProcessInteraction
+                pure observations
 
 
 createAgentObservation : CompletedInteraction -> Party -> AgentObservationWeights -> Party -> ContractId Configuration.I -> Update (ContractId Observation.I)
@@ -96,6 +99,7 @@ createAgentObservation completed subject weights operator configCid = do
             agentObsWeights         = weights
             configCid               = configCid
             recordedAt              = completed.completedAt
+            processed               = False
 
 createBuyerObservation : CompletedInteraction -> Party -> BuyerObservationWeights -> Party -> ContractId Configuration.I -> Update (ContractId Observation.I)
 createBuyerObservation completed subject weights operator configCid = do
@@ -146,3 +150,4 @@ createBuyerObservation completed subject weights operator configCid = do
             buyerObsWeights         = weights
             configCid               = configCid
             recordedAt              = completed.completedAt
+            processed               = False

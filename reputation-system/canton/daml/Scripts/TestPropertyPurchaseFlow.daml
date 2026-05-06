@@ -2,10 +2,12 @@ module Scripts.TestPropertyPurchaseFlow where
 
 import Daml.Script
 import DA.List (head)
+import DA.Map qualified as DA.Map
 import DA.Time (time)
 import DA.Date (date, Month(..))
 
 import Reputation.Configuration.PropertyPurchase (PropertyPurchaseConfiguration(..), CreateObservations(..))
+import Reputation.Configuration.ReputationConfiguration (ReputationConfiguration(..))
 import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
@@ -46,7 +48,23 @@ testPropertyPurchaseFlow = do
       t12 = time (date 2026 Jan 15) 14 0 0   -- transaction closed
       t13 = time (date 2026 Jan 15) 15 0 0   -- interaction completed
 
-  -- ── 1. Role configuration ─────────────────────────────────────────────────
+  -- ── 1. Reputation configuration ──────────────────────────────────────────
+  _ <- submit operator do
+    createCmd ReputationConfiguration with
+      operator
+      configId     = "REP-CONFIG-001"
+      scoreFloor   = 0.0
+      scoreCeiling = 1.0
+      startValues  = DA.Map.fromList
+        [ (Reliability,    0.5)
+        , (Responsiveness, 0.5)
+        , (Accuracy,       0.5)
+        ]
+      createdAt    = t0
+
+  debug "✓ ReputationConfiguration created"
+
+  -- ── 3. Role configuration ─────────────────────────────────────────────────
   roleConfigCid <- submit operator do
     createCmd RoleConfiguration with
       operator
@@ -63,7 +81,7 @@ testPropertyPurchaseFlow = do
 
   debug "✓ RoleConfiguration created"
 
-  -- ── 2. Roles ──────────────────────────────────────────────────────────────
+  -- ── 4. Roles ──────────────────────────────────────────────────────────────
   _ <- submit operator do
     exerciseCmd roleConfigCid CreateRole with
       party      = alice
@@ -78,7 +96,7 @@ testPropertyPurchaseFlow = do
 
   debug "✓ AgentRole (Alice) and BuyerRole (Bob) created"
 
-  -- ── 3. Property purchase configuration ───────────────────────────────────
+  -- ── 5. Property purchase configuration ───────────────────────────────────
   ppConfigCid <- submit operator do
     createCmd PropertyPurchaseConfiguration with
       operator
@@ -101,7 +119,7 @@ testPropertyPurchaseFlow = do
 
   let iPPConfigCid : ContractId Configuration.I = toInterfaceContractId ppConfigCid
 
-  -- ── 4. Draft → InProgress ─────────────────────────────────────────────────
+  -- ── 6. Draft → InProgress ─────────────────────────────────────────────────
   draftCid <- submit operator do
     createCmd DraftInteraction with
       operator
@@ -115,7 +133,7 @@ testPropertyPurchaseFlow = do
 
   debug "✓ Interaction started (DraftInteraction → InProgressInteraction)"
 
-  -- ── 5. Record events ──────────────────────────────────────────────────────
+  -- ── 7. Record events ──────────────────────────────────────────────────────
 
   -- ── Agent (Alice) document cycle 1: uploaded then rejected after 12 hours
   inProgressCid <- submit operator do
@@ -271,7 +289,7 @@ testPropertyPurchaseFlow = do
 
   debug "✓ Events recorded"
 
-  -- ── 6. Complete ───────────────────────────────────────────────────────────
+  -- ── 8. Complete ───────────────────────────────────────────────────────────
   completedCid <- submit operator do
     exerciseCmd inProgressCid Complete with
       completedAt = t13
@@ -279,13 +297,13 @@ testPropertyPurchaseFlow = do
 
   debug "✓ Interaction completed"
 
-  -- ── 7. Generate observations ──────────────────────────────────────────────
+  -- ── 9. Generate observations ──────────────────────────────────────────────
   obsCids <- submit operator do
     exerciseCmd ppConfigCid CreateObservations with completedCid
 
   debug "✓ Observations created"
 
-  -- ── 8. Verify ─────────────────────────────────────────────────────────────
+  -- ── 10. Verify ────────────────────────────────────────────────────────────
   assertMsg "Expected exactly 2 observations (agent + buyer)" (length obsCids == 2)
 
   -- Verify Agent observation

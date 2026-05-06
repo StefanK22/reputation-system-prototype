@@ -4,7 +4,7 @@ import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Interaction.Discarded (DiscardedInteraction(..))
 import Reputation.Interaction.Completed (CompletedInteraction(..))
-import Reputation.Types (RoleType, RecordedEvent)
+import Reputation.Types (RoleType, RecordedEvent(..), Event(ParticipantsAdded, ParticipantsRemoved))
 type T = InProgressInteraction
 
 template InProgressInteraction 
@@ -28,6 +28,7 @@ template InProgressInteraction
                 interactionType
                 participants
                 events
+                processed = False
 
         choice Discard : ContractId DiscardedInteraction
             with
@@ -56,6 +57,7 @@ template InProgressInteraction
                     startedAt
                     completedAt
                     configCid
+                    processed = False
 
         choice RecordEvent : ContractId InProgressInteraction
             with 
@@ -69,9 +71,29 @@ template InProgressInteraction
             with 
                 party       : Party
                 roleType    : RoleType
+                actor       : Party
+                addedAt     : Time
             controller operator
             do
                 create this with
                     participants = participants ++ [(party, roleType)]
+                    events = events ++ [RecordedEvent with
+                        event = ParticipantsAdded
+                        actor
+                        occurredAt = addedAt
+                        resourceId = Some (partyToText party)]
         
-   
+        choice RemoveParticipant : ContractId InProgressInteraction
+            with
+                party       : Party
+                actor       : Party
+                removedAt   : Time
+            controller operator
+            do 
+                create this with
+                    participants = filter (\(p, _) -> p /= party) participants
+                    events = events ++ [RecordedEvent with
+                        event = ParticipantsRemoved
+                        actor
+                        occurredAt = removedAt
+                        resourceId = Some (partyToText party)]

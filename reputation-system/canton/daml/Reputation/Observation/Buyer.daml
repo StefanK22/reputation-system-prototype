@@ -42,6 +42,7 @@ template BuyerObservation
         buyerObsWeights         : BuyerObservationWeights
         configCid               : ContractId Configuration.I
         recordedAt              : Time
+        processed               : Bool
     where
         signatory operator
         observer subject
@@ -68,3 +69,6 @@ template BuyerObservation
                     (Accuracy, computeAccuracy
                         attemptsPerApprovedDoc
                     )]
+                processed
+            setProcessed = toInterfaceContractId <$> 
+                create this with processed = True

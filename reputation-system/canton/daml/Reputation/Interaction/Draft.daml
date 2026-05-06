@@ -27,7 +27,8 @@ template DraftInteraction
                 interactionId
                 interactionType
                 participants
-                events = []
+                events      = []
+                processed   = False
 
         choice AddParticipant : ContractId DraftInteraction
             with 
@@ -37,6 +38,15 @@ template DraftInteraction
             do
                 create this with
                     participants = participants ++ [(party, roleType)]
+
+        choice RemoveParticipant : ContractId DraftInteraction
+            with
+                party : Party
+            controller operator
+            do
+                create this with    
+                    participants = filter (\(p, _) -> p /= party) participants
+        
         
         choice Begin : ContractId InProgressInteraction
             with
