@@ -2,21 +2,26 @@ module Reputation.Configuration.PropertyPurchase where
 
 import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
 import Reputation.Interface.Observation qualified as Observation (I)
+import Reputation.Interface.FeedbackRequest qualified as FeedbackRequest (I)
 import Reputation.Interaction.Completed (CompletedInteraction(..), ProcessInteraction(..))
 import Reputation.Observation.Agent (AgentObservation(..))
 import Reputation.Observation.Buyer (BuyerObservation(..))
+import Reputation.Feedback.PropertyPurchaseFeedback (PropertyPurchaseFeedbackRequest(..))
 import Reputation.Utils (computePairHours, hoursBetween)
 import Reputation.Types (Event(..), AgentObservationWeights, BuyerObservationWeights, RoleType(Agent, Buyer))
+import DA.Optional (isSome)
+import DA.Time (days, addRelTime)
 
 type T = PropertyPurchaseConfiguration
 
 template PropertyPurchaseConfiguration  
     with 
-        operator        : Party
-        configId        : Text
-        createdAt       : Time
-        agentObsWeights : AgentObservationWeights
-        buyerObsWeights : BuyerObservationWeights
+        operator            : Party
+        configId            : Text
+        createdAt           : Time
+        agentObsWeights     : AgentObservationWeights
+        buyerObsWeights     : BuyerObservationWeights
+        feedbackWindowDays  : Int
     where 
         signatory operator
         
@@ -47,17 +52,51 @@ template PropertyPurchaseConfiguration
                 completed <- fetch completedCid
                 assertMsg "Interaction already processed" (not completed.processed)
                 let configCid = toInterfaceContractId @Configuration.I self
-                observations <- fmap concat $ forA completed.participants $ \(subject, roleType) ->
-                    case roleType of
-                        Agent -> do
-                            obs <- createAgentObservation completed subject agentObsWeights operator configCid
-                            pure [obs]
-                        Buyer -> do
-                            obs <- createBuyerObservation completed subject buyerObsWeights operator configCid
-                            pure [obs]
-                exercise completedCid ProcessInteraction
-                pure observations
 
+                let agentParty = find (\(_, role) -> role == Agent) completed.participants
+                let buyerParty = find (\(_, role) -> role == Buyer) completed.participants
+                assertMsg "Agent or Buyer not found in participants" (isSome agentParty && isSome buyerParty)
+                let Some (agent, _) = agentParty
+                let Some (buyer, _) = buyerParty
+
+                agentObs <- createAgentObservation completed agent agentObsWeights operator configCid
+                buyerObs <- createBuyerObservation completed buyer buyerObsWeights operator configCid
+                exercise completedCid ProcessInteraction
+                pure [agentObs, buyerObs]
+                
+        nonconsuming choice CreateFeedbackRequests : [ContractId FeedbackRequest.I]
+            with
+                completedCid : ContractId CompletedInteraction
+            controller operator
+            do
+                completed <- fetch completedCid
+                assertMsg "Interaction already processed" (not completed.processed)
+                let configCid = toInterfaceContractId @Configuration.I self
+
+                let agentParty = find (\(_, role) -> role == Agent) completed.participants
+                let buyerParty = find (\(_, role) -> role == Buyer) completed.participants
+                assertMsg "Agent or Buyer not found in participants" (isSome agentParty && isSome buyerParty)
+                let Some (agent, _) = agentParty
+                let Some (buyer, _) = buyerParty
+                
+                agentReq <- toInterfaceContractId <$> create PropertyPurchaseFeedbackRequest with
+                    operator        = operator
+                    interactionId   = completed.interactionId
+                    from            = agent
+                    to              = buyer
+                    requestedAt     = completed.completedAt
+                    expiresAt       = addRelTime completed.completedAt (days feedbackWindowDays)
+                    configCid       = configCid
+
+                buyerReq <- toInterfaceContractId <$> create PropertyPurchaseFeedbackRequest with
+                    operator        = operator
+                    interactionId   = completed.interactionId
+                    from            = buyer
+                    to              = agent
+                    requestedAt     = completed.completedAt
+                    expiresAt       = addRelTime completed.completedAt (days feedbackWindowDays)
+                    configCid       = configCid                
+                pure [agentReq, buyerReq]
 
 createAgentObservation : CompletedInteraction -> Party -> AgentObservationWeights -> Party -> ContractId Configuration.I -> Update (ContractId Observation.I)
 createAgentObservation completed subject weights operator configCid = do

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getRankings, getAllSubjects, getSubject } from '../api/reputation.js';
-import { Tag, ScoreBar, ScoreGauge } from '../components/shared.jsx';
+import { getRankings, getAllSubjects, getSubject, getReputationConfig } from '../api/reputation.js';
+import { Tag, ScoreBar, ScoreGauge, normalizeScore } from '../components/shared.jsx';
 
 const COMP_IDS    = ['Reliability', 'Responsiveness', 'Accuracy'];
 const COMP_COLORS = ['#1a6abf', '#7a5abf', '#2a7a6a'];
@@ -25,7 +25,7 @@ function buildCompMap(subjects) {
   return map;
 }
 
-function SubjectPanel({ party, onClose }) {
+function SubjectPanel({ party, repConfig, onClose }) {
   const [subject, setSubject] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +52,10 @@ function SubjectPanel({ party, onClose }) {
       {!loading && subject && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-            <ScoreGauge score={subject.overallScore ?? 0} />
+            <ScoreGauge
+              score={normalizeScore(subject.overallScore ?? 0, repConfig)}
+              displayLabel={(subject.overallScore ?? 0).toFixed(1)}
+            />
             <div>
               <Tag>{subject.roleType || '—'}</Tag>
               {subject.components?.length > 0 && (
@@ -71,10 +74,10 @@ function SubjectPanel({ party, onClose }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                     <span style={{ fontSize: 11, color: '#555' }}>{c.componentId}</span>
                     <span style={{ fontSize: 11, color: '#333', fontWeight: 600 }}>
-                      {((c.score ?? 0) * 100).toFixed(1)}
+                      {(c.score ?? 0).toFixed(1)}
                     </span>
                   </div>
-                  <ScoreBar value={c.score ?? 0} color={COMP_COLORS[i % COMP_COLORS.length]} height={6} />
+                  <ScoreBar value={normalizeScore(c.score ?? 0, repConfig)} color={COMP_COLORS[i % COMP_COLORS.length]} height={6} />
                 </div>
               ))}
             </div>
@@ -90,6 +93,7 @@ function SubjectPanel({ party, onClose }) {
 export default function Rankings() {
   const [rankings,  setRankings]  = useState([]);
   const [compMap,   setCompMap]   = useState({});
+  const [repConfig, setRepConfig] = useState(null);
   const [selected,  setSelected]  = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState(null);
@@ -100,10 +104,12 @@ export default function Rankings() {
     Promise.all([
       getRankings(50),
       getAllSubjects().catch(() => []),
+      getReputationConfig().catch(() => null),
     ])
-      .then(([rows, subjects]) => {
+      .then(([rows, subjects, cfg]) => {
         setRankings(rows ?? []);
         setCompMap(buildCompMap(subjects));
+        setRepConfig(cfg);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -164,11 +170,11 @@ export default function Rankings() {
                     <td style={tdSt}>
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontSize: 16, fontWeight: 700, color: '#1a6abf' }}>
-                          {r.overallScore?.toFixed(1) ?? '—'}
+                          {typeof r.overallScore === 'number' ? r.overallScore.toFixed(1) : '—'}
                         </span>
                       </div>
                       {typeof r.overallScore === 'number' && (
-                        <ScoreBar value={r.overallScore / 100} height={3} />
+                        <ScoreBar value={normalizeScore(r.overallScore, repConfig)} height={3} />
                       )}
                     </td>
                     {hasCompData && <>
@@ -178,8 +184,8 @@ export default function Rankings() {
                           <td key={id} style={{ ...tdSt, minWidth: 100 }}>
                             {val !== null ? (
                               <>
-                                <div style={{ fontSize: 11, color: '#555', marginBottom: 4 }}>{(val * 100).toFixed(0)}%</div>
-                                <ScoreBar value={val} color={COMP_COLORS[ci]} />
+                                <div style={{ fontSize: 11, color: '#555', marginBottom: 4 }}>{val.toFixed(1)}</div>
+                                <ScoreBar value={normalizeScore(val, repConfig)} color={COMP_COLORS[ci]} />
                               </>
                             ) : <span className="muted">—</span>}
                           </td>
@@ -196,7 +202,7 @@ export default function Rankings() {
       </div>
 
       {selected && (
-        <SubjectPanel party={selected} onClose={() => setSelected(null)} />
+        <SubjectPanel party={selected} repConfig={repConfig} onClose={() => setSelected(null)} />
       )}
     </div>
   );

@@ -1,0 +1,24 @@
+module Reputation.Interface.FeedbackRequest where
+
+type I = FeedbackRequest
+type V = View
+
+data View = View
+    with 
+        operator            : Party
+        interactionId       : Text
+        from                : Party
+        to                  : Party
+        requestedAt         : Time
+        expiresAt           : Time
+    deriving (Eq, Show)
+
+interface FeedbackRequest where
+    viewtype View
+
+    nonconsuming choice GetView : View
+        with
+            viewer : Party
+        controller viewer
+        do
+            pure $ view this

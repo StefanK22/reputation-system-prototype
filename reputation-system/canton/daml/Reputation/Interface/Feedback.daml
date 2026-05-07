@@ -1,0 +1,27 @@
+module Reputation.Interface.Feedback where
+
+import Reputation.Types (ComponentId)
+import DA.Map (Map)
+
+type I = Feedback
+type V = View
+
+data View = View
+    with 
+        operator            : Party
+        interactionId       : Text
+        to                  : Party
+        from                : Party
+        componentRatings    : Map ComponentId (Optional Decimal)
+        submittedAt         : Time
+    deriving (Eq, Show)
+
+interface Feedback where
+    viewtype View
+
+    nonconsuming choice GetView : View
+        with
+            viewer : Party
+        controller viewer
+        do
+            pure $ view this

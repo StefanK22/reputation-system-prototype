@@ -54,11 +54,11 @@ testPropertyPurchaseFlow = do
       operator
       configId     = "REP-CONFIG-001"
       scoreFloor   = 0.0
-      scoreCeiling = 1.0
+      scoreCeiling = 100.0
       startValues  = DA.Map.fromList
-        [ (Reliability,    0.5)
-        , (Responsiveness, 0.5)
-        , (Accuracy,       0.5)
+        [ (Reliability,    0.7)
+        , (Responsiveness, 0.7)
+        , (Accuracy,       0.7)
         ]
       createdAt    = t0
 
@@ -114,6 +114,7 @@ testPropertyPurchaseFlow = do
         responsivenessRejectionWeight = 0.3
         responsivenessProposalWeight = 0.2
         responsivenessCapHours = 24.0
+      feedbackWindowDays             = 7
 
   debug "✓ PropertyPurchaseConfiguration created"
 

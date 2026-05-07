@@ -26,23 +26,23 @@ computeAccuracy attemptsPerDoc = Some (1.0 / mean attemptsPerDoc)
 
 template BuyerObservation 
     with
-        operator                : Party
-        interactionId           : Text
-        subject                 : Party
+        operator                    : Party
+        interactionId               : Text
+        subject                     : Party
         -- Reliability
-        uploadedDocs            : Int
-        approvedDocs            : Int
+        uploadedDocs                : Int
+        approvedDocs                : Int
         -- Responsiveness
-        contractSigningTimes     : [Int]
-        uploadAfterRejectionTimes : [Int]
-        proposalResponseTimes   : [Int]
+        contractSigningTimes        : [Int]
+        uploadAfterRejectionTimes   : [Int]
+        proposalResponseTimes       : [Int]
         -- Accuracy
-        attemptsPerApprovedDoc   : [Int]
+        attemptsPerApprovedDoc      : [Int]
         -- Weights
-        buyerObsWeights         : BuyerObservationWeights
-        configCid               : ContractId Configuration.I
-        recordedAt              : Time
-        processed               : Bool
+        buyerObsWeights             : BuyerObservationWeights
+        configCid                   : ContractId Configuration.I
+        recordedAt                  : Time
+        processed                   : Bool
     where
         signatory operator
         observer subject
@@ -70,5 +70,6 @@ template BuyerObservation
                         attemptsPerApprovedDoc
                     )]
                 processed
+                configCid
             setProcessed = toInterfaceContractId <$> 
                 create this with processed = True

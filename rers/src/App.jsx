@@ -19,12 +19,6 @@ function TopBar() {
   return (
     <div className="top-bar">
       <span className="top-bar-page">{page.charAt(0).toUpperCase() + page.slice(1)}</span>
-      <span className="top-bar-sep">·</span>
-      <span className="top-bar-user">operator::OPERATOR</span>
-      <div className="top-bar-status">
-        <div className="top-bar-dot" />
-        <span className="top-bar-label">Connected</span>
-      </div>
     </div>
   );
 }

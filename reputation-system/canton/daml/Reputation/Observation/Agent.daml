@@ -92,5 +92,6 @@ template AgentObservation
                         proposalRejectedCount
                     )]
                 processed
+                configCid
             setProcessed = toInterfaceContractId <$> 
                 create this with processed = True

@@ -1,0 +1,93 @@
+module Reputation.Feedback.PropertyPurchaseFeedback where
+
+import Reputation.Interface.Feedback qualified as Feedback (I, View(..))
+import Reputation.Interface.FeedbackRequest qualified as FeedbackRequest (I, View(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Observation.Feedback (FeedbackObservation(..))
+import Reputation.Types (ComponentId(..))
+import DA.Map qualified as Map
+
+template PropertyPurchaseFeedbackRequest 
+    with
+        operator        : Party
+        interactionId   : Text
+        from            : Party
+        to              : Party
+        requestedAt     : Time
+        expiresAt       : Time
+        configCid       : ContractId Configuration.I
+    where
+        signatory operator
+        observer from
+
+        ensure
+            interactionId /= "" &&
+                expiresAt > requestedAt
+
+        interface instance FeedbackRequest.I for PropertyPurchaseFeedbackRequest where
+            view = FeedbackRequest.View with
+                operator
+                interactionId
+                from
+                to
+                requestedAt
+                expiresAt
+
+        choice SubmitFeedback : (ContractId PropertyPurchaseFeedback, ContractId FeedbackObservation)
+            with
+                reliabilityRating       : Optional Decimal
+                responsivenessRating    : Optional Decimal
+                accuracyRating          : Optional Decimal
+                submittedAt             : Time
+            controller from 
+            do
+                now <- getTime
+                assertMsg "Feedback Request Expired" (now <= expiresAt)
+                feedbackCid <- create PropertyPurchaseFeedback with
+                    operator
+                    interactionId
+                    to           
+                    from         
+                    reliabilityRating
+                    responsivenessRating
+                    accuracyRating      
+                    submittedAt     
+                obsCid <- create FeedbackObservation with
+                    operator
+                    interactionId
+                    to
+                    reliabilityRating
+                    responsivenessRating
+                    accuracyRating
+                    configCid
+                    recordedAt = submittedAt
+                    processed = False
+                pure (feedbackCid, obsCid)
+
+
+template PropertyPurchaseFeedback
+    with 
+        operator                : Party
+        interactionId           : Text
+        to                      : Party
+        from                    : Party
+        reliabilityRating       : Optional Decimal
+        responsivenessRating    : Optional Decimal
+        accuracyRating          : Optional Decimal 
+        submittedAt             : Time
+    where
+        signatory operator, from
+
+        ensure interactionId /= ""
+
+        interface instance Feedback.I for PropertyPurchaseFeedback where
+            view = Feedback.View with
+                operator
+                interactionId
+                to           
+                from         
+                componentRatings = Map.fromList
+                    [(Reliability, reliabilityRating),
+                    (Responsiveness, responsivenessRating),
+                    (Accuracy, accuracyRating)]
+                submittedAt

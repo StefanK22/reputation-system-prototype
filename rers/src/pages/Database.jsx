@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllSubjects, getInterfaceIds, getSystemState } from '../api/reputation.js';
-import { Tag, ScoreBar } from '../components/shared.jsx';
+import { getAllSubjects, getInterfaceIds, getSystemState, getReputationConfig } from '../api/reputation.js';
+import { Tag, ScoreBar, normalizeScore } from '../components/shared.jsx';
 
 const tdSt = { padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333', verticalAlign: 'middle' };
 const thSt = { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #eee', color: '#999', fontWeight: 'normal', fontSize: 11, textTransform: 'uppercase' };
@@ -23,7 +23,7 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-function ComponentsDetail({ components }) {
+function ComponentsDetail({ components, repConfig }) {
   if (!components?.length) return <p style={{ color: '#bbb', fontSize: 12, margin: 0 }}>No components.</p>;
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -44,9 +44,9 @@ function ComponentsDetail({ components }) {
               {c.count > 0 ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontWeight: 600, color: COMP_COLORS[c.componentId] ?? '#333', fontSize: 13 }}>
-                    {c.score.toFixed(3)}
+                    {c.score.toFixed(1)}
                   </span>
-                  <ScoreBar value={c.score} color={COMP_COLORS[c.componentId]} height={4} />
+                  <ScoreBar value={normalizeScore(c.score, repConfig)} color={COMP_COLORS[c.componentId]} height={4} />
                 </div>
               ) : <span style={{ color: '#bbb' }}>—</span>}
             </td>
@@ -58,7 +58,7 @@ function ComponentsDetail({ components }) {
   );
 }
 
-function SubjectRow({ s, expanded, onToggle }) {
+function SubjectRow({ s, repConfig, expanded, onToggle }) {
   return (
     <>
       <tr
@@ -76,10 +76,10 @@ function SubjectRow({ s, expanded, onToggle }) {
         <td style={tdSt}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: '#1a6abf' }}>
-              {typeof s.overallScore === 'number' ? (s.overallScore * 100).toFixed(1) : '—'}
+              {typeof s.overallScore === 'number' ? s.overallScore.toFixed(1) : '—'}
             </span>
             {typeof s.overallScore === 'number' && (
-              <ScoreBar value={s.overallScore} height={4} />
+              <ScoreBar value={normalizeScore(s.overallScore, repConfig)} height={4} />
             )}
           </div>
         </td>
@@ -90,7 +90,7 @@ function SubjectRow({ s, expanded, onToggle }) {
         <tr>
           <td colSpan={6} style={{ background: '#f7f9ff', padding: '16px 24px 16px 40px', borderBottom: '1px solid #e8e8e8' }}>
             <div style={{ marginBottom: 12 }}>
-              <ComponentsDetail components={s.components} />
+              <ComponentsDetail components={s.components} repConfig={repConfig} />
             </div>
             <div style={{ display: 'flex', gap: 24, marginTop: 8 }}>
               <div>
@@ -126,24 +126,27 @@ function Section({ title, children, defaultOpen = true }) {
 }
 
 export default function Database() {
-  const [subjects,     setSubjects]     = useState([]);
-  const [systemState,  setSystemState]  = useState(null);
-  const [interfaceIds, setInterfaceIds] = useState(null);
-  const [expanded,     setExpanded]     = useState(new Set());
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState(null);
+  const [subjects,      setSubjects]      = useState([]);
+  const [systemState,   setSystemState]   = useState(null);
+  const [repConfig,     setRepConfig]     = useState(null);
+  const [interfaceIds,  setInterfaceIds]  = useState(null);
+  const [expanded,      setExpanded]      = useState(new Set());
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [subjects, state, ids] = await Promise.all([
+      const [subjects, state, cfg, ids] = await Promise.all([
         getAllSubjects(),
         getSystemState().catch(() => null),
+        getReputationConfig().catch(() => null),
         getInterfaceIds().catch(() => null),
       ]);
       setSubjects(subjects ?? []);
       setSystemState(state);
+      setRepConfig(cfg);
       setInterfaceIds(ids);
     } catch (e) {
       setError(e.message);
@@ -180,7 +183,61 @@ export default function Database() {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
           <StatCard label="Ledger Offset" value={systemState?.ledgerOffset ?? '—'} sub="last processed tx" />
           <StatCard label="Subjects"      value={subjects.length} sub={`${agentCount} agents · ${buyerCount} buyers`} />
+          <StatCard
+            label="Rep. Config"
+            value={repConfig?.configured ? 'active' : 'none'}
+            sub={repConfig?.configured ? `floor ${repConfig.scoreFloor} · ceil ${repConfig.scoreCeiling}` : 'awaiting ReputationConfiguration contract'}
+          />
         </div>
+      </Section>
+
+      {/* ── Reputation configuration ── */}
+      <Section title="Reputation Configuration" defaultOpen={!!repConfig?.configured}>
+        {!repConfig?.configured ? (
+          <p className="muted">No ReputationConfiguration contract has been processed yet.</p>
+        ) : (
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Bounds</div>
+              <table style={{ borderCollapse: 'collapse' }}>
+                <tbody>
+                  <tr>
+                    <td style={{ ...tdSt, color: '#888', paddingLeft: 0 }}>Score Floor</td>
+                    <td style={{ ...tdSt, fontWeight: 600 }}>{repConfig.scoreFloor}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ ...tdSt, color: '#888', paddingLeft: 0 }}>Score Ceiling</td>
+                    <td style={{ ...tdSt, fontWeight: 600 }}>{repConfig.scoreCeiling}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Component Start Values</div>
+              <table style={{ borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thSt, paddingLeft: 0 }}>Component</th>
+                    <th style={thSt}>Start Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(repConfig.componentStartValues ?? {}).map(([comp, val]) => (
+                    <tr key={comp}>
+                      <td style={{ ...tdSt, paddingLeft: 0, color: COMP_COLORS[comp] ?? '#333', fontWeight: 500 }}>{comp}</td>
+                      <td style={tdSt}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 600 }}>{val}</span>
+                          <ScoreBar value={val} color={COMP_COLORS[comp]} height={4} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </Section>
 
       {/* ── Subjects ── */}
@@ -204,6 +261,7 @@ export default function Database() {
                 <SubjectRow
                   key={s.party}
                   s={s}
+                  repConfig={repConfig}
                   expanded={expanded.has(s.party)}
                   onToggle={() => toggleExpand(s.party)}
                 />

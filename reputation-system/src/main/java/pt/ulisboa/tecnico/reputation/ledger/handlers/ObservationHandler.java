@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import pt.ulisboa.tecnico.reputation.ledger.LedgerSubmitter;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.observation.View;
@@ -24,9 +25,11 @@ public class ObservationHandler {
     private static final Logger log = LoggerFactory.getLogger(ObservationHandler.class);
 
     private final ReputationService reputationService;
+    private final LedgerSubmitter ledgerSubmitter;
 
-    public ObservationHandler(ReputationService reputationService) {
+    public ObservationHandler(ReputationService reputationService, LedgerSubmitter ledgerSubmitter) {
         this.reputationService = reputationService;
+        this.ledgerSubmitter = ledgerSubmitter;
     }
 
     @Transactional
@@ -50,6 +53,10 @@ public class ObservationHandler {
                 return;
             }
             View view = View.valueDecoder().decode(viewRecord);
+            if (view.processed) {
+                log.debug("Skipping already-processed AgentObservation: {}", event.getContractId());
+                return;
+            }
             Map<String, Optional<Double>> componentValues = new HashMap<>();
             view.componentValues.forEach((componentId, optDecimal) ->
                 componentValues.put(componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
@@ -57,6 +64,7 @@ public class ObservationHandler {
             log.info("AgentObservation: subject={}, interactionId={}, components={}",
                     view.subject, view.interactionId, componentValues);
             reputationService.applyObservation(view.subject, componentValues);
+            ledgerSubmitter.markObservationProcessed(event.getContractId());
         } catch (Exception e) {
             log.error("Failed to handle AgentObservation: {}", e.getMessage(), e);
         }
@@ -70,6 +78,10 @@ public class ObservationHandler {
                 return;
             }
             View view = View.valueDecoder().decode(viewRecord);
+            if (view.processed) {
+                log.debug("Skipping already-processed BuyerObservation: {}", event.getContractId());
+                return;
+            }
             Map<String, Optional<Double>> componentValues = new HashMap<>();
             view.componentValues.forEach((componentId, optDecimal) ->
                 componentValues.put(componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
@@ -77,6 +89,7 @@ public class ObservationHandler {
             log.info("BuyerObservation: subject={}, interactionId={}, components={}",
                     view.subject, view.interactionId, componentValues);
             reputationService.applyObservation(view.subject, componentValues);
+            ledgerSubmitter.markObservationProcessed(event.getContractId());
         } catch (Exception e) {
             log.error("Failed to handle BuyerObservation: {}", e.getMessage(), e);
         }

@@ -27,14 +27,24 @@ export function ScoreBar({ value, color = '#1a6abf', height = 4 }) {
   );
 }
 
-export function ScoreGauge({ score, size = 52 }) {
+// score: raw 0-1 value; displayLabel: already-scaled string to show inside
+export function ScoreGauge({ score, displayLabel, size = 52 }) {
   const n = typeof score === 'number' ? score : 0;
-  const color = n >= 75 ? '#2a7a2a' : n >= 55 ? '#8a5800' : '#a33';
+  const color = n >= 0.75 ? '#2a7a2a' : n >= 0.55 ? '#8a5800' : '#a33';
+  const label = displayLabel ?? (n * 100).toFixed(0);
   return (
     <div style={{ width: size, height: size, borderRadius: '50%', border: `3px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'border-color 0.4s' }}>
-      <span style={{ fontSize: size * 0.26, fontWeight: 700, color, transition: 'color 0.4s' }}>{n.toFixed(0)}</span>
+      <span style={{ fontSize: size * 0.26, fontWeight: 700, color, transition: 'color 0.4s' }}>{label}</span>
     </div>
   );
+}
+
+// Maps a display-range score back to 0-1 — use this when passing to ScoreBar or ScoreGauge
+export function normalizeScore(scaled, config) {
+  const floor   = config?.scoreFloor   ?? 0;
+  const ceiling = config?.scoreCeiling ?? 1;
+  if (ceiling === floor) return 0;
+  return ((typeof scaled === 'number' ? scaled : 0) - floor) / (ceiling - floor);
 }
 
 export function ScoreDelta({ delta }) {

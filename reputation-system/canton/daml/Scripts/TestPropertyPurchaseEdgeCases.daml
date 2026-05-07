@@ -73,6 +73,7 @@ setupEnv = do
         responsivenessRejectionWeight = 0.3
         responsivenessProposalWeight  = 0.2
         responsivenessCapHours        = 24.0
+      feedbackWindowDays             = 7
 
   let iPPConfigCid : ContractId Configuration.I = toInterfaceContractId ppConfigCid
 
