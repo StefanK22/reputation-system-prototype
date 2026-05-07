@@ -1,13 +1,13 @@
-module Reputation.Feedback.PropertyPurchaseFeedback where
+module Reputation.PropertyPurchase.Feedback where
 
 import Reputation.Interface.Feedback qualified as Feedback (I, View(..))
 import Reputation.Interface.FeedbackRequest qualified as FeedbackRequest (I, View(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
-import Reputation.Observation.Feedback (FeedbackObservation(..))
+import Reputation.PropertyPurchase.FeedbackObservation (FeedbackObservation(..))
 import Reputation.Types (ComponentId(..))
 import DA.Map qualified as Map
 
-template PropertyPurchaseFeedbackRequest 
+template PropertyPurchaseFeedbackRequest
     with
         operator        : Party
         interactionId   : Text
@@ -39,19 +39,19 @@ template PropertyPurchaseFeedbackRequest
                 responsivenessRating    : Optional Decimal
                 accuracyRating          : Optional Decimal
                 submittedAt             : Time
-            controller from 
+            controller from
             do
                 now <- getTime
                 assertMsg "Feedback Request Expired" (now <= expiresAt)
                 feedbackCid <- create PropertyPurchaseFeedback with
                     operator
                     interactionId
-                    to           
-                    from         
+                    to
+                    from
                     reliabilityRating
                     responsivenessRating
-                    accuracyRating      
-                    submittedAt     
+                    accuracyRating
+                    submittedAt
                 obsCid <- create FeedbackObservation with
                     operator
                     interactionId
@@ -66,14 +66,14 @@ template PropertyPurchaseFeedbackRequest
 
 
 template PropertyPurchaseFeedback
-    with 
+    with
         operator                : Party
         interactionId           : Text
         to                      : Party
         from                    : Party
         reliabilityRating       : Optional Decimal
         responsivenessRating    : Optional Decimal
-        accuracyRating          : Optional Decimal 
+        accuracyRating          : Optional Decimal
         submittedAt             : Time
     where
         signatory operator, from
@@ -84,8 +84,8 @@ template PropertyPurchaseFeedback
             view = Feedback.View with
                 operator
                 interactionId
-                to           
-                from         
+                to
+                from
                 componentRatings = Map.fromList
                     [(Reliability, reliabilityRating),
                     (Responsiveness, responsivenessRating),

@@ -1,5 +1,5 @@
-export const OBS_TEMPLATES  = { AgentObservation: 'Agent', BuyerObservation: 'Buyer' };
-export const OBS_COMP_IDS   = ['Reliability', 'Responsiveness', 'Accuracy'];
+export const OBS_TEMPLATES   = { AgentObservation: 'Agent', BuyerObservation: 'Buyer', FeedbackObservation: 'Feedback' };
+export const OBS_COMP_IDS    = ['Reliability', 'Responsiveness', 'Accuracy'];
 export const OBS_COMP_COLORS = { Reliability: '#1a6abf', Responsiveness: '#7a5abf', Accuracy: '#2a7a6a' };
 
 // DAML Map [[k, v], ...] → plain object
@@ -29,13 +29,9 @@ export function optDecimal(v) {
 // Parse raw contract fields into a normalized observation object.
 // Includes `payload` (raw DAML fields) and `templateId` for role-specific display.
 export function parseObservation(c) {
-  const rawComps = toMap(
-    c.interfaceViews?.['Observation']?.componentValues
-    ?? c.interfaceViews?.['Observation.I']?.componentValues
-    ?? {}
-  );
+  const view = c.interfaceViews?.['Observation'] ?? c.interfaceViews?.['Observation.I'] ?? {};
   const components = {};
-  for (const [k, v] of Object.entries(rawComps)) {
+  for (const [k, v] of Object.entries(toMap(view.componentValues))) {
     const val = optDecimal(v);
     if (val !== null) components[k] = val;
   }
@@ -43,10 +39,10 @@ export function parseObservation(c) {
     contractId:    c.contractId,
     templateId:    c.templateId,
     role:          OBS_TEMPLATES[c.templateId],
-    interactionId: c.payload?.interactionId,
-    subject:       c.payload?.subject,
-    recordedAt:    c.payload?.recordedAt || c.createdAt,
-    processed:     c.payload?.processed === true,
+    interactionId: view.interactionId,
+    subject:       view.subject,
+    recordedAt:    view.recordedAt || c.createdAt,
+    processed:     view.processed === true,
     components,
     payload:       c.payload ?? {},
   };

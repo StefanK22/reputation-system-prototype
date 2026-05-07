@@ -1,11 +1,11 @@
-module Reputation.Observation.Feedback where
+module Reputation.PropertyPurchase.FeedbackObservation where
 
 import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Interface.Observation qualified as Observation (I, View(..))
 import Reputation.Types (ComponentId(..))
 import DA.Map qualified as Map
 
-type T = FeedbackObservation 
+type T = FeedbackObservation
 
 template FeedbackObservation
     with
@@ -25,7 +25,7 @@ template FeedbackObservation
         ensure interactionId /= ""
 
         interface instance Observation.I for FeedbackObservation where
-            view = Observation.View with 
+            view = Observation.View with
                 operator
                 interactionId
                 subject = to

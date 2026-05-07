@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 const USER_LINKS = [
   { to: '/rankings',     label: 'Rankings'     },
   { to: '/interactions', label: 'Interactions' },
-  { to: '/contracts',    label: 'Contracts'    },
+  { to: '/feedback',     label: 'Feedback'     },
   { to: '/observations', label: 'Observations' },
 ];
 

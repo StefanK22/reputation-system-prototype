@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useLedger } from '../LedgerContext.jsx';
+import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
 import { getInterfaceIds } from '../api/reputation.js';
-import { OBS_TEMPLATES, OBS_COMP_IDS, OBS_COMP_COLORS, parseObservation } from '../api/observations.js';
+import { OBS_TEMPLATES, OBS_COMP_IDS, OBS_COMP_COLORS, parseObservation, optDecimal } from '../api/observations.js';
 import { Tag, ScoreBar } from '../components/shared.jsx';
 
 const tdSt = { padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333', verticalAlign: 'middle' };
@@ -80,6 +80,17 @@ function BuyerMetrics({ p }) {
   );
 }
 
+function FeedbackMetrics({ p }) {
+  const optPct = v => { const n = optDecimal(v); return n !== null ? String(Math.round(n * 100)) : 'N/A'; };
+  return (
+    <MetricSection title="Peer ratings">
+      <MetricRow label="Reliability"    value={optPct(p.reliabilityRating)} />
+      <MetricRow label="Responsiveness" value={optPct(p.responsivenessRating)} />
+      <MetricRow label="Accuracy"       value={optPct(p.accuracyRating)} />
+    </MetricSection>
+  );
+}
+
 // compact=true skips the header and subject avatar (used when embedded inside a card that already shows them)
 export function ObservationDetail({ obs, onClose, compact = false }) {
   return (
@@ -130,6 +141,8 @@ export function ObservationDetail({ obs, onClose, compact = false }) {
         <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#999', letterSpacing: '0.08em', marginBottom: 10 }}>Input Metrics</div>
         {obs.templateId === 'AgentObservation'
           ? <AgentMetrics p={obs.payload} />
+          : obs.templateId === 'FeedbackObservation'
+          ? <FeedbackMetrics p={obs.payload} />
           : <BuyerMetrics p={obs.payload} />
         }
       </div>
@@ -157,6 +170,7 @@ export function ObservationDetail({ obs, onClose, compact = false }) {
 
 export default function Observations() {
   const ledger = useLedger();
+  const { activeParty } = usePartyCtx();
   const [observations, setObservations] = useState([]);
   const [selected,     setSelected]     = useState(null);
   const [loading,      setLoading]      = useState(true);
@@ -167,7 +181,7 @@ export default function Observations() {
     setError(null);
     try {
       const interfaceIds = await getInterfaceIds().catch(() => ({}));
-      const contracts    = await ledger.queryAll(undefined, interfaceIds);
+      const contracts    = await ledger.queryAll(activeParty, interfaceIds);
 
       const obs = contracts
         .filter(c => c.templateId in OBS_TEMPLATES)
@@ -183,7 +197,7 @@ export default function Observations() {
     }
   }
 
-  useEffect(() => { load(); }, [ledger]);
+  useEffect(() => { load(); }, [ledger, activeParty]);
 
   if (loading) return (
     <div className="page-with-panel">

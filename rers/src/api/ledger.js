@@ -155,13 +155,12 @@ export class LedgerClient {
     return toEvent(created, res.transaction?.offset);
   }
 
-  async exercise(contractId, templateId, choiceName, choiceArgument = {}) {
+  async exercise(contractId, templateId, choiceName, choiceArgument = {}, { actAs = [] } = {}) {
     const encoded = applyMaps(choiceArgument, CHOICE_MAPS[choiceName]);
-    const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choice: choiceName, choiceArgument: encoded } }]);
+    const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choice: choiceName, choiceArgument: encoded } }], actAs);
     const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
     const created = events.map((e) => e.CreatedEvent || e.created || e.createdEvent).find(Boolean);
-    if (!created) throw new Error(`Exercise ${choiceName} did not return a created event.`);
-    return toEvent(created, res.transaction?.offset);
+    return created ? toEvent(created, res.transaction?.offset) : null;
   }
 
   async query(templateId, activeAtOffset) {

@@ -1,24 +1,25 @@
-module Reputation.Observation.Agent where
+module Reputation.PropertyPurchase.AgentObservation where
 
 import Reputation.Interface.Observation qualified as Observation (I, View(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
-import Reputation.Types (AgentObservationWeights, ComponentId(..))
+import Reputation.PropertyPurchase.Types (AgentObservationWeights)
+import Reputation.Types (ComponentId(..))
 import Reputation.Utils (normalize, mean)
 import DA.Map qualified as Map
 
 
-type T = AgentObservation 
+type T = AgentObservation
 
 computeReliability : Bool -> Int -> Int -> Int -> AgentObservationWeights -> Decimal
-computeReliability transactionCompleted contractVoided participantAddition participantRemoval w = 
-    let 
+computeReliability transactionCompleted contractVoided participantAddition participantRemoval w =
+    let
         completionScore = if transactionCompleted then 1.0 else 0.0
         remTotal        = intToDecimal (participantAddition + participantRemoval)
         removalRatio    = if participantAddition > 0
                             then intToDecimal participantRemoval / remTotal
                             else 0.0
         removalScore    = 1.0 - removalRatio
-        voidedScore     = 1.0 / (1.0 + intToDecimal contractVoided) 
+        voidedScore     = 1.0 / (1.0 + intToDecimal contractVoided)
     in
         w.reliabilityCompletionWeight * completionScore +
         w.reliabilityRemovalWeight * removalScore+
@@ -29,19 +30,19 @@ computeResponsiveness [] [] _ = None
 computeResponsiveness docTimes contractTimes w = Some (
     (w.responsivenessDocWeight * normalize w.responsivenessCapHours (mean (docTimes)))
      + (w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean (contractTimes))))
-    
-    
+
+
 computeAccuracy : Int -> Int -> Optional Decimal
 computeAccuracy 0 0 = None
 computeAccuracy approved rejected =
-    let 
+    let
         total = intToDecimal (approved + rejected)
-    in 
+    in
         Some (intToDecimal approved / total)
 
 
 
-template AgentObservation 
+template AgentObservation
     with
         operator                : Party
         interactionId           : Text
@@ -69,13 +70,13 @@ template AgentObservation
         ensure interactionId /= ""
 
         interface instance Observation.I for AgentObservation where
-            view = Observation.View with 
+            view = Observation.View with
                 operator
                 interactionId
                 subject
                 recordedAt
-                componentValues = Map.fromList 
-                    [(Reliability, Some (computeReliability 
+                componentValues = Map.fromList
+                    [(Reliability, Some (computeReliability
                         transactionCompleted
                         contractVoided
                         participantAddition
@@ -93,5 +94,5 @@ template AgentObservation
                     )]
                 processed
                 configCid
-            setProcessed = toInterfaceContractId <$> 
+            setProcessed = toInterfaceContractId <$>
                 create this with processed = True

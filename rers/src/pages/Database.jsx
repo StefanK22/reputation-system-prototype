@@ -186,7 +186,7 @@ export default function Database() {
           <StatCard
             label="Rep. Config"
             value={repConfig?.configured ? 'active' : 'none'}
-            sub={repConfig?.configured ? `floor ${repConfig.scoreFloor} · ceil ${repConfig.scoreCeiling}` : 'awaiting ReputationConfiguration contract'}
+            sub={repConfig?.configured ? `floor ${repConfig.scoreFloor} · ceil ${repConfig.scoreCeiling}` : 'awaiting ScoringConfiguration contract'}
           />
         </div>
       </Section>
@@ -194,7 +194,7 @@ export default function Database() {
       {/* ── Reputation configuration ── */}
       <Section title="Reputation Configuration" defaultOpen={!!repConfig?.configured}>
         {!repConfig?.configured ? (
-          <p className="muted">No ReputationConfiguration contract has been processed yet.</p>
+          <p className="muted">No ScoringConfiguration contract has been processed yet.</p>
         ) : (
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <div>

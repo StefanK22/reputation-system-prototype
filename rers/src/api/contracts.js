@@ -18,15 +18,27 @@ export const CONFIGURATION_TEMPLATES = Object.freeze({
   PropertyPurchaseConfiguration: true,
 });
 
+// Feedback request template short names
+export const FEEDBACK_REQUEST_TEMPLATES = Object.freeze({
+  PropertyPurchaseFeedbackRequest: true,
+});
+
+// Submitted feedback template short names
+export const FEEDBACK_TEMPLATES = Object.freeze({
+  PropertyPurchaseFeedback: true,
+});
+
 // Module paths used to derive full package-qualified IDs at runtime from a known package prefix.
 // Key is the template/interface short name; value is "Module.Path:EntityName".
 export const KNOWN_MODULE_PATHS = Object.freeze({
-  DraftInteraction:              'Reputation.Interaction.Draft:DraftInteraction',
-  InProgressInteraction:         'Reputation.Interaction.InProgress:InProgressInteraction',
-  CompletedInteraction:          'Reputation.Interaction.Completed:CompletedInteraction',
-  DiscardedInteraction:          'Reputation.Interaction.Discarded:DiscardedInteraction',
-  PropertyPurchaseConfiguration: 'Reputation.Configuration.PropertyPurchase:PropertyPurchaseConfiguration',
-  ConfigurationInterface:        'Reputation.Interface.Configuration:Configuration',
+  DraftInteraction:                    'Reputation.Interaction.Draft:DraftInteraction',
+  InProgressInteraction:               'Reputation.Interaction.InProgress:InProgressInteraction',
+  CompletedInteraction:                'Reputation.Interaction.Completed:CompletedInteraction',
+  DiscardedInteraction:                'Reputation.Interaction.Discarded:DiscardedInteraction',
+  PropertyPurchaseConfiguration:       'Reputation.PropertyPurchase.Configuration:PropertyPurchaseConfiguration',
+  PropertyPurchaseFeedbackRequest:     'Reputation.PropertyPurchase.Feedback:PropertyPurchaseFeedbackRequest',
+  PropertyPurchaseFeedback:            'Reputation.PropertyPurchase.Feedback:PropertyPurchaseFeedback',
+  ConfigurationInterface:              'Reputation.Interface.Configuration:Configuration',
 });
 
 // Legacy template short names used by Contracts.jsx

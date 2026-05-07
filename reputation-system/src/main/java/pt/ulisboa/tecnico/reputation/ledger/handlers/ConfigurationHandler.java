@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
-import reputation.configuration.propertypurchase.PropertyPurchaseConfiguration;
-import reputation.configuration.reputationconfiguration.ReputationConfiguration;
+import reputation.propertypurchase.configuration.PropertyPurchaseConfiguration;
+import reputation.configuration.scoring.ScoringConfiguration;
 import reputation.configuration.role.RoleConfiguration;
 import reputation.types.ComponentId;
 
@@ -35,24 +35,24 @@ public class ConfigurationHandler {
                     contract.data.configId, contract.id.contractId);
         } else if (PropertyPurchaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
             log.info("PropertyPurchaseConfiguration created: contractId={}", event.getContractId());
-        } else if (ReputationConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            handleReputationConfiguration(event);
+        } else if (ScoringConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
+            handleScoringConfiguration(event);
         } else {
             log.warn("Unknown Configuration.I template: {}", templateId);
         }
     }
 
-    private void handleReputationConfiguration(CreatedEvent event) {
+    private void handleScoringConfiguration(CreatedEvent event) {
         try {
-            ReputationConfiguration.Contract contract = ReputationConfiguration.Contract.fromCreatedEvent(event);
-            ReputationConfiguration data = contract.data;
+            ScoringConfiguration.Contract contract = ScoringConfiguration.Contract.fromCreatedEvent(event);
+            ScoringConfiguration data = contract.data;
 
             Map<String, Double> startValues = new HashMap<>();
             data.startValues.forEach((componentId, value) ->
                 startValues.put(componentIdName(componentId), value.doubleValue())
             );
 
-            log.info("ReputationConfiguration: configId={}, floor={}, ceiling={}, startValues={}",
+            log.info("ScoringConfiguration: configId={}, floor={}, ceiling={}, startValues={}",
                     data.configId, data.scoreFloor, data.scoreCeiling, startValues);
 
             reputationService.applyReputationConfiguration(
@@ -61,7 +61,7 @@ public class ConfigurationHandler {
                 startValues
             );
         } catch (Exception e) {
-            log.error("Failed to handle ReputationConfiguration: {}", e.getMessage(), e);
+            log.error("Failed to handle ScoringConfiguration: {}", e.getMessage(), e);
         }
     }
 

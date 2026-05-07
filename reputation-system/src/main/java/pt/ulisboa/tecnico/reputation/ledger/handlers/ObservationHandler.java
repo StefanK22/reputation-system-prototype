@@ -11,8 +11,9 @@ import pt.ulisboa.tecnico.reputation.ledger.LedgerSubmitter;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.observation.View;
-import reputation.observation.agent.AgentObservation;
-import reputation.observation.buyer.BuyerObservation;
+import reputation.propertypurchase.agentobservation.AgentObservation;
+import reputation.propertypurchase.buyerobservation.BuyerObservation;
+import reputation.propertypurchase.feedbackobservation.FeedbackObservation;
 import reputation.types.ComponentId;
 
 import java.util.HashMap;
@@ -35,17 +36,6 @@ public class ObservationHandler {
     @Transactional
     public void handle(CreatedEvent event) {
         Identifier templateId = event.getTemplateId();
-
-        if (AgentObservation.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            handleAgentObservation(event);
-        } else if (BuyerObservation.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            handleBuyerObservation(event);
-        } else {
-            log.warn("Unknown Observation.I template: {}", templateId);
-        }
-    }
-
-    private void handleAgentObservation(CreatedEvent event) {
         try {
             var viewRecord = event.getInterfaceViews().get(Observation.INTERFACE_ID_WITH_PACKAGE_ID);
             if (viewRecord == null) {
@@ -54,44 +44,19 @@ public class ObservationHandler {
             }
             View view = View.valueDecoder().decode(viewRecord);
             if (view.processed) {
-                log.debug("Skipping already-processed AgentObservation: {}", event.getContractId());
+                log.debug("Skipping already-processed Observation: {}", event.getContractId());
                 return;
             }
             Map<String, Optional<Double>> componentValues = new HashMap<>();
             view.componentValues.forEach((componentId, optDecimal) ->
                 componentValues.put(componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
             );
-            log.info("AgentObservation: subject={}, interactionId={}, components={}",
+            log.info("Observation: subject={}, interactionId={}, components={}",
                     view.subject, view.interactionId, componentValues);
             reputationService.applyObservation(view.subject, componentValues);
             ledgerSubmitter.markObservationProcessed(event.getContractId());
         } catch (Exception e) {
-            log.error("Failed to handle AgentObservation: {}", e.getMessage(), e);
-        }
-    }
-
-    private void handleBuyerObservation(CreatedEvent event) {
-        try {
-            var viewRecord = event.getInterfaceViews().get(Observation.INTERFACE_ID_WITH_PACKAGE_ID);
-            if (viewRecord == null) {
-                log.warn("Observation interface view missing for contractId={}", event.getContractId());
-                return;
-            }
-            View view = View.valueDecoder().decode(viewRecord);
-            if (view.processed) {
-                log.debug("Skipping already-processed BuyerObservation: {}", event.getContractId());
-                return;
-            }
-            Map<String, Optional<Double>> componentValues = new HashMap<>();
-            view.componentValues.forEach((componentId, optDecimal) ->
-                componentValues.put(componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
-            );
-            log.info("BuyerObservation: subject={}, interactionId={}, components={}",
-                    view.subject, view.interactionId, componentValues);
-            reputationService.applyObservation(view.subject, componentValues);
-            ledgerSubmitter.markObservationProcessed(event.getContractId());
-        } catch (Exception e) {
-            log.error("Failed to handle BuyerObservation: {}", e.getMessage(), e);
+            log.error("Failed to handle Observation: {}", e.getMessage(), e);
         }
     }
 

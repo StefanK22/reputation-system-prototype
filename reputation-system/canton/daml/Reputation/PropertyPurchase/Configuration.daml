@@ -1,36 +1,37 @@
-module Reputation.Configuration.PropertyPurchase where
+module Reputation.PropertyPurchase.Configuration where
 
 import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
 import Reputation.Interface.Observation qualified as Observation (I)
 import Reputation.Interface.FeedbackRequest qualified as FeedbackRequest (I)
 import Reputation.Interaction.Completed (CompletedInteraction(..), ProcessInteraction(..))
-import Reputation.Observation.Agent (AgentObservation(..))
-import Reputation.Observation.Buyer (BuyerObservation(..))
-import Reputation.Feedback.PropertyPurchaseFeedback (PropertyPurchaseFeedbackRequest(..))
+import Reputation.PropertyPurchase.AgentObservation (AgentObservation(..))
+import Reputation.PropertyPurchase.BuyerObservation (BuyerObservation(..))
+import Reputation.PropertyPurchase.Feedback (PropertyPurchaseFeedbackRequest(..))
+import Reputation.PropertyPurchase.Types (AgentObservationWeights, BuyerObservationWeights)
 import Reputation.Utils (computePairHours, hoursBetween)
-import Reputation.Types (Event(..), AgentObservationWeights, BuyerObservationWeights, RoleType(Agent, Buyer))
+import Reputation.Types (Event(..), RoleType(Agent, Buyer))
 import DA.Optional (isSome)
 import DA.Time (days, addRelTime)
 
 type T = PropertyPurchaseConfiguration
 
-template PropertyPurchaseConfiguration  
-    with 
+template PropertyPurchaseConfiguration
+    with
         operator            : Party
         configId            : Text
         createdAt           : Time
         agentObsWeights     : AgentObservationWeights
         buyerObsWeights     : BuyerObservationWeights
         feedbackWindowDays  : Int
-    where 
+    where
         signatory operator
-        
-        ensure 
+
+        ensure
             configId /= "" &&
-            agentObsWeights.reliabilityVoidedWeight + 
-                agentObsWeights.reliabilityRemovalWeight + 
+            agentObsWeights.reliabilityVoidedWeight +
+                agentObsWeights.reliabilityRemovalWeight +
                     agentObsWeights.reliabilityCompletionWeight == 1.0 &&
-            agentObsWeights.responsivenessDocWeight + 
+            agentObsWeights.responsivenessDocWeight +
                 agentObsWeights.responsivenessContractWeight == 1.0 &&
             agentObsWeights.responsivenessCapHours > 0.0 &&
             buyerObsWeights.responsivenessContractWeight +
@@ -44,7 +45,7 @@ template PropertyPurchaseConfiguration
                 configId
                 createdAt
 
-        nonconsuming choice CreateObservations : [ContractId Observation.I]
+        nonconsuming choice CreateObservations : ([ContractId Observation.I], [ContractId FeedbackRequest.I])
             with
                 completedCid : ContractId CompletedInteraction
             controller operator
@@ -61,24 +62,7 @@ template PropertyPurchaseConfiguration
 
                 agentObs <- createAgentObservation completed agent agentObsWeights operator configCid
                 buyerObs <- createBuyerObservation completed buyer buyerObsWeights operator configCid
-                exercise completedCid ProcessInteraction
-                pure [agentObs, buyerObs]
-                
-        nonconsuming choice CreateFeedbackRequests : [ContractId FeedbackRequest.I]
-            with
-                completedCid : ContractId CompletedInteraction
-            controller operator
-            do
-                completed <- fetch completedCid
-                assertMsg "Interaction already processed" (not completed.processed)
-                let configCid = toInterfaceContractId @Configuration.I self
 
-                let agentParty = find (\(_, role) -> role == Agent) completed.participants
-                let buyerParty = find (\(_, role) -> role == Buyer) completed.participants
-                assertMsg "Agent or Buyer not found in participants" (isSome agentParty && isSome buyerParty)
-                let Some (agent, _) = agentParty
-                let Some (buyer, _) = buyerParty
-                
                 agentReq <- toInterfaceContractId <$> create PropertyPurchaseFeedbackRequest with
                     operator        = operator
                     interactionId   = completed.interactionId
@@ -95,24 +79,25 @@ template PropertyPurchaseConfiguration
                     to              = agent
                     requestedAt     = completed.completedAt
                     expiresAt       = addRelTime completed.completedAt (days feedbackWindowDays)
-                    configCid       = configCid                
-                pure [agentReq, buyerReq]
+                    configCid       = configCid
+                exercise completedCid ProcessInteraction
+                pure ([agentObs, buyerObs], [agentReq, buyerReq])
 
 createAgentObservation : CompletedInteraction -> Party -> AgentObservationWeights -> Party -> ContractId Configuration.I -> Update (ContractId Observation.I)
 createAgentObservation completed subject weights operator configCid = do
-    let 
+    let
         allEvents = completed.events
         agentEvents = filter (\e -> e.actor == subject) completed.events
-        
+
         -- Reliability
-        transactionCompleted    = any (\e -> e.event == TransactionStateChanged 
+        transactionCompleted    = any (\e -> e.event == TransactionStateChanged
                                                 && e.resourceId == Some "SELL_CLOSED") agentEvents
         contractVoided          = length (filter (\e -> e.event == ContractVoided) agentEvents)
         participantAddition     = length (filter (\e -> e.event == ParticipantsAdded) agentEvents)
         participantRemoval      = length (filter (\e -> e.event == ParticipantsRemoved) agentEvents)
 
         -- Responsiveness
-        documentEvaluationTimes = computePairHours DocumentUploaded 
+        documentEvaluationTimes = computePairHours DocumentUploaded
             [DocumentApproved, DocumentRejectedWithNotes] agentEvents allEvents
 
         contractSigningTimes    = computePairHours ContractUploaded
@@ -122,8 +107,8 @@ createAgentObservation completed subject weights operator configCid = do
         proposalApprovedCount   = length (filter (\e -> e.event == ProposalApproved) allEvents)
         proposalRejectedCount   = length (filter (\e -> e.event == ProposalRejectedWithNotes) allEvents)
 
-    toInterfaceContractId <$> 
-        create AgentObservation with 
+    toInterfaceContractId <$>
+        create AgentObservation with
             operator                = operator
             interactionId           = completed.interactionId
             subject
@@ -145,34 +130,34 @@ createBuyerObservation completed subject weights operator configCid = do
     let
         allEvents = completed.events
         buyerEvents = filter (\e -> e.actor == subject) completed.events
-        
+
         -- Reliability
         uploadedDocs                = (filter (\e -> e.event == DocumentUploaded)) buyerEvents
         uploadedDocsNum             = length uploadedDocs
         uplodadeDocsRid             = map (\e -> e.resourceId) uploadedDocs
         approvedDocsList            = (filter (\e -> e.event == DocumentApproved && e.resourceId `elem` uplodadeDocsRid)) allEvents
         approvedDocs                = length approvedDocsList
-        
+
         -- Responsiveness
         contractSigningTimes        = computePairHours ContractUploaded
             [ContractSigned] buyerEvents allEvents
 
         buyerRejectionEvents        = filter (\e -> e.event == DocumentRejectedWithNotes && e.resourceId `elem` uplodadeDocsRid) allEvents
-        uploadAfterRejectionTimes   = concatMap (\rej -> 
-            let 
+        uploadAfterRejectionTimes   = concatMap (\rej ->
+            let
                 nextUpload = take 1 (filter (\e -> e.event == DocumentUploaded && e.occurredAt > rej.occurredAt) buyerEvents)
-            in  
+            in
                 map (\u -> hoursBetween rej.occurredAt u.occurredAt) nextUpload) buyerRejectionEvents
 
-        proposalResponseTimes = computePairHours ContractUploaded 
+        proposalResponseTimes = computePairHours ContractUploaded
             [ProposalApproved, ProposalRejectedWithNotes] buyerEvents allEvents
 
-        -- Accuracy 
+        -- Accuracy
         approvedDocsResourceIds     = map (\e -> e.resourceId) approvedDocsList
         attemptsPerApprovedDoc      = map (\rid -> length (filter (\e -> e.event == DocumentUploaded && e.resourceId == rid) buyerEvents)) approvedDocsResourceIds
 
-    toInterfaceContractId <$> 
-        create BuyerObservation with 
+    toInterfaceContractId <$>
+        create BuyerObservation with
             operator                = operator
             interactionId           = completed.interactionId
             subject

@@ -6,15 +6,16 @@ import DA.Map qualified as DA.Map
 import DA.Time (time)
 import DA.Date (date, Month(..))
 
-import Reputation.Configuration.PropertyPurchase (PropertyPurchaseConfiguration(..), CreateObservations(..))
-import Reputation.Configuration.ReputationConfiguration (ReputationConfiguration(..))
+import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..), CreateObservations(..))
+import Reputation.Configuration.Scoring (ScoringConfiguration(..))
 import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
-import Reputation.Observation.Agent (AgentObservation)
-import Reputation.Observation.Buyer (BuyerObservation)
+import Reputation.PropertyPurchase.AgentObservation (AgentObservation)
+import Reputation.PropertyPurchase.BuyerObservation (BuyerObservation)
 import Reputation.Types
+import Reputation.PropertyPurchase.Types (AgentObservationWeights(..), BuyerObservationWeights(..))
 
 
 testPropertyPurchaseFlow : Script ()
@@ -33,24 +34,24 @@ testPropertyPurchaseFlow = do
   --   Reliability   ≈ 0.85  (completed=1.0, no voids, 1 removal out of 2)
   --   Responsiveness ≈ 0.35  (mean doc eval 18h → 0.25; contract 12h → 0.50)
   --   Accuracy      = 0.50  (1 approved, 1 rejected)
-  let t0  = time (date 2026 Jan 10) 9  0 0   -- interaction starts
-      t1  = time (date 2026 Jan 10) 11 0 0   -- doc-001 uploaded
-      t2  = time (date 2026 Jan 10) 23 0 0   -- doc-001 rejected      (12h eval)
-      t3  = time (date 2026 Jan 11) 9  0 0   -- doc-002 uploaded
-      t4  = time (date 2026 Jan 12) 9  0 0   -- doc-002 approved      (24h eval, at cap)
-      t5  = time (date 2026 Jan 12) 14 0 0   -- contract-001 uploaded
-      t6  = time (date 2026 Jan 13) 2  0 0   -- contract-001 signed   (12h signing)
-      t7  = time (date 2026 Jan 13) 9  0 0   -- participants added
-      t8  = time (date 2026 Jan 13) 11 0 0   -- participants removed
-      t9  = time (date 2026 Jan 13) 21 0 0   -- proposal-001 sent
-      t10 = time (date 2026 Jan 14) 9  0 0   -- proposal-001 rejected
-      t11 = time (date 2026 Jan 15) 9  0 0   -- proposal-001 approved
-      t12 = time (date 2026 Jan 15) 14 0 0   -- transaction closed
-      t13 = time (date 2026 Jan 15) 15 0 0   -- interaction completed
+  let t0  = time (date 2026 May 5) 9  0 0   -- interaction starts
+      t1  = time (date 2026 May 5) 11 0 0   -- doc-001 uploaded
+      t2  = time (date 2026 May 5) 23 0 0   -- doc-001 rejected      (12h eval)
+      t3  = time (date 2026 May 6) 9  0 0   -- doc-002 uploaded
+      t4  = time (date 2026 May 7) 9  0 0   -- doc-002 approved      (24h eval, at cap)
+      t5  = time (date 2026 May 7) 14 0 0   -- contract-001 uploaded
+      t6  = time (date 2026 May 8) 2  0 0   -- contract-001 signed   (12h signing)
+      t7  = time (date 2026 May 8) 9  0 0   -- participants added
+      t8  = time (date 2026 May 8) 11 0 0   -- participants removed
+      t9  = time (date 2026 May 8) 21 0 0   -- proposal-001 sent
+      t10 = time (date 2026 May 9) 9  0 0   -- proposal-001 rejected
+      t11 = time (date 2026 May 10) 9  0 0   -- proposal-001 approved
+      t12 = time (date 2026 May 10) 14 0 0   -- transaction closed
+      t13 = time (date 2026 May 10) 15 0 0   -- interaction completed
 
   -- ── 1. Reputation configuration ──────────────────────────────────────────
   _ <- submit operator do
-    createCmd ReputationConfiguration with
+    createCmd ScoringConfiguration with
       operator
       configId     = "REP-CONFIG-001"
       scoreFloor   = 0.0
@@ -299,13 +300,14 @@ testPropertyPurchaseFlow = do
   debug "✓ Interaction completed"
 
   -- ── 9. Generate observations ──────────────────────────────────────────────
-  obsCids <- submit operator do
+  (obsCids, reqsCids) <- submit operator do
     exerciseCmd ppConfigCid CreateObservations with completedCid
 
   debug "✓ Observations created"
 
   -- ── 10. Verify ────────────────────────────────────────────────────────────
   assertMsg "Expected exactly 2 observations (agent + buyer)" (length obsCids == 2)
+  assertMsg "Expected exactly 2 requests (agent + buyer)" (length reqsCids == 2)
 
   -- Verify Agent observation
   agentObs <- query @AgentObservation operator

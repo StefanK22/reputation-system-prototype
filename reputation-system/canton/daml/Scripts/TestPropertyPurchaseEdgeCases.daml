@@ -5,14 +5,15 @@ import DA.List (head)
 import DA.Time (time)
 import DA.Date (date, Month(..))
 
-import Reputation.Configuration.PropertyPurchase (PropertyPurchaseConfiguration(..), CreateObservations(..))
+import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..), CreateObservations(..))
 import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
-import Reputation.Observation.Agent (AgentObservation)
-import Reputation.Observation.Buyer (BuyerObservation)
+import Reputation.PropertyPurchase.AgentObservation (AgentObservation)
+import Reputation.PropertyPurchase.BuyerObservation (BuyerObservation)
 import Reputation.Types
+import Reputation.PropertyPurchase.Types (AgentObservationWeights(..), BuyerObservationWeights(..))
 
 
 -- ── Shared setup ─────────────────────────────────────────────────────────────

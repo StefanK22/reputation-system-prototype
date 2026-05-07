@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLedger } from '../LedgerContext.jsx';
+import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
 import { Tag, ScoreBar } from '../components/shared.jsx';
 import { getInterfaceIds } from '../api/reputation.js';
 import { OBS_TEMPLATES, OBS_COMP_IDS, OBS_COMP_COLORS, parseObservation } from '../api/observations.js';
@@ -89,6 +89,7 @@ function completedDate(c) {
 
 export default function Interactions() {
   const ledger = useLedger();
+  const { activeParty } = usePartyCtx();
   const [interactions,  setInteractions]  = useState([]);
   const [selected,      setSelected]      = useState(null);
   const [loading,       setLoading]       = useState(true);
@@ -135,7 +136,7 @@ export default function Interactions() {
     setError(null);
     try {
       const [contracts, { parties: pts }] = await Promise.all([
-        getInterfaceIds().catch(() => ({})).then(ids => ledger.queryAll(undefined, ids)),
+        getInterfaceIds().catch(() => ({})).then(ids => ledger.queryAll(activeParty, ids)),
         ledger.listAllParties().catch(() => ({ parties: [] })),
       ]);
 
@@ -188,7 +189,7 @@ export default function Interactions() {
     }
   }
 
-  useEffect(() => { load(); }, [ledger]);
+  useEffect(() => { load(); }, [ledger, activeParty]);
 
   // ── Exercise helper ────────────────────────────────────────────────────────
 
@@ -700,12 +701,16 @@ export default function Interactions() {
                 <span style={{ fontSize: 10, textTransform: 'uppercase', color: '#999', letterSpacing: '0.08em' }}>
                   Observations{selObservations.length > 0 ? ` (${selObservations.length})` : ''}
                 </span>
-                {selObservations.length === 0 && (
-                  <button
-                    disabled={!!actionBusy}
-                    onClick={() => handleCreateObservations(sel)}
-                    style={{ ...btnSt, fontSize: 11, padding: '4px 12px', background: '#f0f6ff', borderColor: '#1a6abf', color: '#1a6abf', fontWeight: 600 }}
-                  >{actionBusy === 'CreateObservations' ? 'Creating...' : 'Create Observations'}</button>
+                {!sel.processed && (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {selObservations.length === 0 && (
+                      <button
+                        disabled={!!actionBusy}
+                        onClick={() => handleCreateObservations(sel)}
+                        style={{ ...btnSt, fontSize: 11, padding: '4px 10px', background: '#f0f6ff', borderColor: '#1a6abf', color: '#1a6abf', fontWeight: 600 }}
+                      >{actionBusy === 'CreateObservations' ? 'Creating...' : 'Create Observations'}</button>
+                    )}
+                  </div>
                 )}
               </div>
               {selObservations.length === 0 ? (

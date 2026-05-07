@@ -1,0 +1,19 @@
+module Reputation.PropertyPurchase.Types where
+
+data AgentObservationWeights = AgentObservationWeights
+    with
+        reliabilityVoidedWeight         : Decimal
+        reliabilityRemovalWeight        : Decimal
+        reliabilityCompletionWeight     : Decimal
+        responsivenessDocWeight         : Decimal
+        responsivenessContractWeight    : Decimal
+        responsivenessCapHours          : Decimal
+    deriving (Eq, Show)
+
+data BuyerObservationWeights = BuyerObservationWeights
+    with
+        responsivenessContractWeight    : Decimal
+        responsivenessRejectionWeight   : Decimal
+        responsivenessProposalWeight    : Decimal
+        responsivenessCapHours          : Decimal
+    deriving (Eq, Show)

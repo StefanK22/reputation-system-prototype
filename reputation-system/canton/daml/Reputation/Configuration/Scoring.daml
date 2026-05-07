@@ -1,13 +1,13 @@
-module Reputation.Configuration.ReputationConfiguration where
+module Reputation.Configuration.Scoring where
 
 import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
 import Reputation.Types (ComponentId)
 import DA.Map (Map)
 import DA.Map qualified as Map
 
-type T = ReputationConfiguration
+type T = ScoringConfiguration
 
-template ReputationConfiguration 
+template ScoringConfiguration
     with
         operator : Party
         configId : Text
@@ -17,14 +17,14 @@ template ReputationConfiguration
         createdAt : Time
     where
         signatory operator
-        
+
         ensure
             configId /= "" &&
                 scoreFloor >= 0.0 &&
                 scoreCeiling > scoreFloor &&
                 not (Map.null startValues)
-        
-        interface instance Configuration.I for ReputationConfiguration where
+
+        interface instance Configuration.I for ScoringConfiguration where
             view = Configuration.View with
                 operator
                 configId
