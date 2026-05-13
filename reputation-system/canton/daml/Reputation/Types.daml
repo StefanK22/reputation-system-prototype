@@ -7,6 +7,7 @@ data Event
     | ContractUploaded
     | ContractSigned
     | ContractVoided
+    | ProposalSubmitted
     | ProposalApproved
     | ProposalRejectedWithNotes
     | TransactionClosed

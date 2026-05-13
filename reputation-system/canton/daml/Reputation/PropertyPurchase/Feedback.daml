@@ -35,10 +35,10 @@ template PropertyPurchaseFeedbackRequest
 
         choice SubmitFeedback : (ContractId PropertyPurchaseFeedback, ContractId FeedbackObservation)
             with
-                reliabilityRating       : Optional Decimal
-                responsivenessRating    : Optional Decimal
-                accuracyRating          : Optional Decimal
-                submittedAt             : Time
+                professionalism     : Optional Decimal
+                availability        : Optional Decimal
+                honesty             : Optional Decimal
+                submittedAt         : Time
             controller from
             do
                 now <- getTime
@@ -48,17 +48,17 @@ template PropertyPurchaseFeedbackRequest
                     interactionId
                     to
                     from
-                    reliabilityRating
-                    responsivenessRating
-                    accuracyRating
+                    professionalism
+                    availability
+                    honesty
                     submittedAt
                 obsCid <- create FeedbackObservation with
                     operator
                     interactionId
                     to
-                    reliabilityRating
-                    responsivenessRating
-                    accuracyRating
+                    professionalism
+                    availability
+                    honesty
                     configCid
                     recordedAt = submittedAt
                     processed = False
@@ -71,9 +71,9 @@ template PropertyPurchaseFeedback
         interactionId           : Text
         to                      : Party
         from                    : Party
-        reliabilityRating       : Optional Decimal
-        responsivenessRating    : Optional Decimal
-        accuracyRating          : Optional Decimal
+        professionalism         : Optional Decimal
+        availability            : Optional Decimal
+        honesty                 : Optional Decimal
         submittedAt             : Time
     where
         signatory operator, from
@@ -87,7 +87,7 @@ template PropertyPurchaseFeedback
                 to
                 from
                 componentRatings = Map.fromList
-                    [(Reliability, reliabilityRating),
-                    (Responsiveness, responsivenessRating),
-                    (Accuracy, accuracyRating)]
+                    [(Reliability, professionalism),
+                    (Responsiveness, availability),
+                    (Accuracy, honesty)]
                 submittedAt

@@ -12,9 +12,9 @@ template FeedbackObservation
         operator                : Party
         interactionId           : Text
         to                      : Party
-        reliabilityRating       : Optional Decimal
-        responsivenessRating    : Optional Decimal
-        accuracyRating          : Optional Decimal
+        professionalism         : Optional Decimal
+        availability            : Optional Decimal
+        honesty                 : Optional Decimal
         configCid               : ContractId Configuration.I
         recordedAt              : Time
         processed               : Bool
@@ -33,8 +33,8 @@ template FeedbackObservation
                 processed
                 configCid
                 componentValues = Map.fromList
-                    [(Reliability, reliabilityRating),
-                    (Responsiveness, responsivenessRating),
-                    (Accuracy, accuracyRating)]
+                    [(Reliability, professionalism),
+                    (Responsiveness, availability),
+                    (Accuracy, honesty)]
             setProcessed = toInterfaceContractId <$>
                 create this with processed = True

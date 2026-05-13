@@ -2,7 +2,7 @@ module Scripts.TestPropertyPurchaseFlow where
 
 import Daml.Script
 import DA.List (head)
-import DA.Map qualified as DA.Map
+import DA.Map qualified as Map
 import DA.Time (time)
 import DA.Date (date, Month(..))
 
@@ -27,27 +27,27 @@ testPropertyPurchaseFlow = do
   bob      <- allocateParty "BuyerBob"
 
   -- ── Timestamps ───────────────────────────────────────────────────────────
-  -- Scenario: doc rejected and resubmitted, participant churn, proposal
-  -- rejected once before final approval. Tests all three score dimensions
-  -- with non-trivial values.
+  -- Flow:
+  --   1. Agent submits proposal → buyer rejects → agent resubmits → buyer approves
+  --   2. Agent uploads contract (same resourceId as proposal) and both sign
+  --   3. Transaction closes
   --
-  --   Reliability   ≈ 0.85  (completed=1.0, no voids, 1 removal out of 2)
-  --   Responsiveness ≈ 0.35  (mean doc eval 18h → 0.25; contract 12h → 0.50)
-  --   Accuracy      = 0.50  (1 approved, 1 rejected)
-  let t0  = time (date 2026 May 5) 9  0 0   -- interaction starts
-      t1  = time (date 2026 May 5) 11 0 0   -- doc-001 uploaded
-      t2  = time (date 2026 May 5) 23 0 0   -- doc-001 rejected      (12h eval)
-      t3  = time (date 2026 May 6) 9  0 0   -- doc-002 uploaded
-      t4  = time (date 2026 May 7) 9  0 0   -- doc-002 approved      (24h eval, at cap)
-      t5  = time (date 2026 May 7) 14 0 0   -- contract-001 uploaded
-      t6  = time (date 2026 May 8) 2  0 0   -- contract-001 signed   (12h signing)
-      t7  = time (date 2026 May 8) 9  0 0   -- participants added
-      t8  = time (date 2026 May 8) 11 0 0   -- participants removed
-      t9  = time (date 2026 May 8) 21 0 0   -- proposal-001 sent
-      t10 = time (date 2026 May 9) 9  0 0   -- proposal-001 rejected
-      t11 = time (date 2026 May 10) 9  0 0   -- proposal-001 approved
-      t12 = time (date 2026 May 10) 14 0 0   -- transaction closed
-      t13 = time (date 2026 May 10) 15 0 0   -- interaction completed
+  -- Round 1: ProposalSubmitted t1 → ProposalRejectedWithNotes t2  (12h response)
+  -- Round 2: ProposalSubmitted t3 → ProposalApproved t4            (24h response)
+  -- Contract: ContractUploaded t5 (12h after approval) → ContractSigned t6 (12h)
+  --
+  -- proposalToContractTime = 12h  (ProposalApproved t4 → ContractUploaded t5)
+  -- contractSigningTimes   = [12] (ContractUploaded t5 → ContractSigned t6)
+  -- proposalRounds         = 2    (two ProposalSubmitted events)
+  let t0 = time (date 2026 May 5) 9  0 0   -- interaction starts
+      t1 = time (date 2026 May 5) 9  0 0   -- proposal-001 submitted (round 1)
+      t2 = time (date 2026 May 5) 21 0 0   -- proposal-001 rejected by buyer (12h)
+      t3 = time (date 2026 May 6) 9  0 0   -- proposal-001 resubmitted (round 2)
+      t4 = time (date 2026 May 7) 9  0 0   -- proposal-001 approved by buyer (24h)
+      t5 = time (date 2026 May 7) 21 0 0   -- contract uploaded (same rid, 12h after approval)
+      t6 = time (date 2026 May 8) 9  0 0   -- both sign (12h after upload)
+      t7 = time (date 2026 May 8) 14 0 0   -- transaction closed
+      t8 = time (date 2026 May 8) 15 0 0   -- interaction completed
 
   -- ── 1. Reputation configuration ──────────────────────────────────────────
   _ <- submit operator do
@@ -56,16 +56,14 @@ testPropertyPurchaseFlow = do
       configId     = "REP-CONFIG-001"
       scoreFloor   = 0.0
       scoreCeiling = 100.0
-      startValues  = DA.Map.fromList
+      startValues  = Map.fromList
         [ (Reliability,    0.7)
         , (Responsiveness, 0.7)
         , (Accuracy,       0.7)
         ]
-      createdAt    = t0
+      createdAt = t0
 
-  debug "✓ ReputationConfiguration created"
-
-  -- ── 3. Role configuration ─────────────────────────────────────────────────
+  -- ── 2. Role configuration ─────────────────────────────────────────────────
   roleConfigCid <- submit operator do
     createCmd RoleConfiguration with
       operator
@@ -80,48 +78,35 @@ testPropertyPurchaseFlow = do
         responsiveness = 0.3
         accuracy       = 0.2
 
-  debug "✓ RoleConfiguration created"
-
-  -- ── 4. Roles ──────────────────────────────────────────────────────────────
   _ <- submit operator do
     exerciseCmd roleConfigCid CreateRole with
-      party      = alice
-      roleType   = Agent
-      assignedAt = t0
+      party = alice; roleType = Agent; assignedAt = t0
 
   _ <- submit operator do
     exerciseCmd roleConfigCid CreateRole with
-      party      = bob
-      roleType   = Buyer
-      assignedAt = t0
+      party = bob; roleType = Buyer; assignedAt = t0
 
-  debug "✓ AgentRole (Alice) and BuyerRole (Bob) created"
-
-  -- ── 5. Property purchase configuration ───────────────────────────────────
+  -- ── 3. Property purchase configuration ───────────────────────────────────
   ppConfigCid <- submit operator do
     createCmd PropertyPurchaseConfiguration with
       operator
       configId  = "PP-CONFIG-001"
       createdAt = t0
       agentObsWeights = AgentObservationWeights with
-        reliabilityVoidedWeight      = 0.2
-        reliabilityRemovalWeight     = 0.3
-        reliabilityCompletionWeight  = 0.5
-        responsivenessDocWeight      = 0.6
-        responsivenessContractWeight = 0.4
-        responsivenessCapHours       = 24.0
+        reliabilityVoidedWeight                = 0.3
+        reliabilityCompletionWeight            = 0.7
+        responsivenessProposalToContractWeight = 0.6
+        responsivenessContractWeight           = 0.4
+        responsivenessCapHours                 = 24.0
       buyerObsWeights = BuyerObservationWeights with
-        responsivenessContractWeight = 0.5
-        responsivenessRejectionWeight = 0.3
+        responsivenessContractWeight = 0.8
         responsivenessProposalWeight = 0.2
-        responsivenessCapHours = 24.0
-      feedbackWindowDays             = 7
-
-  debug "✓ PropertyPurchaseConfiguration created"
+        responsivenessCapHours       = 24.0
+      feedbackWindowDays = 7
 
   let iPPConfigCid : ContractId Configuration.I = toInterfaceContractId ppConfigCid
 
-  -- ── 6. Draft → InProgress ─────────────────────────────────────────────────
+  -- ── 4. Draft → InProgress ─────────────────────────────────────────────────
   draftCid <- submit operator do
     createCmd DraftInteraction with
       operator
@@ -133,206 +118,104 @@ testPropertyPurchaseFlow = do
   inProgressCid <- submit operator do
     exerciseCmd draftCid Begin with startedAt = t0
 
-  debug "✓ Interaction started (DraftInteraction → InProgressInteraction)"
+  -- ── 5. Record events ──────────────────────────────────────────────────────
 
-  -- ── 7. Record events ──────────────────────────────────────────────────────
-
-  -- ── Agent (Alice) document cycle 1: uploaded then rejected after 12 hours
+  -- Round 1: agent submits, buyer rejects
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
-        event      = DocumentUploaded
-        actor      = alice
-        occurredAt = t1
-        resourceId = Some "doc-001"
-
-  -- ── Buyer (Bob) document cycle 1: uploaded then rejected after 12 hours
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = DocumentUploaded
-        actor      = bob
-        occurredAt = t1
-        resourceId = Some "buyer-doc-001"
-
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = DocumentRejectedWithNotes
-        actor      = alice
-        occurredAt = t2
-        resourceId = Some "doc-001"
-
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = DocumentRejectedWithNotes
-        actor      = alice
-        occurredAt = t2
-        resourceId = Some "buyer-doc-001"
-
-  -- ── Agent (Alice) document cycle 2: re-uploaded then approved after 24 hours (at cap)
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = DocumentUploaded
-        actor      = alice
-        occurredAt = t3
-        resourceId = Some "doc-002"
-
-  -- ── Buyer (Bob) document cycle 2: re-uploaded then approved after 24 hours
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = DocumentUploaded
-        actor      = bob
-        occurredAt = t3
-        resourceId = Some "buyer-doc-002"
-
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = DocumentApproved
-        actor      = alice
-        occurredAt = t4
-        resourceId = Some "doc-002"
-
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = DocumentApproved
-        actor      = alice
-        occurredAt = t4
-        resourceId = Some "buyer-doc-002"
-
-  -- ── Agent (Alice) contract: uploaded then signed
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = ContractUploaded
-        actor      = alice
-        occurredAt = t5
-        resourceId = Some "contract-001"
-
-  -- ── Buyer (Bob) contract: uploaded then signed after 12 hours
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = ContractUploaded
-        actor      = bob
-        occurredAt = t5
-        resourceId = Some "contract-buyer-001"
-
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = ContractSigned
-        actor      = alice
-        occurredAt = t6
-        resourceId = Some "contract-001"
-
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = ContractSigned
-        actor      = bob
-        occurredAt = t6
-        resourceId = Some "contract-buyer-001"
-
-  -- Participant churn: a co-buyer is added then removed
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = ParticipantsAdded
-        actor      = alice
-        occurredAt = t7
-        resourceId = Some "buyer-002"
-
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = ParticipantsRemoved
-        actor      = alice
-        occurredAt = t8
-        resourceId = Some "buyer-002"
-
-  -- Proposal: rejected first, then approved
-  inProgressCid <- submit operator do
-    exerciseCmd inProgressCid RecordEvent with
-      event = RecordedEvent with
-        event      = ContractUploaded
-        actor      = alice
-        occurredAt = t9
+        event = ProposalSubmitted; actor = alice; occurredAt = t1
         resourceId = Some "proposal-001"
 
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
-        event      = ProposalRejectedWithNotes
-        actor      = bob
-        occurredAt = t10
+        event = ProposalRejectedWithNotes; actor = bob; occurredAt = t2
+        resourceId = Some "proposal-001"
+
+  -- Round 2: agent resubmits, buyer approves
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = alice; occurredAt = t3
         resourceId = Some "proposal-001"
 
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
-        event      = ProposalApproved
-        actor      = bob
-        occurredAt = t11
+        event = ProposalApproved; actor = bob; occurredAt = t4
+        resourceId = Some "proposal-001"
+
+  -- Agent uploads contract using the same resourceId as the approved proposal,
+  -- so proposalToContractTime can be computed (ProposalApproved t4 → ContractUploaded t5)
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = alice; occurredAt = t5
+        resourceId = Some "proposal-001"
+
+  -- Both sign (12h after upload)
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = alice; occurredAt = t6
         resourceId = Some "proposal-001"
 
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
-        event      = TransactionStateChanged
-        actor      = alice
-        occurredAt = t12
+        event = ContractSigned; actor = bob; occurredAt = t6
+        resourceId = Some "proposal-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged; actor = alice; occurredAt = t7
         resourceId = Some "SELL_CLOSED"
 
-  debug "✓ Events recorded"
-
-  -- ── 8. Complete ───────────────────────────────────────────────────────────
+  -- ── 6. Complete ───────────────────────────────────────────────────────────
   completedCid <- submit operator do
     exerciseCmd inProgressCid Complete with
-      completedAt = t13
-      configCid   = iPPConfigCid
+      completedAt = t8; configCid = iPPConfigCid
 
-  debug "✓ Interaction completed"
-
-  -- ── 9. Generate observations ──────────────────────────────────────────────
+  -- ── 7. Generate observations ──────────────────────────────────────────────
   (obsCids, reqsCids) <- submit operator do
     exerciseCmd ppConfigCid CreateObservations with completedCid
 
-  debug "✓ Observations created"
+  assertMsg "Expected 2 observations" (length obsCids == 2)
+  assertMsg "Expected 2 feedback requests" (length reqsCids == 2)
 
-  -- ── 10. Verify ────────────────────────────────────────────────────────────
-  assertMsg "Expected exactly 2 observations (agent + buyer)" (length obsCids == 2)
-  assertMsg "Expected exactly 2 requests (agent + buyer)" (length reqsCids == 2)
-
-  -- Verify Agent observation
+  -- ── 8. Verify Agent observation ───────────────────────────────────────────
   agentObs <- query @AgentObservation operator
-  assertMsg "Expected 1 AgentObservation on ledger" (length agentObs == 1)
-
+  assertMsg "Expected 1 AgentObservation" (length agentObs == 1)
   let (_, agentOb) = head agentObs
-  assertMsg "Agent: Transaction should be marked completed" agentOb.transactionCompleted
-  assertMsg "Agent: No voided contracts"                    (agentOb.contractVoided == 0)
-  assertMsg "Agent: 1 participant added"                    (agentOb.participantAddition == 1)
-  assertMsg "Agent: 1 participant removed"                  (agentOb.participantRemoval == 1)
-  assertMsg "Agent: 1 proposal approved"                    (agentOb.proposalApprovedCount == 1)
-  assertMsg "Agent: 1 proposal rejected"                    (agentOb.proposalRejectedCount == 1)
-  assertMsg "Agent: 4 doc evaluation times recorded"        (length agentOb.documentEvaluationTimes == 4)
-  assertMsg "Agent: 1 contract signing time recorded"       (length agentOb.contractSigningTimes == 1)
 
-  -- Verify Buyer observation
+  assertMsg "Agent: transaction completed"                   agentOb.transactionCompleted
+  assertMsg "Agent: no voided contracts"                     (agentOb.contractVoided == 0)
+  -- ProposalApproved at t4 (09:00), ContractUploaded at t5 (21:00) = 12h
+  assertMsg "Agent: proposal-to-contract time is Some 12h"   (agentOb.proposalToContractTime == Some 12)
+  assertMsg "Agent: 1 contract signing time"                 (length agentOb.contractSigningTimes == 1)
+  -- ContractUploaded at t5 (21:00), ContractSigned at t6 (09:00 next day) = 12h
+  assertMsg "Agent: contract signing time is 12h"            (agentOb.contractSigningTimes == [12])
+  assertMsg "Agent: 1 proposal approved"                     (agentOb.proposalApprovedCount == 1)
+  assertMsg "Agent: 1 proposal rejected"                     (agentOb.proposalRejectedCount == 1)
+
+  -- ── 9. Verify Buyer observation ───────────────────────────────────────────
   buyerObs <- query @BuyerObservation operator
-  assertMsg "Expected 1 BuyerObservation on ledger" (length buyerObs == 1)
-
+  assertMsg "Expected 1 BuyerObservation" (length buyerObs == 1)
   let (_, buyerOb) = head buyerObs
-  assertMsg "Buyer: 2 docs uploaded"                      (buyerOb.uploadedDocs == 2)
-  assertMsg "Buyer: 2 docs approved"                      (buyerOb.approvedDocs == 1)
-  assertMsg "Buyer: 1 contract signing time"              (length buyerOb.contractSigningTimes == 1)
-  assertMsg "Buyer: 1 upload after rejection time"        (length buyerOb.uploadAfterRejectionTimes == 1)
-  assertMsg "Buyer: attempts per approved doc recorded"   (length buyerOb.attemptsPerApprovedDoc == 1)
+
+  -- uploadedContracts = all ContractUploaded in allEvents = 1 (agent's upload)
+  assertMsg "Buyer: 1 contract uploaded"                     (buyerOb.uploadedContracts == 1)
+  assertMsg "Buyer: 1 contract signed by buyer"              (buyerOb.signedContracts == 1)
+  assertMsg "Buyer: 1 contract signing time"                 (length buyerOb.contractSigningTimes == 1)
+  -- ContractUploaded at t5 (21:00), ContractSigned by bob at t6 (09:00) = 12h
+  assertMsg "Buyer: contract signing time is 12h"            (buyerOb.contractSigningTimes == [12])
+  -- proposalResponseTimes uses ContractUploaded as start event; since ContractUploaded
+  -- comes after the proposal rounds, there is no preceding upload to pair against
+  assertMsg "Buyer: no proposal response times"              (null buyerOb.proposalResponseTimes)
+  -- proposalRounds = count of ProposalSubmitted events = 2
+  assertMsg "Buyer: 2 proposal rounds"                       (buyerOb.proposalRounds == 2)
 
   debug "✓ All assertions passed"
   pure ()

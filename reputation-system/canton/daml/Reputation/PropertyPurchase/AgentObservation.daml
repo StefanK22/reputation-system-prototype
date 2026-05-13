@@ -10,26 +10,25 @@ import DA.Map qualified as Map
 
 type T = AgentObservation
 
-computeReliability : Bool -> Int -> Int -> Int -> AgentObservationWeights -> Decimal
-computeReliability transactionCompleted contractVoided participantAddition participantRemoval w =
+computeReliability : Bool -> Int -> AgentObservationWeights -> Decimal
+computeReliability transactionCompleted contractVoided w =
     let
         completionScore = if transactionCompleted then 1.0 else 0.0
-        remTotal        = intToDecimal (participantAddition + participantRemoval)
-        removalRatio    = if participantAddition > 0
-                            then intToDecimal participantRemoval / remTotal
-                            else 0.0
-        removalScore    = 1.0 - removalRatio
         voidedScore     = 1.0 / (1.0 + intToDecimal contractVoided)
     in
         w.reliabilityCompletionWeight * completionScore +
-        w.reliabilityRemovalWeight * removalScore+
         w.reliabilityVoidedWeight * voidedScore
 
-computeResponsiveness : [Int] -> [Int] -> AgentObservationWeights -> Optional Decimal
-computeResponsiveness [] [] _ = None
-computeResponsiveness docTimes contractTimes w = Some (
-    (w.responsivenessDocWeight * normalize w.responsivenessCapHours (mean (docTimes)))
-     + (w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean (contractTimes))))
+computeResponsiveness : Optional Int -> [Int] -> AgentObservationWeights -> Optional Decimal
+computeResponsiveness None [] _ = None
+computeResponsiveness optP2C contractTimes w =
+    let
+        p2cScore = case optP2C of
+            None   -> 0.0
+            Some t -> w.responsivenessProposalToContractWeight * normalize w.responsivenessCapHours (intToDecimal t)
+        contractScore = w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean contractTimes)
+    in
+        Some (p2cScore + contractScore)
 
 
 computeAccuracy : Int -> Int -> Optional Decimal
@@ -50,10 +49,8 @@ template AgentObservation
         -- Reliability
         transactionCompleted    : Bool
         contractVoided          : Int
-        participantAddition     : Int
-        participantRemoval      : Int
         -- Responsiveness
-        documentEvaluationTimes : [Int]
+        proposalToContractTime  : Optional Int
         contractSigningTimes    : [Int]
         -- Accuracy
         proposalApprovedCount   : Int
@@ -79,12 +76,10 @@ template AgentObservation
                     [(Reliability, Some (computeReliability
                         transactionCompleted
                         contractVoided
-                        participantAddition
-                        participantRemoval
                         agentObsWeights)
                     ),
                     (Responsiveness, computeResponsiveness
-                        documentEvaluationTimes
+                        proposalToContractTime
                         contractSigningTimes
                         agentObsWeights
                     ),

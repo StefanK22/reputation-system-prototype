@@ -13,6 +13,7 @@ events:
     - CONTRACT_SIGNED
     - CONTRACT_VOIDED
     
+    - PROPOSAL_SUBMITTED
     - PROPOSAL_APPROVED
     - PROPOSAL_REJECTED_WITH_NOTES
 
@@ -28,20 +29,62 @@ interaction:
         - Agent
         - Buyer
 
-        - Buyer sends documents for the Agent
-        - Agents sends contracts for the Buyer to sign
+        - Agent sends a purchase proposal for Buyer to accept
+        - Agents sends contracts for both to sign
 
     - metrics:
+        - ''Agent
         - Reliability:
-            - (AGENT) completes Transaction (y/n)
-            - (AGENT) number of voided contract uploaded
-            - (AGENT) participant removal ratio
-            - (BUYER) document followthrough rate
+            - Transaction completion
+            - Voided contract ratio
         - Responsiveness:
-            - (AGENT) median time to evaluate Document
-            - (AGENT) (BUYER) mean time to sign the Contract
-            - (BUYER) median time to upload document after rejected
-            - (BUYER) time to proposal approval response
+            - Time from proposal acceptance to contract upload
+            - Contract Signing speed
         - Accuracy:
-            - (AGENT) proposal acceptance rate
-            - (BUYER) mean attempts per approved document
+            - Proposal acceptance rate
+
+        - ''Buyer
+        - Reliability:
+            - Contract signing rate
+        - Responsiveness:
+            - Proposal response time
+            - Contract Signing speed
+        - Accuracy:
+            - Proposal round efficiency 
+
+
+
+    - ''Rental Agreement
+
+    - roles:
+        - Landlord
+        - Tenant
+
+        - Tenant uploads documents for the Landlord to review
+        - Landlord approves or reject 
+
+
+    - metrics:
+        - ''Landlord
+        - Reliability:
+            - Document evaluation completion rate
+        - Responsiveness:
+            - Document evaluation speed
+        - Accuracy:
+            - Single-round clearnace rate 
+
+        - ''Tenant
+        - Reliability:
+            - Dropout rate after proposal acceptance
+        - Responsiveness:
+            - Time to first document upload
+            - Re-upload speed after rejection
+        - Accuracy:
+            - Attempts per approved document
+
+
+
+
+- ''detetar com machine learning 
+- ''outlier detection
+- ''tipo Feez.ai

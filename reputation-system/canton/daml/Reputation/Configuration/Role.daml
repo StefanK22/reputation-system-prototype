@@ -4,7 +4,7 @@ import Reputation.Interface.Configuration qualified as Configuration (I, View(..
 import Reputation.Interface.Role qualified as Role (I)
 import Reputation.Role.Agent (AgentRole(..))
 import Reputation.Role.Buyer (BuyerRole(..))
-import Reputation.Types (RoleType(Agent, Buyer))
+import Reputation.Types (RoleType(..))
 
 type T = RoleConfiguration
 

@@ -10,20 +10,19 @@ import DA.Map qualified as Map
 type T = BuyerObservation
 
 computeReliability : Int -> Int -> Optional Decimal
-computeReliability 0 0 = None
-computeReliability uploadedD approvedD =
-    Some (intToDecimal approvedD / intToDecimal uploadedD)
+computeReliability 0 _ = None
+computeReliability uploadedC signedC =
+    Some (intToDecimal signedC / intToDecimal uploadedC)
 
-computeResponsiveness : [Int] -> [Int] -> [Int] -> BuyerObservationWeights -> Optional Decimal
-computeResponsiveness [] [] [] _ = None
-computeResponsiveness contractTimes rejectionTimes proposalTimes w = Some (
+computeResponsiveness : [Int] -> [Int] -> BuyerObservationWeights -> Optional Decimal
+computeResponsiveness [] [] _ = None
+computeResponsiveness contractTimes proposalTimes w = Some (
     w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean contractTimes) +
-    w.responsivenessRejectionWeight * normalize w.responsivenessCapHours (mean rejectionTimes) +
     w.responsivenessProposalWeight * normalize w.responsivenessCapHours (mean proposalTimes))
 
-computeAccuracy : [Int] -> Optional Decimal
-computeAccuracy [] = None
-computeAccuracy attemptsPerDoc = Some (1.0 / mean attemptsPerDoc)
+computeAccuracy : Int -> Optional Decimal
+computeAccuracy 0 = None
+computeAccuracy proposalRounds = Some (1.0 / intToDecimal proposalRounds)
 
 template BuyerObservation
     with
@@ -31,14 +30,13 @@ template BuyerObservation
         interactionId               : Text
         subject                     : Party
         -- Reliability
-        uploadedDocs                : Int
-        approvedDocs                : Int
+        uploadedContracts              : Int
+        signedContracts                : Int
         -- Responsiveness
         contractSigningTimes        : [Int]
-        uploadAfterRejectionTimes   : [Int]
         proposalResponseTimes       : [Int]
         -- Accuracy
-        attemptsPerApprovedDoc      : [Int]
+        proposalRounds              : Int
         -- Weights
         buyerObsWeights             : BuyerObservationWeights
         configCid                   : ContractId Configuration.I
@@ -58,17 +56,16 @@ template BuyerObservation
                 recordedAt
                 componentValues = Map.fromList
                     [(Reliability, computeReliability
-                        uploadedDocs
-                        approvedDocs
+                        uploadedContracts
+                        signedContracts
                     ),
                     (Responsiveness, computeResponsiveness
                         contractSigningTimes
-                        uploadAfterRejectionTimes
                         proposalResponseTimes
                         buyerObsWeights
                     ),
                     (Accuracy, computeAccuracy
-                        attemptsPerApprovedDoc
+                        proposalRounds
                     )]
                 processed
                 configCid
