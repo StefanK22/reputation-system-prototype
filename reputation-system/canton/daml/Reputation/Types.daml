@@ -26,6 +26,8 @@ data ComponentId
 data RoleType
     = Agent
     | Buyer
+    | Landlord
+    | Tenant
     deriving (Eq, Show)
 
 data RecordedEvent = RecordedEvent

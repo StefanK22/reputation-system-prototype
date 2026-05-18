@@ -16,7 +16,7 @@ echo "Canton sandbox process started"
 
 daml script \
   --dar .daml/dist/reputation-0.0.1.dar \
-  --script-name Scripts.TestPropertyPurchaseFlow:testPropertyPurchaseFlow \
+  --script-name Scripts.SeedLedger:seedLedger \
   --ledger-host localhost \
   --ledger-port 6865
 echo "canton-init-complete" | tee -a /tmp/sandbox.log

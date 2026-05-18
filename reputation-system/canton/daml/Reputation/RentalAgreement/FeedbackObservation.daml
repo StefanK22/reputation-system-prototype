@@ -1,0 +1,71 @@
+module Reputation.RentalAgreement.FeedbackObservation where
+
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Interface.Observation qualified as Observation (I, View(..))
+import Reputation.Types (ComponentId(..))
+import DA.Map qualified as Map
+
+template LandlordFeedbackObservation
+    with
+        operator                : Party
+        interactionId           : Text
+        to                      : Party
+        fairness                : Optional Decimal
+        availability            : Optional Decimal
+        requirementClarity      : Optional Decimal
+        configCid               : ContractId Configuration.I
+        recordedAt              : Time
+        processed               : Bool
+    where
+        signatory operator
+        observer to
+
+        ensure interactionId /= ""
+
+        interface instance Observation.I for LandlordFeedbackObservation where
+            view = Observation.View with
+                operator
+                interactionId
+                subject = to
+                recordedAt
+                processed
+                configCid
+                componentValues = Map.fromList
+                    [(Reliability, fairness),
+                    (Responsiveness, availability),
+                    (Accuracy, requirementClarity)]
+            setProcessed = toInterfaceContractId <$>
+                create this with processed = True
+
+template TenantFeedbackObservation
+    with
+        operator                : Party
+        interactionId           : Text
+        to                      : Party
+        documentHonesty         : Optional Decimal
+        communicationTimeliness : Optional Decimal
+        requirementCompliance   : Optional Decimal
+        configCid               : ContractId Configuration.I
+        recordedAt              : Time
+        processed               : Bool
+    where
+        signatory operator
+        observer to
+
+        ensure interactionId /= ""
+
+        interface instance Observation.I for TenantFeedbackObservation where
+            view = Observation.View with
+                operator
+                interactionId
+                subject = to
+                recordedAt
+                processed
+                configCid
+                componentValues = Map.fromList
+                    [(Reliability, documentHonesty),
+                    (Responsiveness, communicationTimeliness),
+                    (Accuracy, requirementCompliance)]
+            setProcessed = toInterfaceContractId <$>
+                create this with processed = True
+

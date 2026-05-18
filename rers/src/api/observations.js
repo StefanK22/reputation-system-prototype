@@ -1,4 +1,12 @@
-export const OBS_TEMPLATES   = { AgentObservation: 'Agent', BuyerObservation: 'Buyer', FeedbackObservation: 'Feedback' };
+export const OBS_TEMPLATES   = {
+  AgentObservation:            'Agent',
+  BuyerObservation:            'Buyer',
+  FeedbackObservation:         'Feedback',
+  LandlordObservation:         'Landlord',
+  TenantObservation:           'Tenant',
+  LandlordFeedbackObservation: 'Landlord Feedback',
+  TenantFeedbackObservation:   'Tenant Feedback',
+};
 export const OBS_COMP_IDS    = ['Reliability', 'Responsiveness', 'Accuracy'];
 export const OBS_COMP_COLORS = { Reliability: '#1a6abf', Responsiveness: '#7a5abf', Accuracy: '#2a7a6a' };
 

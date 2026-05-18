@@ -1,0 +1,95 @@
+module Reputation.RentalAgreement.FeedbackRequest where
+
+import Reputation.Interface.FeedbackRequest qualified as FeedbackRequest (I, View(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.RentalAgreement.FeedbackObservation (TenantFeedbackObservation(..), LandlordFeedbackObservation(..))
+import Reputation.RentalAgreement.Feedback (RentalAgreementLandlordFeedback(..), RentalAgreementTenantFeedback(..))
+
+template RentalAgreementFeedbackRequest
+    with
+        operator        : Party
+        interactionId   : Text
+        from            : Party
+        to              : Party
+        requestedAt     : Time
+        expiresAt       : Time
+        configCid       : ContractId Configuration.I
+    where
+        signatory operator
+        observer from
+
+        ensure
+            interactionId /= "" &&
+                expiresAt > requestedAt
+
+        interface instance FeedbackRequest.I for RentalAgreementFeedbackRequest where
+            view = FeedbackRequest.View with
+                operator
+                interactionId
+                from
+                to
+                requestedAt
+                expiresAt
+
+
+        choice SubmitFeedbackAsLandlord : (ContractId RentalAgreementLandlordFeedback, ContractId TenantFeedbackObservation)
+            with
+                documentHonesty         : Optional Decimal
+                communicationTimeliness : Optional Decimal
+                requirementCompliance   : Optional Decimal
+                submittedAt             : Time
+            controller from
+            do
+                now <- getTime
+                assertMsg "Feedback Request Expired" (now <= expiresAt)
+                feedbackCid <- create RentalAgreementLandlordFeedback with
+                    operator
+                    interactionId
+                    to
+                    from
+                    documentHonesty
+                    communicationTimeliness
+                    requirementCompliance
+                    submittedAt
+                obsCid <- create TenantFeedbackObservation with
+                    operator
+                    interactionId
+                    to
+                    documentHonesty
+                    communicationTimeliness
+                    requirementCompliance
+                    configCid
+                    recordedAt = submittedAt
+                    processed = False
+                pure (feedbackCid, obsCid)
+
+        choice SubmitFeedbackAsTenant : (ContractId RentalAgreementTenantFeedback, ContractId LandlordFeedbackObservation)
+            with
+                fairness                : Optional Decimal
+                availability            : Optional Decimal
+                requirementClarity      : Optional Decimal
+                submittedAt             : Time
+            controller from
+            do
+                now <- getTime
+                assertMsg "Feedback Request Expired" (now <= expiresAt)
+                feedbackCid <- create RentalAgreementTenantFeedback with
+                    operator
+                    interactionId
+                    to
+                    from
+                    fairness
+                    availability
+                    requirementClarity
+                    submittedAt
+                obsCid <- create LandlordFeedbackObservation with
+                    operator
+                    interactionId
+                    to
+                    fairness
+                    availability
+                    requirementClarity
+                    configCid
+                    recordedAt = submittedAt
+                    processed = False
+                pure (feedbackCid, obsCid)

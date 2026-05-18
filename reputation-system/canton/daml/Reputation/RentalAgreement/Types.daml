@@ -1,0 +1,13 @@
+module Reputation.RentalAgreement.Types where
+
+data LandlordObservationWeights = LandlordObservationWeights
+    with
+        responsivenessCapHours        : Decimal
+    deriving (Eq, Show)
+
+data TenantObservationWeights = TenantObservationWeights
+    with
+        responsivenessFirstUploadWeight : Decimal
+        responsivenessReuploadWeight    : Decimal
+        responsivenessCapHours          : Decimal
+    deriving (Eq, Show)

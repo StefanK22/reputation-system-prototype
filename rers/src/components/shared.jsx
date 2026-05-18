@@ -1,14 +1,19 @@
 export function Tag({ children }) {
   const colors = {
-    Agent:      { bg: '#e8f0fb', text: '#1a5ca8', border: '#c5d8f5' },
-    Buyer:      { bg: '#f0f8ee', text: '#2a7a2a', border: '#c5e5c0' },
-    Completed:  { bg: '#f0f8ee', text: '#2a7a2a', border: '#c5e5c0' },
-    InProgress: { bg: '#fff8e6', text: '#8a5800', border: '#f0d98a' },
-    Draft:      { bg: '#f5f5f5', text: '#666',    border: '#e0e0e0' },
-    Discarded:  { bg: '#fdf0f0', text: '#a33',    border: '#f0c8c8' },
-    pending:    { bg: '#f5f5f5', text: '#888',    border: '#e0e0e0' },
-    processing: { bg: '#fff8e6', text: '#8a5800', border: '#f0d98a' },
-    processed:  { bg: '#f0f8ee', text: '#2a7a2a', border: '#c5e5c0' },
+    Agent:             { bg: '#e8f0fb', text: '#1a5ca8', border: '#c5d8f5' },
+    Buyer:             { bg: '#f0f8ee', text: '#2a7a2a', border: '#c5e5c0' },
+    Landlord:          { bg: '#f5eefb', text: '#6a2a9a', border: '#d8b8f5' },
+    Tenant:            { bg: '#fff3e8', text: '#8a4a00', border: '#f5d0a0' },
+    Feedback:          { bg: '#fef0f8', text: '#9a2a6a', border: '#f5b8d8' },
+    'Landlord Feedback': { bg: '#f5eefb', text: '#6a2a9a', border: '#d8b8f5' },
+    'Tenant Feedback': { bg: '#fff3e8', text: '#8a4a00', border: '#f5d0a0' },
+    Completed:         { bg: '#f0f8ee', text: '#2a7a2a', border: '#c5e5c0' },
+    InProgress:        { bg: '#fff8e6', text: '#8a5800', border: '#f0d98a' },
+    Draft:             { bg: '#f5f5f5', text: '#666',    border: '#e0e0e0' },
+    Discarded:         { bg: '#fdf0f0', text: '#a33',    border: '#f0c8c8' },
+    pending:           { bg: '#f5f5f5', text: '#888',    border: '#e0e0e0' },
+    processing:        { bg: '#fff8e6', text: '#8a5800', border: '#f0d98a' },
+    processed:         { bg: '#f0f8ee', text: '#2a7a2a', border: '#c5e5c0' },
   };
   const s = colors[children] || { bg: '#f5f5f5', text: '#666', border: '#e0e0e0' };
   return (

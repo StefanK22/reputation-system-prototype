@@ -29,6 +29,16 @@ function normalizeTemplateId(id) {
   return parts[parts.length - 1] || s;
 }
 
+function normalizeInterfaceId(id) {
+  const s = String(id || '');
+  const parts = s.split(':');
+  if (parts.length >= 2) {
+    const moduleParts = parts[1].split('.');
+    return moduleParts[moduleParts.length - 1] || s;
+  }
+  return parts[parts.length - 1] || s;
+}
+
 function toEvent(created, fallbackOffset = 0) {
   return {
     offset:     Number(created.offset ?? fallbackOffset),
@@ -45,7 +55,7 @@ function parseContracts(response) {
     if (event) {
       const rawViews = event.interfaceViews || [];
       const interfaceViews = rawViews.reduce((acc, v) => {
-        const name = normalizeTemplateId(v.interfaceId);
+        const name = normalizeInterfaceId(v.interfaceId);
         if (v.viewStatus === 'OK' || v.viewValue) {
           acc[name] = v.viewValue || v.value || v;
         }

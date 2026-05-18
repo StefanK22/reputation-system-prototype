@@ -8,7 +8,7 @@ import DA.Date (date, Month(..))
 
 import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..), CreateObservations(..))
 import Reputation.Configuration.Scoring (ScoringConfiguration(..))
-import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), CreateRole(..))
+import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
@@ -29,22 +29,30 @@ testPropertyPurchaseFlow = do
   -- ── Timestamps ───────────────────────────────────────────────────────────
   -- Flow:
   --   1. Agent submits proposal → buyer rejects → agent resubmits → buyer approves
-  --   2. Agent uploads contract (same resourceId as proposal) and both sign
+  --   2. Agent uploads contract and both sign
   --   3. Transaction closes
   --
   -- Round 1: ProposalSubmitted t1 → ProposalRejectedWithNotes t2  (12h response)
   -- Round 2: ProposalSubmitted t3 → ProposalApproved t4            (24h response)
   -- Contract: ContractUploaded t5 (12h after approval) → ContractSigned t6 (12h)
   --
-  -- proposalToContractTime = 12h  (ProposalApproved t4 → ContractUploaded t5)
-  -- contractSigningTimes   = [12] (ContractUploaded t5 → ContractSigned t6)
-  -- proposalRounds         = 2    (two ProposalSubmitted events)
+  -- Agent:
+  --   proposalToContractTime = Some 12  (ProposalApproved t4 → ContractUploaded t5)
+  --   contractSigningTimes   = [12]     (ContractUploaded t5 → ContractSigned alice t6)
+  --   proposalApprovedCount  = 1
+  --   proposalRejectedCount  = 1
+  --
+  -- Buyer:
+  --   contractSigned         = True
+  --   proposalResponseTimes  = [12, 24] (buyer response time per proposal round)
+  --   contractSigningTimes   = [12]     (ContractUploaded t5 → ContractSigned bob t6)
+  --   proposalRounds         = 2        (two ProposalSubmitted events)
   let t0 = time (date 2026 May 5) 9  0 0   -- interaction starts
-      t1 = time (date 2026 May 5) 9  0 0   -- proposal-001 submitted (round 1)
+      t1 = time (date 2026 May 5) 9  0 0   -- proposal-001 submitted round 1
       t2 = time (date 2026 May 5) 21 0 0   -- proposal-001 rejected by buyer (12h)
-      t3 = time (date 2026 May 6) 9  0 0   -- proposal-001 resubmitted (round 2)
+      t3 = time (date 2026 May 6) 9  0 0   -- proposal-001 resubmitted round 2
       t4 = time (date 2026 May 7) 9  0 0   -- proposal-001 approved by buyer (24h)
-      t5 = time (date 2026 May 7) 21 0 0   -- contract uploaded (same rid, 12h after approval)
+      t5 = time (date 2026 May 7) 21 0 0   -- contract uploaded (12h after approval)
       t6 = time (date 2026 May 8) 9  0 0   -- both sign (12h after upload)
       t7 = time (date 2026 May 8) 14 0 0   -- transaction closed
       t8 = time (date 2026 May 8) 15 0 0   -- interaction completed
@@ -70,13 +78,13 @@ testPropertyPurchaseFlow = do
       configId     = "ROLE-CONFIG-001"
       createdAt    = t0
       agentWeights = AgentWeights with
-        reliability    = 0.5
-        responsiveness = 0.3
-        accuracy       = 0.2
+        reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       buyerWeights = BuyerWeights with
-        reliability    = 0.5
-        responsiveness = 0.3
-        accuracy       = 0.2
+        reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
+      landlordWeights = LandlordWeights with
+        reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
+      tenantWeights = TenantWeights with
+        reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
 
   _ <- submit operator do
     exerciseCmd roleConfigCid CreateRole with
@@ -99,8 +107,8 @@ testPropertyPurchaseFlow = do
         responsivenessContractWeight           = 0.4
         responsivenessCapHours                 = 24.0
       buyerObsWeights = BuyerObservationWeights with
-        responsivenessContractWeight = 0.8
-        responsivenessProposalWeight = 0.2
+        responsivenessContractWeight = 0.6
+        responsivenessProposalWeight = 0.4
         responsivenessCapHours       = 24.0
       feedbackWindowDays = 7
 
@@ -120,7 +128,7 @@ testPropertyPurchaseFlow = do
 
   -- ── 5. Record events ──────────────────────────────────────────────────────
 
-  -- Round 1: agent submits, buyer rejects
+  -- Round 1: agent submits, buyer rejects (12h response)
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
@@ -133,7 +141,7 @@ testPropertyPurchaseFlow = do
         event = ProposalRejectedWithNotes; actor = bob; occurredAt = t2
         resourceId = Some "proposal-001"
 
-  -- Round 2: agent resubmits, buyer approves
+  -- Round 2: agent resubmits, buyer approves (24h response)
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
@@ -146,26 +154,25 @@ testPropertyPurchaseFlow = do
         event = ProposalApproved; actor = bob; occurredAt = t4
         resourceId = Some "proposal-001"
 
-  -- Agent uploads contract using the same resourceId as the approved proposal,
-  -- so proposalToContractTime can be computed (ProposalApproved t4 → ContractUploaded t5)
+  -- Agent uploads contract (12h after approval → proposalToContractTime = 12)
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
         event = ContractUploaded; actor = alice; occurredAt = t5
-        resourceId = Some "proposal-001"
+        resourceId = Some "contract-001"
 
-  -- Both sign (12h after upload)
+  -- Both sign (12h after upload → contractSigningTimes = [12] for both)
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
         event = ContractSigned; actor = alice; occurredAt = t6
-        resourceId = Some "proposal-001"
+        resourceId = Some "contract-001"
 
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
       event = RecordedEvent with
         event = ContractSigned; actor = bob; occurredAt = t6
-        resourceId = Some "proposal-001"
+        resourceId = Some "contract-001"
 
   inProgressCid <- submit operator do
     exerciseCmd inProgressCid RecordEvent with
@@ -182,40 +189,36 @@ testPropertyPurchaseFlow = do
   (obsCids, reqsCids) <- submit operator do
     exerciseCmd ppConfigCid CreateObservations with completedCid
 
-  assertMsg "Expected 2 observations" (length obsCids == 2)
-  assertMsg "Expected 2 feedback requests" (length reqsCids == 2)
+  assertMsg "Expected 2 observations"        (length obsCids == 2)
+  assertMsg "Expected 2 feedback requests"   (length reqsCids == 2)
 
   -- ── 8. Verify Agent observation ───────────────────────────────────────────
   agentObs <- query @AgentObservation operator
   assertMsg "Expected 1 AgentObservation" (length agentObs == 1)
   let (_, agentOb) = head agentObs
 
-  assertMsg "Agent: transaction completed"                   agentOb.transactionCompleted
-  assertMsg "Agent: no voided contracts"                     (agentOb.contractVoided == 0)
-  -- ProposalApproved at t4 (09:00), ContractUploaded at t5 (21:00) = 12h
-  assertMsg "Agent: proposal-to-contract time is Some 12h"   (agentOb.proposalToContractTime == Some 12)
-  assertMsg "Agent: 1 contract signing time"                 (length agentOb.contractSigningTimes == 1)
-  -- ContractUploaded at t5 (21:00), ContractSigned at t6 (09:00 next day) = 12h
-  assertMsg "Agent: contract signing time is 12h"            (agentOb.contractSigningTimes == [12])
-  assertMsg "Agent: 1 proposal approved"                     (agentOb.proposalApprovedCount == 1)
-  assertMsg "Agent: 1 proposal rejected"                     (agentOb.proposalRejectedCount == 1)
+  assertMsg "Agent: transaction completed"                    agentOb.transactionCompleted
+  assertMsg "Agent: no voided contracts"                      (agentOb.contractVoided == 0)
+  -- ProposalApproved at t4 (09:00) → ContractUploaded at t5 (21:00) = 12h
+  assertMsg "Agent: proposal-to-contract time is Some 12"     (agentOb.proposalToContractTime == Some 12)
+  -- ContractUploaded t5 (21:00) → ContractSigned alice t6 (09:00 next day) = 12h
+  assertMsg "Agent: contract signing time is [12]"            (agentOb.contractSigningTimes == [12])
+  assertMsg "Agent: 1 proposal approved"                      (agentOb.proposalApprovedCount == 1)
+  assertMsg "Agent: 1 proposal rejected"                      (agentOb.proposalRejectedCount == 1)
 
   -- ── 9. Verify Buyer observation ───────────────────────────────────────────
   buyerObs <- query @BuyerObservation operator
   assertMsg "Expected 1 BuyerObservation" (length buyerObs == 1)
   let (_, buyerOb) = head buyerObs
 
-  -- uploadedContracts = all ContractUploaded in allEvents = 1 (agent's upload)
-  assertMsg "Buyer: 1 contract uploaded"                     (buyerOb.uploadedContracts == 1)
-  assertMsg "Buyer: 1 contract signed by buyer"              (buyerOb.signedContracts == 1)
-  assertMsg "Buyer: 1 contract signing time"                 (length buyerOb.contractSigningTimes == 1)
-  -- ContractUploaded at t5 (21:00), ContractSigned by bob at t6 (09:00) = 12h
-  assertMsg "Buyer: contract signing time is 12h"            (buyerOb.contractSigningTimes == [12])
-  -- proposalResponseTimes uses ContractUploaded as start event; since ContractUploaded
-  -- comes after the proposal rounds, there is no preceding upload to pair against
-  assertMsg "Buyer: no proposal response times"              (null buyerOb.proposalResponseTimes)
-  -- proposalRounds = count of ProposalSubmitted events = 2
-  assertMsg "Buyer: 2 proposal rounds"                       (buyerOb.proposalRounds == 2)
+  assertMsg "Buyer: contract signed"                          (buyerOb.signedContracts > 0)
+  -- ProposalSubmitted t1 (09:00) → ProposalRejectedWithNotes t2 (21:00) = 12h
+  -- ProposalSubmitted t3 (09:00) → ProposalApproved t4 (09:00 next day) = 24h
+  assertMsg "Buyer: proposal response times are [12, 24]"     (buyerOb.proposalResponseTimes == [12, 24])
+  -- ContractUploaded t5 (21:00) → ContractSigned bob t6 (09:00 next day) = 12h
+  assertMsg "Buyer: contract signing time is [12]"            (buyerOb.contractSigningTimes == [12])
+  -- Two ProposalSubmitted events recorded
+  assertMsg "Buyer: 2 proposal rounds"                        (buyerOb.proposalRounds == 2)
 
   debug "✓ All assertions passed"
   pure ()

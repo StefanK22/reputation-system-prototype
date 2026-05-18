@@ -25,8 +25,8 @@ findEventHours rid startEvent endEvents endTime allEvents =
             (Some start, Some end)  -> Some (hoursBetween start.occurredAt end.occurredAt)
             _                       -> None
 
-computePairHours : Event -> [Event] -> [RecordedEvent] -> [RecordedEvent] -> [Int]
-computePairHours startEvent endEvents actorEvents allEvents = 
+computeHours : Event -> [Event] -> [RecordedEvent] -> [RecordedEvent] -> [Int]
+computeHours startEvent endEvents actorEvents allEvents = 
     mapOptional (\e -> case e.resourceId of
         None -> None
         Some r -> findEventHours r startEvent endEvents e.occurredAt allEvents

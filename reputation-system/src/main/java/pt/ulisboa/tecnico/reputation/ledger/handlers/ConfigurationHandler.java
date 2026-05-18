@@ -35,6 +35,8 @@ public class ConfigurationHandler {
                     contract.data.configId, contract.id.contractId);
         } else if (PropertyPurchaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
             log.info("PropertyPurchaseConfiguration created: contractId={}", event.getContractId());
+        } else if (templateId.getEntityName().equals("RentalAgreementConfiguration")) {
+            log.info("RentalAgreementConfiguration created: contractId={}", event.getContractId());
         } else if (ScoringConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
             handleScoringConfiguration(event);
         } else {

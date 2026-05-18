@@ -7,9 +7,6 @@ import Reputation.Types (ComponentId(..))
 import Reputation.Utils (normalize, mean)
 import DA.Map qualified as Map
 
-
-type T = AgentObservation
-
 computeReliability : Bool -> Int -> AgentObservationWeights -> Decimal
 computeReliability transactionCompleted contractVoided w =
     let
@@ -21,14 +18,14 @@ computeReliability transactionCompleted contractVoided w =
 
 computeResponsiveness : Optional Int -> [Int] -> AgentObservationWeights -> Optional Decimal
 computeResponsiveness None [] _ = None
-computeResponsiveness optP2C contractTimes w =
+computeResponsiveness proposalToCTime contractTimes w =
     let
-        p2cScore = case optP2C of
+        optionalScore = case proposalToCTime of
             None   -> 0.0
             Some t -> w.responsivenessProposalToContractWeight * normalize w.responsivenessCapHours (intToDecimal t)
         contractScore = w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean contractTimes)
     in
-        Some (p2cScore + contractScore)
+        Some (optionalScore + contractScore)
 
 
 computeAccuracy : Int -> Int -> Optional Decimal

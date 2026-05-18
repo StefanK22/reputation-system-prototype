@@ -4,9 +4,9 @@ import Reputation.Interface.Configuration qualified as Configuration (I, View(..
 import Reputation.Interface.Role qualified as Role (I)
 import Reputation.Role.Agent (AgentRole(..))
 import Reputation.Role.Buyer (BuyerRole(..))
+import Reputation.Role.Landlord (LandlordRole(..))
+import Reputation.Role.Tenant (TenantRole(..))
 import Reputation.Types (RoleType(..))
-
-type T = RoleConfiguration
 
 data AgentWeights = AgentWeights
     with
@@ -22,14 +22,30 @@ data BuyerWeights = BuyerWeights
         accuracy        : Decimal
     deriving (Eq, Show)
 
-template RoleConfiguration 
-    with 
+data LandlordWeights = LandlordWeights
+    with
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    deriving (Eq, Show)
+
+data TenantWeights = TenantWeights
+    with
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    deriving (Eq, Show)
+
+template RoleConfiguration
+    with
         operator        : Party
         configId        : Text
         createdAt       : Time
         agentWeights    : AgentWeights
         buyerWeights    : BuyerWeights
-    where 
+        landlordWeights : LandlordWeights
+        tenantWeights   : TenantWeights
+    where
         signatory operator
 
         ensure configId /= ""
@@ -56,9 +72,9 @@ template RoleConfiguration
                                 party
                                 assignedAt
                                 configCid
-                                reliability = agentWeights.reliability
+                                reliability    = agentWeights.reliability
                                 responsiveness = agentWeights.responsiveness
-                                accuracy = agentWeights.accuracy
+                                accuracy       = agentWeights.accuracy
                     Buyer ->
                         toInterfaceContractId <$>
                             create BuyerRole with
@@ -66,6 +82,26 @@ template RoleConfiguration
                                 party
                                 assignedAt
                                 configCid
-                                reliability = buyerWeights.reliability
+                                reliability    = buyerWeights.reliability
                                 responsiveness = buyerWeights.responsiveness
-                                accuracy = buyerWeights.accuracy
+                                accuracy       = buyerWeights.accuracy
+                    Landlord ->
+                        toInterfaceContractId <$>
+                            create LandlordRole with
+                                operator
+                                party
+                                assignedAt
+                                configCid
+                                reliability    = landlordWeights.reliability
+                                responsiveness = landlordWeights.responsiveness
+                                accuracy       = landlordWeights.accuracy
+                    Tenant ->
+                        toInterfaceContractId <$>
+                            create TenantRole with
+                                operator
+                                party
+                                assignedAt
+                                configCid
+                                reliability    = tenantWeights.reliability
+                                responsiveness = tenantWeights.responsiveness
+                                accuracy       = tenantWeights.accuracy

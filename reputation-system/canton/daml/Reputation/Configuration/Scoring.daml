@@ -5,8 +5,6 @@ import Reputation.Types (ComponentId)
 import DA.Map (Map)
 import DA.Map qualified as Map
 
-type T = ScoringConfiguration
-
 template ScoringConfiguration
     with
         operator : Party

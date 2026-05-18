@@ -5,7 +5,6 @@ import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Interaction.Discarded (DiscardedInteraction(..))
 import Reputation.Interaction.Completed (CompletedInteraction(..))
 import Reputation.Types (RoleType, RecordedEvent(..), Event(ParticipantsAdded, ParticipantsRemoved))
-type T = InProgressInteraction
 
 template InProgressInteraction 
     with

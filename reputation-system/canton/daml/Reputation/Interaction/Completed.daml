@@ -3,7 +3,6 @@ module Reputation.Interaction.Completed where
 import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
 import Reputation.Types (RecordedEvent, RoleType)
-type T = CompletedInteraction
 
 template CompletedInteraction
     with

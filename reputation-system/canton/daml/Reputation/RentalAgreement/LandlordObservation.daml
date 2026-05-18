@@ -1,0 +1,71 @@
+module Reputation.RentalAgreement.LandlordObservation where
+
+import Reputation.Interface.Observation qualified as Observation (I, View(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.RentalAgreement.Types (LandlordObservationWeights)
+import Reputation.Types (ComponentId(..))
+import Reputation.Utils (normalize, mean)
+import DA.Map qualified as Map
+
+computeReliability : Int -> Int -> Optional Decimal
+computeReliability 0 _ = None
+computeReliability uploadedDocs evaluatedDocs =
+    Some (intToDecimal evaluatedDocs / intToDecimal uploadedDocs)
+
+computeResponsiveness : [Int] -> LandlordObservationWeights -> Optional Decimal
+computeResponsiveness [] _ = None
+computeResponsiveness evalTimes w =
+    Some (normalize w.responsivenessCapHours (mean evalTimes))
+    
+computeAccuracy : Int -> Int -> Optional Decimal
+computeAccuracy 0 _ = None
+computeAccuracy approved firstApproved =
+    Some (intToDecimal firstApproved / intToDecimal approved)
+
+template LandlordObservation
+    with
+        operator                : Party
+        interactionId           : Text
+        subject                 : Party
+        -- Reliability
+        uploadedDocs            : Int
+        evaluatedDocs           : Int
+        -- Responsiveness
+        evaluationTimes         : [Int]
+        -- Accuracy
+        approvedDocs            : Int
+        firstRoundApprovals     : Int
+        -- Weights
+        landlordObsWeights      : LandlordObservationWeights
+        configCid               : ContractId Configuration.I
+        recordedAt              : Time
+        processed               : Bool
+    where
+        signatory operator
+        observer subject
+
+        ensure interactionId /= ""
+
+        interface instance Observation.I for LandlordObservation where
+            view = Observation.View with
+                operator
+                interactionId
+                subject
+                recordedAt
+                componentValues = Map.fromList
+                    [(Reliability, computeReliability
+                        uploadedDocs
+                        evaluatedDocs
+                    ),
+                    (Responsiveness, computeResponsiveness
+                        evaluationTimes
+                        landlordObsWeights
+                    ),
+                    (Accuracy, computeAccuracy
+                        approvedDocs
+                        firstRoundApprovals
+                    )]
+                processed
+                configCid
+            setProcessed = toInterfaceContractId <$>
+                create this with processed = True

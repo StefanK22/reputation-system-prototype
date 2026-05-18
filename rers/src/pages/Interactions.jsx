@@ -15,7 +15,7 @@ const labelSt = { color: '#999', fontSize: 11, textTransform: 'uppercase', lette
 const ALL_EVENTS = [
   'DocumentUploaded', 'DocumentApproved', 'DocumentRejectedWithNotes',
   'ContractUploaded', 'ContractSigned', 'ContractVoided',
-  'ProposalApproved', 'ProposalRejectedWithNotes',
+  'ProposalSubmitted', 'ProposalApproved', 'ProposalRejectedWithNotes',
   'TransactionStateChanged', 'TransactionClosed', 'TransactionCanceled',
   'ParticipantsAdded', 'ParticipantsRemoved',
 ];
@@ -96,7 +96,7 @@ export default function Interactions() {
   const [error,         setError]         = useState(null);
   const [parties,       setParties]       = useState([]);
   const [templateIdMap, setTemplateIdMap] = useState({});
-  const [configCid,     setConfigCid]     = useState(null);
+  const [configMap,     setConfigMap]     = useState({});
   const [contractTemplateMap, setContractTemplateMap] = useState({});
   const [observations,        setObservations]        = useState([]);
   const [expandedObsId,       setExpandedObsId]       = useState(null);
@@ -157,8 +157,12 @@ export default function Interactions() {
       });
       setPartyRoleMap(roleMap);
 
-      const cfgContract = contracts.find(c => c.templateId in CONFIGURATION_TEMPLATES);
-      setConfigCid(cfgContract ? { contractId: cfgContract.contractId, rawTemplateId: cfgContract.rawTemplateId } : null);
+      const cfgMap = {};
+      contracts.filter(c => c.templateId in CONFIGURATION_TEMPLATES).forEach(c => {
+        const key = c.templateId === 'RentalAgreementConfiguration' ? 'RENTAL_AGREEMENT' : 'PROPERTY_PURCHASE';
+        cfgMap[key] = { contractId: c.contractId, rawTemplateId: c.rawTemplateId };
+      });
+      setConfigMap(cfgMap);
 
       const ixs = contracts
         .filter(c => c.templateId in INTERACTION_TEMPLATES)
@@ -218,13 +222,15 @@ export default function Interactions() {
   }
 
   function handleComplete(ix) {
-    if (!configCid) {
+    const key = ix.type?.toUpperCase().includes('RENTAL') ? 'RENTAL_AGREEMENT' : 'PROPERTY_PURCHASE';
+    const cfg = configMap[key];
+    if (!cfg) {
       setActionError('No configuration contract found on the ledger.');
       return;
     }
     return doExercise(ix, 'Complete', {
       completedAt: new Date().toISOString(),
-      configCid:   configCid.contractId,
+      configCid:   cfg.contractId,
     });
   }
 
@@ -355,6 +361,7 @@ export default function Interactions() {
               <label style={labelSt}>Interaction Type</label>
               <select value={newType} onChange={e => setNewType(e.target.value)} style={inputSt}>
                 <option value="PROPERTY_PURCHASE">PROPERTY_PURCHASE</option>
+                <option value="RENTAL_AGREEMENT">RENTAL_AGREEMENT</option>
               </select>
             </div>
             {createError && <p className="error" style={{ marginBottom: 12 }}>{createError}</p>}
@@ -509,6 +516,8 @@ export default function Interactions() {
                     : <select value={newRole} onChange={e => setNewRole(e.target.value)} style={{ ...inputSt, width: 90, fontSize: 11 }}>
                         <option>Agent</option>
                         <option>Buyer</option>
+                        <option>Landlord</option>
+                        <option>Tenant</option>
                       </select>
                   }
                 </div>

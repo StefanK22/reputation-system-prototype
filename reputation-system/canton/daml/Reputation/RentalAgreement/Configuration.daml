@@ -1,0 +1,167 @@
+module Reputation.RentalAgreement.Configuration where
+
+import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
+import Reputation.Interface.Observation qualified as Observation (I)
+import Reputation.Interface.FeedbackRequest qualified as FeedbackRequest (I)
+import Reputation.Interaction.Completed (CompletedInteraction(..), ProcessInteraction(..))
+import Reputation.RentalAgreement.Types (LandlordObservationWeights, TenantObservationWeights)
+import Reputation.RentalAgreement.LandlordObservation (LandlordObservation(..))
+import Reputation.RentalAgreement.TenantObservation (TenantObservation(..))
+import Reputation.RentalAgreement.FeedbackRequest (RentalAgreementFeedbackRequest(..))
+import Reputation.Types (Event(..), RoleType(Landlord, Tenant))
+import Reputation.Utils (computeHours, hoursBetween)
+import DA.Optional (isSome, mapOptional)
+import DA.List (dedup)
+import DA.Time (days, addRelTime)
+
+template RentalAgreementConfiguration
+    with
+        operator            : Party
+        configId            : Text
+        createdAt           : Time
+        landlordObsWeights  : LandlordObservationWeights
+        tenantObsWeights    : TenantObservationWeights
+        feedbackWindowDays  : Int
+    where
+        signatory
+            operator
+
+        ensure
+            configId /= "" &&
+            landlordObsWeights.responsivenessCapHours > 0.0 &&
+            tenantObsWeights.responsivenessFirstUploadWeight +
+                tenantObsWeights.responsivenessReuploadWeight == 1.0 &&
+            tenantObsWeights.responsivenessCapHours > 0.0
+
+        interface instance Configuration.I for RentalAgreementConfiguration where
+            view = Configuration.View with
+                operator
+                configId
+                createdAt
+
+        nonconsuming choice CreateObservations : ([ContractId Observation.I], [ContractId FeedbackRequest.I])
+            with
+                completedCid : ContractId CompletedInteraction
+            controller operator
+            do
+                completed <- fetch completedCid
+                assertMsg "Interaction already processed" (not completed.processed)
+                let configCid = toInterfaceContractId @Configuration.I self
+
+                let landlordParty = find (\(_, role) -> role == Landlord) completed.participants
+                let tenantParty = find (\(_, role) -> role == Tenant) completed.participants
+                assertMsg "Landlord or Tenant not found in participants" (isSome landlordParty && isSome tenantParty)
+                let Some (landlord, _) = landlordParty
+                let Some (tenant, _) = tenantParty
+
+                landlordObs <- createLandlordObservation completed landlord landlordObsWeights operator configCid
+                tenantObs <- createTenantObservation completed tenant tenantObsWeights operator configCid
+
+                landlordReq <- toInterfaceContractId <$> create RentalAgreementFeedbackRequest with
+                    operator        = operator
+                    interactionId   = completed.interactionId
+                    from            = landlord
+                    to              = tenant
+                    requestedAt     = completed.completedAt
+                    expiresAt       = addRelTime completed.completedAt (days feedbackWindowDays)
+                    configCid       = configCid
+
+                tenantReq <- toInterfaceContractId <$> create RentalAgreementFeedbackRequest with
+                    operator        = operator
+                    interactionId   = completed.interactionId
+                    from            = tenant
+                    to              = landlord
+                    requestedAt     = completed.completedAt
+                    expiresAt       = addRelTime completed.completedAt (days feedbackWindowDays)
+                    configCid       = configCid
+
+                exercise completedCid ProcessInteraction
+                pure ([landlordObs, tenantObs], [landlordReq, tenantReq])
+
+createLandlordObservation : CompletedInteraction -> Party -> LandlordObservationWeights -> Party -> ContractId Configuration.I -> Update (ContractId Observation.I)
+createLandlordObservation completed subject weights operator configCid = do
+    let
+        allEvents = completed.events
+        landlordEvents = filter (\e -> e.actor == subject) completed.events
+
+        -- Reliability
+        uploadedDocs = length (filter (\e -> e.event == DocumentUploaded) allEvents)
+        evaluatedDocs = length (filter (\e -> e.event `elem`
+            [DocumentApproved, DocumentRejectedWithNotes]) landlordEvents)
+
+        -- Responsiveness
+        evaluationTimes = computeHours DocumentUploaded 
+            [DocumentApproved, DocumentRejectedWithNotes] landlordEvents allEvents
+
+        approvedRids = dedup $ mapOptional (\e -> e.resourceId)
+            (filter (\e -> e.event == DocumentApproved) landlordEvents)
+        
+        approvedDocs = length approvedRids
+        firstRoundApprovals = length (filter (\rid -> 
+            length (filter (\e -> e.event == DocumentRejectedWithNotes 
+                && e.resourceId == Some rid) landlordEvents) <= 1) approvedRids)
+        
+    toInterfaceContractId <$>
+        create LandlordObservation with 
+            operator
+            interactionId       = completed.interactionId
+            subject
+            uploadedDocs
+            evaluatedDocs
+            evaluationTimes
+            approvedDocs
+            firstRoundApprovals
+            landlordObsWeights  = weights
+            configCid
+            recordedAt          = completed.completedAt
+            processed           = False
+
+
+createTenantObservation : CompletedInteraction -> Party -> TenantObservationWeights -> Party -> ContractId Configuration.I -> Update (ContractId Observation.I)
+createTenantObservation completed subject weights operator configCid = do
+    let
+        allEvents = completed.events
+        tenantEvents = filter (\e -> e.actor == subject) completed.events
+
+        -- Reliability
+        proposalApproved = any (\e -> e.event == ProposalApproved) tenantEvents
+        rentalRented = any (\e -> e.event == TransactionStateChanged
+                                 && e.resourceId == Some "RENTAL_RENTED") allEvents
+        applicationAbandoned = proposalApproved && not rentalRented
+
+        -- Responsiveness
+        firstUploadEvent = find (\e -> e.event == DocumentUploaded) tenantEvents
+        firstUploadTime = fmap (\e -> hoursBetween completed.startedAt e.occurredAt) firstUploadEvent
+
+        rejectionEvents = filter (\e -> e.event == DocumentRejectedWithNotes) allEvents
+        reuploadTimes = concatMap (\rej ->
+            let
+                nextUpload = take 1 (filter (\e ->
+                    e.event == DocumentUploaded &&
+                    e.occurredAt > rej.occurredAt) tenantEvents)
+            in
+                map (\u -> hoursBetween rej.occurredAt u.occurredAt) nextUpload
+            ) rejectionEvents
+
+        -- Accuracy
+        approvedRids = mapOptional (\e -> e.resourceId)
+            (filter (\e -> e.event == DocumentApproved) allEvents)
+
+        attemptsPerApprovedDoc = map (\rid ->
+            length (filter (\e -> e.event == DocumentUploaded
+                && e.resourceId == Some rid) tenantEvents))
+                approvedRids
+
+    toInterfaceContractId <$> 
+        create TenantObservation with
+            operator
+            interactionId           = completed.interactionId
+            subject
+            applicationAbandoned
+            firstUploadTime
+            reuploadTimes
+            attemptsPerApprovedDoc
+            tenantObsWeights        = weights
+            configCid
+            recordedAt              = completed.completedAt
+            processed               = False

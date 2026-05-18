@@ -64,9 +64,13 @@ public class RoleHandler {
     }
 
     private String resolveRoleType(Identifier templateId) {
-        if (AgentRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) return "Agent";
-        if (BuyerRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId))  return "Buyer";
-        return "Unknown";
+        return switch (templateId.getEntityName()) {
+            case "AgentRole"    -> "Agent";
+            case "BuyerRole"    -> "Buyer";
+            case "LandlordRole" -> "Landlord";
+            case "TenantRole"   -> "Tenant";
+            default             -> "Unknown";
+        };
     }
 
     private String componentIdName(ComponentId id) {

@@ -5,8 +5,6 @@ import Reputation.Interface.Role qualified as Role (I, View(..))
 import Reputation.Interface.Configuration qualified as Config (I)
 import Reputation.Types (ComponentId(..))
 
-type T = AgentRole
-
 template AgentRole
     with
         operator        : Party 

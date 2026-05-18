@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
 import { getInterfaceIds } from '../api/reputation.js';
-import { FEEDBACK_REQUEST_TEMPLATES, FEEDBACK_TEMPLATES } from '../api/contracts.js';
+import { FEEDBACK_REQUEST_TEMPLATES, FEEDBACK_TEMPLATES, ROLE_TEMPLATES } from '../api/contracts.js';
 import { optDecimal } from '../api/observations.js';
 import { Tag } from '../components/shared.jsx';
 
@@ -14,6 +14,44 @@ const labelSt = { color: '#999', fontSize: 11, textTransform: 'uppercase', lette
 function shortName(party) {
   const s = typeof party === 'string' ? party : String(party ?? '');
   return s.split('::')[0] || '—';
+}
+
+function getFeedbackConfig(templateId, fromRole) {
+  if (templateId === 'RentalAgreementFeedbackRequest') {
+    if (fromRole === 'Landlord') return {
+      choice: 'SubmitFeedbackAsLandlord',
+      labels: ['Document Honesty', 'Communication Timeliness', 'Requirement Compliance'],
+      buildArgs: (a, b, c, submittedAt) => ({ documentHonesty: a, communicationTimeliness: b, requirementCompliance: c, submittedAt }),
+    };
+    return {
+      choice: 'SubmitFeedbackAsTenant',
+      labels: ['Fairness', 'Availability', 'Requirement Clarity'],
+      buildArgs: (a, b, c, submittedAt) => ({ fairness: a, availability: b, requirementClarity: c, submittedAt }),
+    };
+  }
+  return {
+    choice: 'SubmitFeedback',
+    labels: ['Professionalism', 'Availability', 'Honesty'],
+    buildArgs: (a, b, c, submittedAt) => ({ professionalism: a, availability: b, honesty: c, submittedAt }),
+  };
+}
+
+function getFeedbackValues(fb) {
+  if (fb.templateId === 'RentalAgreementLandlordFeedback') return {
+    reliability:    optDecimal(fb.raw?.documentHonesty),
+    responsiveness: optDecimal(fb.raw?.communicationTimeliness),
+    accuracy:       optDecimal(fb.raw?.requirementCompliance),
+  };
+  if (fb.templateId === 'RentalAgreementTenantFeedback') return {
+    reliability:    optDecimal(fb.raw?.fairness),
+    responsiveness: optDecimal(fb.raw?.availability),
+    accuracy:       optDecimal(fb.raw?.requirementClarity),
+  };
+  return {
+    reliability:    optDecimal(fb.raw?.professionalism),
+    responsiveness: optDecimal(fb.raw?.availability),
+    accuracy:       optDecimal(fb.raw?.honesty),
+  };
 }
 
 function isExpired(expiresAt) {
@@ -57,8 +95,9 @@ export default function Feedbacks() {
   const ledger = useLedger();
   const { activeParty, parties } = usePartyCtx();
 
-  const [requests,  setRequests]  = useState([]);
-  const [feedbacks, setFeedbacks] = useState([]);
+  const [requests,     setRequests]     = useState([]);
+  const [feedbacks,    setFeedbacks]    = useState([]);
+  const [partyRoleMap, setPartyRoleMap] = useState({});
   const [selected,  setSelected]  = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState(null);
@@ -79,11 +118,19 @@ export default function Feedbacks() {
       const queryParty   = activeParty || undefined;
       const contracts    = await ledger.queryAll(queryParty, interfaceIds);
 
+      const roleMap = {};
+      contracts.forEach(c => {
+        const role = ROLE_TEMPLATES[c.templateId];
+        if (role) roleMap[c.payload?.party] = role;
+      });
+      setPartyRoleMap(roleMap);
+
       const reqs = contracts
         .filter(c => c.templateId in FEEDBACK_REQUEST_TEMPLATES)
         .map(c => ({
-          contractId:   c.contractId,
+          contractId:    c.contractId,
           rawTemplateId: c.rawTemplateId,
+          templateId:    c.templateId,
           interactionId: c.payload?.interactionId,
           from:          c.payload?.from,
           to:            c.payload?.to,
@@ -95,16 +142,18 @@ export default function Feedbacks() {
 
       const fbs = contracts
         .filter(c => c.templateId in FEEDBACK_TEMPLATES)
-        .map(c => ({
-          contractId:   c.contractId,
-          interactionId: c.payload?.interactionId,
-          from:          c.payload?.from,
-          to:            c.payload?.to,
-          submittedAt:   c.payload?.submittedAt,
-          reliability:   optDecimal(c.payload?.reliabilityRating),
-          responsiveness: optDecimal(c.payload?.responsivenessRating),
-          accuracy:      optDecimal(c.payload?.accuracyRating),
-        }))
+        .map(c => {
+          const vals = getFeedbackValues({ templateId: c.templateId, raw: c.payload });
+          return {
+            contractId:    c.contractId,
+            templateId:    c.templateId,
+            interactionId: c.payload?.interactionId,
+            from:          c.payload?.from,
+            to:            c.payload?.to,
+            submittedAt:   c.payload?.submittedAt,
+            ...vals,
+          };
+        })
         .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
       // If viewing as a specific party, only show requests/feedbacks where that party is 'from'
@@ -146,16 +195,13 @@ export default function Feedbacks() {
     setSubmitError(null);
     setSubmitSuccess(false);
     try {
+      const cfg  = getFeedbackConfig(selected.templateId, partyRoleMap[selected.from]);
+      const args = cfg.buildArgs(reliability, responsiveness, accuracy, new Date().toISOString());
       await ledger.exercise(
         selected.contractId,
         selected.rawTemplateId,
-        'SubmitFeedback',
-        {
-          reliabilityRating:    reliability,
-          responsivenessRating: responsiveness,
-          accuracyRating:       accuracy,
-          submittedAt:          new Date().toISOString(),
-        },
+        cfg.choice,
+        args,
         { actAs: [activeParty] },
       );
       setSubmitSuccess(true);
@@ -317,24 +363,14 @@ export default function Feedbacks() {
             <>
               <div style={{ borderTop: '1px solid #eee', paddingTop: 14, marginBottom: 4 }}>
                 <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#999', letterSpacing: '0.08em', marginBottom: 12 }}>Ratings (0 – 100)</div>
-                <RatingSlider
-                  label="Reliability"
-                  value={reliability}
-                  onChange={setReliability}
-                  color="#1a6abf"
-                />
-                <RatingSlider
-                  label="Responsiveness"
-                  value={responsiveness}
-                  onChange={setResponsiveness}
-                  color="#7a5abf"
-                />
-                <RatingSlider
-                  label="Accuracy"
-                  value={accuracy}
-                  onChange={setAccuracy}
-                  color="#2a7a6a"
-                />
+                {(() => {
+                  const cfg = getFeedbackConfig(selected.templateId, partyRoleMap[selected.from]);
+                  return (<>
+                    <RatingSlider label={cfg.labels[0]} value={reliability}    onChange={setReliability}    color="#1a6abf" />
+                    <RatingSlider label={cfg.labels[1]} value={responsiveness} onChange={setResponsiveness} color="#7a5abf" />
+                    <RatingSlider label={cfg.labels[2]} value={accuracy}       onChange={setAccuracy}       color="#2a7a6a" />
+                  </>);
+                })()}
               </div>
 
               {submitError && (

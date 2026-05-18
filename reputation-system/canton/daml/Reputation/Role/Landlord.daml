@@ -1,11 +1,11 @@
-module Reputation.Role.Buyer where
+module Reputation.Role.Landlord where
 
 import DA.Map qualified as Map
 import Reputation.Interface.Role qualified as Role (I, View(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Types (ComponentId(..))
 
-template BuyerRole
+template LandlordRole
     with
         operator        : Party 
         party           : Party
@@ -21,7 +21,7 @@ template BuyerRole
         ensure reliability + responsiveness + accuracy == 1.0 
             && all (> 0.0) [reliability, responsiveness, accuracy]
         
-        interface instance Role.I for BuyerRole where
+        interface instance Role.I for LandlordRole where
             view = Role.View with
                 operator
                 party

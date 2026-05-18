@@ -1,0 +1,76 @@
+module Reputation.RentalAgreement.TenantObservation where
+
+import Reputation.Interface.Observation qualified as Observation (I, View(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.RentalAgreement.Types (TenantObservationWeights)
+import Reputation.Types (ComponentId(..))
+import Reputation.Utils (normalize, mean)
+import DA.Map qualified as Map
+
+computeReliability : Bool -> Decimal
+computeReliability applicationAbandoned = if applicationAbandoned then 0.0 else 1.0
+
+computeResponsiveness : Optional Int -> [Int] -> TenantObservationWeights -> Optional Decimal
+computeResponsiveness None [] _ = None
+computeResponsiveness firstUpTime reupTimes w =
+    let
+        firstScore = case firstUpTime of
+            None   -> 0.0
+            Some t -> w.responsivenessFirstUploadWeight *
+                normalize w.responsivenessCapHours (intToDecimal t)
+        reuploadScore = case reupTimes of
+            [] -> 0.0
+            _  -> w.responsivenessReuploadWeight *
+                normalize w.responsivenessCapHours (mean reupTimes)
+    in
+        Some (firstScore + reuploadScore)
+
+computeAccuracy : [Int] -> Optional Decimal
+computeAccuracy [] = None
+computeAccuracy attempts = Some (1.0 / mean attempts)
+
+template TenantObservation
+    with
+        operator                : Party
+        interactionId           : Text
+        subject                 : Party
+        -- Reliability
+        applicationAbandoned    : Bool
+        -- Responsiveness
+        firstUploadTime         : Optional Int
+        reuploadTimes           : [Int]
+        -- Accuracy
+        attemptsPerApprovedDoc  : [Int]
+        -- Weights
+        tenantObsWeights        : TenantObservationWeights
+        configCid               : ContractId Configuration.I
+        recordedAt              : Time
+        processed               : Bool
+    where
+        signatory operator
+        observer subject
+
+        ensure interactionId /= ""
+
+        interface instance Observation.I for TenantObservation where
+            view = Observation.View with
+                operator
+                interactionId
+                subject
+                recordedAt
+                componentValues = Map.fromList
+                    [(Reliability, Some (computeReliability
+                        applicationAbandoned)
+                    ),
+                    (Responsiveness, computeResponsiveness
+                        firstUploadTime
+                        reuploadTimes
+                        tenantObsWeights
+                    ),
+                    (Accuracy, computeAccuracy
+                        attemptsPerApprovedDoc
+                    )]
+                processed
+                configCid
+            setProcessed = toInterfaceContractId <$>
+                create this with processed = True

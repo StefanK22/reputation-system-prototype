@@ -5,8 +5,6 @@ import Reputation.Interface.Observation qualified as Observation (I, View(..))
 import Reputation.Types (ComponentId(..))
 import DA.Map qualified as Map
 
-type T = FeedbackObservation
-
 template FeedbackObservation
     with
         operator                : Party

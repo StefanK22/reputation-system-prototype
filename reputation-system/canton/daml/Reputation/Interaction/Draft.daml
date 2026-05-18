@@ -5,8 +5,6 @@ import Reputation.Interaction.Discarded(DiscardedInteraction(..))
 import Reputation.Interaction.InProgress(InProgressInteraction(..))
 import Reputation.Types (RoleType)
 
-type T = DraftInteraction
-
 template DraftInteraction
     with 
         operator        : Party

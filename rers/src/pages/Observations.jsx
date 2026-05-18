@@ -41,17 +41,17 @@ function fmtInts(arr) {
 }
 
 function AgentMetrics({ p }) {
+  const pToC = p.proposalToContractTime;
+  const pToCVal = (pToC === null || pToC === undefined) ? '—' : (typeof pToC?.Some === 'number' ? pToC.Some + ' h' : pToC + ' h');
   return (
     <>
       <MetricSection title="Reliability inputs">
         <MetricRow label="Transaction completed"    value={p.transactionCompleted ? 'Yes' : 'No'} />
         <MetricRow label="Contract voided"          value={p.contractVoided ?? 0} />
-        <MetricRow label="Participant additions"    value={p.participantAddition ?? 0} />
-        <MetricRow label="Participant removals"     value={p.participantRemoval ?? 0} />
       </MetricSection>
       <MetricSection title="Responsiveness inputs">
-        <MetricRow label="Doc evaluation times"     value={fmtHours(p.documentEvaluationTimes)} />
-        <MetricRow label="Contract signing times"   value={fmtHours(p.contractSigningTimes)} />
+        <MetricRow label="Proposal to contract time" value={pToCVal} />
+        <MetricRow label="Contract signing times"    value={fmtHours(p.contractSigningTimes)} />
       </MetricSection>
       <MetricSection title="Accuracy inputs">
         <MetricRow label="Proposals approved"       value={p.proposalApprovedCount ?? 0} />
@@ -65,13 +65,48 @@ function BuyerMetrics({ p }) {
   return (
     <>
       <MetricSection title="Reliability inputs">
-        <MetricRow label="Docs uploaded"             value={p.uploadedDocs ?? 0} />
-        <MetricRow label="Docs approved"             value={p.approvedDocs ?? 0} />
+        <MetricRow label="Contracts uploaded"        value={p.uploadedContracts ?? 0} />
+        <MetricRow label="Contracts signed"          value={p.signedContracts ?? 0} />
       </MetricSection>
       <MetricSection title="Responsiveness inputs">
         <MetricRow label="Contract signing times"    value={fmtHours(p.contractSigningTimes)} />
-        <MetricRow label="Upload after rejection"    value={fmtHours(p.uploadAfterRejectionTimes)} />
         <MetricRow label="Proposal response times"   value={fmtHours(p.proposalResponseTimes)} />
+      </MetricSection>
+      <MetricSection title="Accuracy inputs">
+        <MetricRow label="Proposal rounds"           value={p.proposalRounds ?? 0} />
+      </MetricSection>
+    </>
+  );
+}
+
+function LandlordMetrics({ p }) {
+  return (
+    <>
+      <MetricSection title="Reliability inputs">
+        <MetricRow label="Docs uploaded"             value={p.uploadedDocs ?? 0} />
+        <MetricRow label="Docs evaluated"            value={p.evaluatedDocs ?? 0} />
+      </MetricSection>
+      <MetricSection title="Responsiveness inputs">
+        <MetricRow label="Evaluation times"          value={fmtHours(p.evaluationTimes)} />
+      </MetricSection>
+      <MetricSection title="Accuracy inputs">
+        <MetricRow label="Docs approved"             value={p.approvedDocs ?? 0} />
+        <MetricRow label="First-round approvals"     value={p.firstRoundApprovals ?? 0} />
+      </MetricSection>
+    </>
+  );
+}
+
+function TenantMetrics({ p }) {
+  const firstUp = optDecimal(p.firstUploadTime);
+  return (
+    <>
+      <MetricSection title="Reliability inputs">
+        <MetricRow label="Application abandoned"     value={p.applicationAbandoned ? 'Yes' : 'No'} />
+      </MetricSection>
+      <MetricSection title="Responsiveness inputs">
+        <MetricRow label="First upload time"         value={firstUp !== null ? firstUp + ' h' : '—'} />
+        <MetricRow label="Re-upload times"           value={fmtHours(p.reuploadTimes)} />
       </MetricSection>
       <MetricSection title="Accuracy inputs">
         <MetricRow label="Attempts per approved doc" value={fmtInts(p.attemptsPerApprovedDoc)} />
@@ -80,13 +115,35 @@ function BuyerMetrics({ p }) {
   );
 }
 
-function FeedbackMetrics({ p }) {
+function PropertyPurchaseFeedbackMetrics({ p }) {
   const optPct = v => { const n = optDecimal(v); return n !== null ? String(Math.round(n * 100)) : 'N/A'; };
   return (
     <MetricSection title="Peer ratings">
-      <MetricRow label="Reliability"    value={optPct(p.reliabilityRating)} />
-      <MetricRow label="Responsiveness" value={optPct(p.responsivenessRating)} />
-      <MetricRow label="Accuracy"       value={optPct(p.accuracyRating)} />
+      <MetricRow label="Professionalism"      value={optPct(p.professionalism)} />
+      <MetricRow label="Availability"         value={optPct(p.availability)} />
+      <MetricRow label="Honesty"              value={optPct(p.honesty)} />
+    </MetricSection>
+  );
+}
+
+function LandlordFeedbackMetrics({ p }) {
+  const optPct = v => { const n = optDecimal(v); return n !== null ? String(Math.round(n * 100)) : 'N/A'; };
+  return (
+    <MetricSection title="Peer ratings (tenant → landlord)">
+      <MetricRow label="Fairness"             value={optPct(p.fairness)} />
+      <MetricRow label="Availability"         value={optPct(p.availability)} />
+      <MetricRow label="Requirement Clarity"  value={optPct(p.requirementClarity)} />
+    </MetricSection>
+  );
+}
+
+function TenantFeedbackMetrics({ p }) {
+  const optPct = v => { const n = optDecimal(v); return n !== null ? String(Math.round(n * 100)) : 'N/A'; };
+  return (
+    <MetricSection title="Peer ratings (landlord → tenant)">
+      <MetricRow label="Document Honesty"          value={optPct(p.documentHonesty)} />
+      <MetricRow label="Communication Timeliness"  value={optPct(p.communicationTimeliness)} />
+      <MetricRow label="Requirement Compliance"    value={optPct(p.requirementCompliance)} />
     </MetricSection>
   );
 }
@@ -119,7 +176,7 @@ export function ObservationDetail({ obs, onClose, compact = false }) {
       )}
 
       {/* Component scores */}
-      <div style={{ marginBottom: 16 }}>
+      {!compact && <div style={{ marginBottom: 16 }}>
         {OBS_COMP_IDS.map(id => {
           const val = obs.components[id];
           if (val === undefined) return null;
@@ -134,16 +191,24 @@ export function ObservationDetail({ obs, onClose, compact = false }) {
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {/* Raw input metrics */}
       <div style={{ borderTop: '1px solid #eee', paddingTop: 12 }}>
         <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#999', letterSpacing: '0.08em', marginBottom: 10 }}>Input Metrics</div>
         {obs.templateId === 'AgentObservation'
           ? <AgentMetrics p={obs.payload} />
-          : obs.templateId === 'FeedbackObservation'
-          ? <FeedbackMetrics p={obs.payload} />
-          : <BuyerMetrics p={obs.payload} />
+          : obs.templateId === 'BuyerObservation'
+          ? <BuyerMetrics p={obs.payload} />
+          : obs.templateId === 'LandlordObservation'
+          ? <LandlordMetrics p={obs.payload} />
+          : obs.templateId === 'TenantObservation'
+          ? <TenantMetrics p={obs.payload} />
+          : obs.templateId === 'LandlordFeedbackObservation'
+          ? <LandlordFeedbackMetrics p={obs.payload} />
+          : obs.templateId === 'TenantFeedbackObservation'
+          ? <TenantFeedbackMetrics p={obs.payload} />
+          : <PropertyPurchaseFeedbackMetrics p={obs.payload} />
         }
       </div>
 

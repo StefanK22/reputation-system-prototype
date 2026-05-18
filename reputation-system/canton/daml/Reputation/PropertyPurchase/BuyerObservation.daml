@@ -7,8 +7,6 @@ import Reputation.Types (ComponentId(..))
 import Reputation.Utils (normalize, mean)
 import DA.Map qualified as Map
 
-type T = BuyerObservation
-
 computeReliability : Int -> Int -> Optional Decimal
 computeReliability 0 _ = None
 computeReliability uploadedC signedC =

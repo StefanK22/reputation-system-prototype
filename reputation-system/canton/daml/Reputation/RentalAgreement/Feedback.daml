@@ -1,0 +1,60 @@
+module Reputation.RentalAgreement.Feedback where
+
+import Reputation.Interface.Feedback qualified as Feedback (I, View(..))
+import Reputation.Types (ComponentId(..))
+import DA.Map qualified as Map
+
+template RentalAgreementLandlordFeedback
+    with
+        operator                : Party
+        interactionId           : Text
+        to                      : Party
+        from                    : Party
+        documentHonesty         : Optional Decimal
+        communicationTimeliness : Optional Decimal
+        requirementCompliance   : Optional Decimal
+        submittedAt             : Time
+    where
+        signatory operator, from
+
+        ensure interactionId /= ""
+
+        interface instance Feedback.I for RentalAgreementLandlordFeedback where
+            view = Feedback.View with
+                operator
+                interactionId
+                to
+                from
+                componentRatings = Map.fromList
+                    [(Reliability, documentHonesty),
+                    (Responsiveness, communicationTimeliness),
+                    (Accuracy, requirementCompliance)]
+                submittedAt
+
+template RentalAgreementTenantFeedback
+    with
+        operator                : Party
+        interactionId           : Text
+        to                      : Party
+        from                    : Party
+        fairness                : Optional Decimal
+        availability            : Optional Decimal
+        requirementClarity      : Optional Decimal
+        submittedAt             : Time
+    where
+        signatory operator, from
+
+        ensure interactionId /= ""
+
+        interface instance Feedback.I for RentalAgreementTenantFeedback where
+            view = Feedback.View with
+                operator
+                interactionId
+                to
+                from
+                componentRatings = Map.fromList
+                    [(Reliability, fairness),
+                    (Responsiveness, availability),
+                    (Accuracy, requirementClarity)]
+                submittedAt
+
