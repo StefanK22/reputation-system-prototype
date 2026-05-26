@@ -24,10 +24,6 @@ export function getInterfaceIds() {
   return fetchJson('/debug/interface-ids');
 }
 
-export function getSystemState() {
-  return fetchJson('/debug/system-state');
-}
-
 export function getReputationConfig() {
   return fetchJson('/debug/reputation-config');
 }

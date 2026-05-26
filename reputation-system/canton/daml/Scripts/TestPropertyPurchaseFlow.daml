@@ -7,8 +7,7 @@ import DA.Time (time)
 import DA.Date (date, Month(..))
 
 import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..), CreateObservations(..))
-import Reputation.Configuration.Scoring (ScoringConfiguration(..))
-import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
+import Reputation.Role.Configuration (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
@@ -57,20 +56,6 @@ testPropertyPurchaseFlow = do
       t7 = time (date 2026 May 8) 14 0 0   -- transaction closed
       t8 = time (date 2026 May 8) 15 0 0   -- interaction completed
 
-  -- ── 1. Reputation configuration ──────────────────────────────────────────
-  _ <- submit operator do
-    createCmd ScoringConfiguration with
-      operator
-      configId     = "REP-CONFIG-001"
-      scoreFloor   = 0.0
-      scoreCeiling = 100.0
-      startValues  = Map.fromList
-        [ (Reliability,    0.7)
-        , (Responsiveness, 0.7)
-        , (Accuracy,       0.7)
-        ]
-      createdAt = t0
-
   -- ── 2. Role configuration ─────────────────────────────────────────────────
   roleConfigCid <- submit operator do
     createCmd RoleConfiguration with
@@ -85,6 +70,9 @@ testPropertyPurchaseFlow = do
         reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       tenantWeights = TenantWeights with
         reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
+      scoreFloor   = 0.0
+      scoreCeiling = 100.0
+      startValue  = 70.0
 
   _ <- submit operator do
     exerciseCmd roleConfigCid CreateRole with
@@ -118,9 +106,11 @@ testPropertyPurchaseFlow = do
   draftCid <- submit operator do
     createCmd DraftInteraction with
       operator
+      initiator       = operator
       interactionId   = "TX-001"
       interactionType = "PropertyPurchase"
       participants    = [(alice, Agent), (bob, Buyer)]
+      configCid       = iPPConfigCid
       openedAt        = t0
 
   inProgressCid <- submit operator do
@@ -183,7 +173,7 @@ testPropertyPurchaseFlow = do
   -- ── 6. Complete ───────────────────────────────────────────────────────────
   completedCid <- submit operator do
     exerciseCmd inProgressCid Complete with
-      completedAt = t8; configCid = iPPConfigCid
+      completedAt = t8
 
   -- ── 7. Generate observations ──────────────────────────────────────────────
   (obsCids, reqsCids) <- submit operator do

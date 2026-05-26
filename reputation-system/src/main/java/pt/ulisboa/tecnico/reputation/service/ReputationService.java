@@ -33,33 +33,35 @@ public class ReputationService {
 
     // ── Engine Configuration ──────────────────────────────────────────────────
 
-    private EngineConfiguration getOrCreateConfig() {
+    @Transactional
+    public EngineConfiguration getOrCreateConfig() {
         return configRepo.findById(1L).orElseGet(EngineConfiguration::new);
     }
 
     @Transactional
-    public void applyReputationConfiguration(double floor, double ceiling, Map<String, Double> startValues) {
+    public void applyReputationConfiguration(double floor, double ceiling, double startValue) {
         EngineConfiguration config = getOrCreateConfig();
         config.setScoreFloor(floor);
         config.setScoreCeiling(ceiling);
-        config.getComponentStartValues().clear();
-        config.getComponentStartValues().putAll(startValues);
+        config.setStartValue(startValue);
         configRepo.save(config);
-        log.info("ReputationConfiguration applied: floor={}, ceiling={}, startValues={}", floor, ceiling, startValues);
+        log.info("ReputationConfiguration applied: floor={}, ceiling={}, startValue={}",
+                floor, ceiling, startValue);
     }
 
     public Map<String, Object> getReputationConfiguration() {
         EngineConfiguration config = getOrCreateConfig();
+        double floor   = config.getScoreFloor()   != null ? config.getScoreFloor()   : 0.0;
+        double ceiling = config.getScoreCeiling() != null ? config.getScoreCeiling() : 100.0;
+        double startValue = config.getStartValue() != null ? config.getStartValue() : 70.0;
+        Long offset = config.getLedgerOffset() != null ? config.getLedgerOffset() : 0L;
         return Map.of(
-            "configured",           config.isReputationConfigured(),
-            "scoreFloor",           config.getScoreFloor()  != null ? config.getScoreFloor()  : 0.0,
-            "scoreCeiling",         config.getScoreCeiling() != null ? config.getScoreCeiling() : 1.0,
-            "componentStartValues", config.getComponentStartValues()
+            "configured",   config.isReputationConfigured(),
+            "scoreFloor",   floor,
+            "scoreCeiling", ceiling,
+            "startValue",   Math.round(startValue * 10000.0) / 10000.0,
+            "ledgerOffset", offset
         );
-    }
-
-    public EngineConfiguration getEngineConfiguration() {
-        return getOrCreateConfig();
     }
 
     @Transactional
@@ -71,13 +73,13 @@ public class ReputationService {
 
     @Transactional
     public void upsertRole(String party, String roleType, String contractId, String configContractId,
-                           Map<String, Double> componentWeights) {
-        Map<String, Double> startValues = getOrCreateConfig().getComponentStartValues();
+                           List<SubjectComponent> components) {
 
+        EngineConfiguration config = getOrCreateConfig();
         Subject s = subjectRepo.findById(party).orElseGet(() -> {
             Subject n = new Subject();
             n.setParty(party);
-            n.setOverallScore(0);
+            n.setOverallScore(normalizeStartValue(config));
             n.setCreatedAt(Instant.now());
             return n;
         });
@@ -86,22 +88,19 @@ public class ReputationService {
         s.setConfigContractId(configContractId);
         s.setUpdatedAt(Instant.now());
 
-        componentWeights.forEach((componentId, weight) -> {
-            SubjectComponent sc = s.getComponents().stream()
-                    .filter(c -> c.getComponentId().equals(componentId))
+        components.forEach(incoming -> {
+            s.getComponents().stream()
+                    .filter(c -> c.getComponentId().equals(incoming.getComponentId()))
                     .findFirst()
-                    .orElseGet(() -> {
-                        SubjectComponent c = new SubjectComponent();
-                        c.setComponentId(componentId);
-                        c.setScore(startValues.getOrDefault(componentId, 0.0));
-                        c.setCount(0);
-                        c.setSubject(s);
-                        s.getComponents().add(c);
-                        return c;
+                    .ifPresentOrElse(existing -> {
+                        existing.setScore(incoming.getScore());
+                        existing.setCount(incoming.getCount());
+                    }, () -> {
+                        incoming.setSubject(s);
+                        s.getComponents().add(incoming);
                     });
-            sc.setWeight(weight);
         });
-
+        recomputeScore(s);
         subjectRepo.save(s);
     }
 
@@ -115,23 +114,17 @@ public class ReputationService {
             return;
         }
 
-        Map<String, Double> startValues = getOrCreateConfig().getComponentStartValues();
-
         componentValues.forEach((componentId, optValue) ->
             optValue.ifPresent(value -> {
                 SubjectComponent sc = subject.getComponents().stream()
                         .filter(c -> c.getComponentId().equals(componentId))
                         .findFirst()
-                        .orElseGet(() -> {
-                            SubjectComponent c = new SubjectComponent();
-                            c.setComponentId(componentId);
-                            c.setWeight(0.0);
-                            c.setScore(startValues.getOrDefault(componentId, 0.0));
-                            c.setCount(0);
-                            c.setSubject(subject);
-                            subject.getComponents().add(c);
-                            return c;
-                        });
+                        .orElse(null);
+
+                if (sc == null) {
+                    log.warn("applyObservation: no component {} found for party {}", componentId, party);
+                    return;
+                }
 
                 int count = sc.getCount();
                 double step = 1.0 / (count + 2);
@@ -152,7 +145,6 @@ public class ReputationService {
         double totalWeight = 0.0;
 
         for (SubjectComponent sc : subject.getComponents()) {
-            if (sc.getCount() == 0) continue;
             weightedSum += sc.getWeight() * sc.getScore();
             totalWeight += sc.getWeight();
         }
@@ -163,13 +155,38 @@ public class ReputationService {
         subject.setUpdatedAt(Instant.now());
     }
 
+    private double normalizeStartValue(EngineConfiguration config) {
+        double floor      = config.getScoreFloor()   != null ? config.getScoreFloor()   : 0.0;
+        double ceiling    = config.getScoreCeiling() != null ? config.getScoreCeiling() : 100.0;
+        double startValue = config.getStartValue()   != null ? config.getStartValue()   : 70.0;
+        return ceiling > floor ? (startValue - floor) / (ceiling - floor) : 0.0;
+    }
+
     private double scaleValue(double raw, EngineConfiguration config) {
         double floor   = config.getScoreFloor()   != null ? config.getScoreFloor()   : 0.0;
-        double ceiling = config.getScoreCeiling() != null ? config.getScoreCeiling() : 1.0;
+        double ceiling = config.getScoreCeiling() != null ? config.getScoreCeiling() : 100.0;
         return Math.round((floor + raw * (ceiling - floor)) * 10000.0) / 10000.0;
     }
 
     // ── Queries ───────────────────────────────────────────────────────────────
+
+    @Transactional
+    public void updateRoleContractId(String party, String contractId) {
+        subjectRepo.findById(party).ifPresent(s -> {
+            s.setContractId(contractId);
+            subjectRepo.save(s);
+        });
+    }
+
+    public Map<String, Double> getSubjectInternalScores(String party) {
+        return subjectRepo.findById(party)
+                .map(s -> {
+                    Map<String, Double> scores = new java.util.HashMap<>();
+                    s.getComponents().forEach(c -> scores.put(c.getComponentId(), c.getScore()));
+                    return scores;
+                })
+                .orElse(Map.of());
+    }
 
     public Optional<SubjectDto> getSubject(String party) {
         EngineConfiguration config = getOrCreateConfig();

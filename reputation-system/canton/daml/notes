@@ -2,9 +2,6 @@ events:
     - TRANSACTION_CREATED
     - TRANSACTION_STATE_CHANGED
 
-    - PARTICIPANT_ADDED
-    - PARTICIPANT_REMOVED
-
     - DOCUMENT_UPLOADED
     - DOCUMENT_APPROVED
     - DOCUMENT_REJECTED_WITH_NOTES
@@ -62,7 +59,6 @@ interaction:
 
         - Tenant uploads documents for the Landlord to review
         - Landlord approves or reject 
-
 
     - metrics:
         - ''Landlord

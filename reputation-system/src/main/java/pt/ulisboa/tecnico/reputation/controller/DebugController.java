@@ -28,11 +28,6 @@ public class DebugController {
         return service.getAllSubjects();
     }
 
-    @GetMapping("/system-state")
-    public EngineConfiguration getEngineConfiguration() {
-        return service.getEngineConfiguration();
-    }
-
     @GetMapping("/reputation-config")
     public Map<String, Object> getReputationConfig() {
         return service.getReputationConfiguration();

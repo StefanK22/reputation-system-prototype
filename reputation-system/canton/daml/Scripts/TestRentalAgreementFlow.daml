@@ -6,7 +6,7 @@ import DA.Time (time)
 import DA.Date (date, Month(..))
 
 import Reputation.RentalAgreement.Configuration (RentalAgreementConfiguration(..), CreateObservations(..))
-import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
+import Reputation.Role.Configuration (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
@@ -66,6 +66,9 @@ testRentalAgreementFlow = do
       buyerWeights    = BuyerWeights    with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       landlordWeights = LandlordWeights with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       tenantWeights   = TenantWeights   with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
+      scoreFloor      = 0.0
+      scoreCeiling    = 100.0
+      startValue      = 70.0
 
   _ <- submit operator do
     exerciseCmd roleConfigCid CreateRole with
@@ -95,9 +98,11 @@ testRentalAgreementFlow = do
   draftCid <- submit operator do
     createCmd DraftInteraction with
       operator
+      initiator       = operator
       interactionId   = "RA-001"
       interactionType = "RentalAgreement"
       participants    = [(alice, Landlord), (bob, Tenant)]
+      configCid       = iRAConfigCid
       openedAt        = t0
 
   inProgressCid <- submit operator do
@@ -152,7 +157,7 @@ testRentalAgreementFlow = do
   -- ── Complete ──────────────────────────────────────────────────────────────
   completedCid <- submit operator do
     exerciseCmd inProgressCid Complete with
-      completedAt = t8; configCid = iRAConfigCid
+      completedAt = t8
 
   -- ── Generate observations ─────────────────────────────────────────────────
   (obsCids, reqsCids) <- submit operator do

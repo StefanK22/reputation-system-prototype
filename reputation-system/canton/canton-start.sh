@@ -11,14 +11,19 @@ daml sandbox \
   --log-profile=container \
   2>&1 | tee /tmp/sandbox.log &
 
-until curl -sf http://localhost:7575/readyz > /dev/null 2>&1; do sleep 1; done
-echo "Canton sandbox process started"
+until grep -q 'Canton sandbox is ready' /tmp/sandbox.log 2>/dev/null; do sleep 1; done
 
-daml script \
-  --dar .daml/dist/reputation-0.0.1.dar \
-  --script-name Scripts.SeedLedger:seedLedger \
-  --ledger-host localhost \
-  --ledger-port 6865
+# Wait for the JSON API to accept requests
+until curl -sf http://localhost:7575/v2/parties > /dev/null 2>&1; do sleep 1; done
+
+# Retry party allocation until the synchronizer is connected (allocation fails before that)
+until curl -s -X POST http://localhost:7575/v2/parties \
+  -H "content-type: application/json" \
+  -d '{"displayName": "Operator", "partyIdHint": "Operator"}' \
+  | grep -q '"party"'; do
+  sleep 2
+done
+
 echo "canton-init-complete" | tee -a /tmp/sandbox.log
 
 wait

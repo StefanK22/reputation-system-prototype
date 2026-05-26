@@ -3,17 +3,20 @@ module Reputation.Interaction.Draft where
 import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
 import Reputation.Interaction.Discarded(DiscardedInteraction(..))
 import Reputation.Interaction.InProgress(InProgressInteraction(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Types (RoleType)
 
 template DraftInteraction
     with 
         operator        : Party
+        initiator       : Party
         interactionId   : Text
         interactionType : Text
         participants    : [(Party, RoleType)]
+        configCid       : ContractId Configuration.I
         openedAt        : Time
     where
-        signatory operator
+        signatory initiator
         observer map fst participants
 
         ensure 
@@ -22,17 +25,48 @@ template DraftInteraction
         interface instance Interaction.I for DraftInteraction where
             view = Interaction.View with
                 operator
+                initiator
                 interactionId
                 interactionType
                 participants
                 events      = []
+                configCid
                 processed   = False
+        
+        choice Begin : ContractId InProgressInteraction
+            with
+                startedAt : Time
+            controller initiator
+            do
+                create InProgressInteraction with
+                    operator
+                    initiator
+                    interactionId
+                    interactionType
+                    participants
+                    events = []
+                    configCid
+                    startedAt
+
+        choice Discard : ContractId DiscardedInteraction
+            with
+                discardedAt : Time
+            controller initiator
+            do
+                create DiscardedInteraction with
+                    operator
+                    initiator
+                    interactionId
+                    interactionType
+                    participants
+                    configCid
+                    discardedAt
 
         choice AddParticipant : ContractId DraftInteraction
             with 
                 party       : Party
                 roleType    : RoleType
-            controller operator
+            controller initiator
             do
                 create this with
                     participants = participants ++ [(party, roleType)]
@@ -40,33 +74,7 @@ template DraftInteraction
         choice RemoveParticipant : ContractId DraftInteraction
             with
                 party : Party
-            controller operator
+            controller initiator
             do
                 create this with    
                     participants = filter (\(p, _) -> p /= party) participants
-        
-        
-        choice Begin : ContractId InProgressInteraction
-            with
-                startedAt : Time
-            controller operator
-            do
-                create InProgressInteraction with
-                    operator
-                    interactionId
-                    interactionType
-                    participants
-                    events = []
-                    startedAt
-
-        choice Discard : ContractId DiscardedInteraction
-            with
-                discardedAt : Time
-            controller operator
-            do
-                create DiscardedInteraction with
-                    operator
-                    interactionId
-                    interactionType
-                    participants
-                    discardedAt

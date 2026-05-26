@@ -1,4 +1,4 @@
-module Reputation.Configuration.Role where
+module Reputation.Role.Configuration where
 
 import Reputation.Interface.Configuration qualified as Configuration (I, View(..))
 import Reputation.Interface.Role qualified as Role (I)
@@ -6,7 +6,7 @@ import Reputation.Role.Agent (AgentRole(..))
 import Reputation.Role.Buyer (BuyerRole(..))
 import Reputation.Role.Landlord (LandlordRole(..))
 import Reputation.Role.Tenant (TenantRole(..))
-import Reputation.Types (RoleType(..))
+import Reputation.Types (RoleType(..), RoleComponent(..))
 
 data AgentWeights = AgentWeights
     with
@@ -45,6 +45,9 @@ template RoleConfiguration
         buyerWeights    : BuyerWeights
         landlordWeights : LandlordWeights
         tenantWeights   : TenantWeights
+        scoreFloor      : Decimal
+        scoreCeiling    : Decimal
+        startValue      : Decimal
     where
         signatory operator
 
@@ -56,6 +59,7 @@ template RoleConfiguration
                 configId
                 createdAt
 
+
         nonconsuming choice CreateRole : ContractId Role.I
             with
                 party       : Party
@@ -63,6 +67,7 @@ template RoleConfiguration
                 assignedAt  : Time
             controller operator
             do
+                let internalStartValue = (startValue - scoreFloor) / (scoreCeiling - scoreFloor)
                 let configCid = toInterfaceContractId @Configuration.I self
                 case roleType of
                     Agent ->
@@ -72,9 +77,11 @@ template RoleConfiguration
                                 party
                                 assignedAt
                                 configCid
-                                reliability    = agentWeights.reliability
-                                responsiveness = agentWeights.responsiveness
-                                accuracy       = agentWeights.accuracy
+                                reliability     = RoleComponent with weight = agentWeights.reliability; score = internalStartValue; count = 0
+                                responsiveness  = RoleComponent with weight = agentWeights.responsiveness; score = internalStartValue; count = 0
+                                accuracy        = RoleComponent with weight = agentWeights.accuracy; score = internalStartValue; count = 0
+                                lastObservationCid = None
+                                lastUpdate = None
                     Buyer ->
                         toInterfaceContractId <$>
                             create BuyerRole with
@@ -82,9 +89,11 @@ template RoleConfiguration
                                 party
                                 assignedAt
                                 configCid
-                                reliability    = buyerWeights.reliability
-                                responsiveness = buyerWeights.responsiveness
-                                accuracy       = buyerWeights.accuracy
+                                reliability     = RoleComponent with weight = buyerWeights.reliability; score = internalStartValue; count = 0
+                                responsiveness  = RoleComponent with weight = buyerWeights.responsiveness; score = internalStartValue; count = 0
+                                accuracy        = RoleComponent with weight = buyerWeights.accuracy; score = internalStartValue; count = 0
+                                lastObservationCid = None
+                                lastUpdate = None
                     Landlord ->
                         toInterfaceContractId <$>
                             create LandlordRole with
@@ -92,9 +101,11 @@ template RoleConfiguration
                                 party
                                 assignedAt
                                 configCid
-                                reliability    = landlordWeights.reliability
-                                responsiveness = landlordWeights.responsiveness
-                                accuracy       = landlordWeights.accuracy
+                                reliability     = RoleComponent with weight = landlordWeights.reliability; score = internalStartValue; count = 0
+                                responsiveness  = RoleComponent with weight = landlordWeights.responsiveness; score = internalStartValue; count = 0
+                                accuracy        = RoleComponent with weight = landlordWeights.accuracy; score = internalStartValue; count = 0
+                                lastObservationCid = None
+                                lastUpdate = None
                     Tenant ->
                         toInterfaceContractId <$>
                             create TenantRole with
@@ -102,6 +113,9 @@ template RoleConfiguration
                                 party
                                 assignedAt
                                 configCid
-                                reliability    = tenantWeights.reliability
-                                responsiveness = tenantWeights.responsiveness
-                                accuracy       = tenantWeights.accuracy
+                                reliability     = RoleComponent with weight = tenantWeights.reliability; score = internalStartValue; count = 0
+                                responsiveness  = RoleComponent with weight = tenantWeights.responsiveness; score = internalStartValue; count = 0
+                                accuracy        = RoleComponent with weight = tenantWeights.accuracy; score = internalStartValue; count = 0
+                                lastObservationCid = None
+                                lastUpdate = None
+

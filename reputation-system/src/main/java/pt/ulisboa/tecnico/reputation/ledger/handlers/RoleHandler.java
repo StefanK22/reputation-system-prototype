@@ -6,12 +6,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import pt.ulisboa.tecnico.reputation.entity.SubjectComponent;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.interface$.role.Role;
 import reputation.interface$.role.View;
 import reputation.role.agent.AgentRole;
 import reputation.role.buyer.BuyerRole;
+import reputation.role.landlord.LandlordRole;
+import reputation.role.tenant.TenantRole;
 import reputation.types.ComponentId;
+
+import java.util.ArrayList;
+import java.util.List;            
 
 import java.util.HashMap;
 import java.util.Map;
@@ -40,15 +46,20 @@ public class RoleHandler {
             }
 
             View view = View.valueDecoder().decode(viewRecord);
+            
+            List<SubjectComponent> components = new ArrayList<>();
+            view.roleComponents.forEach((componentId, roleComponent) -> {
+                SubjectComponent comp = new SubjectComponent();
+                comp.setComponentId(componentIdName(componentId));
+                comp.setWeight(roleComponent.weight.doubleValue());
+                comp.setScore(roleComponent.score.doubleValue());
+                comp.setCount(roleComponent.count.intValue());
+                components.add(comp);
+            });
 
-            Map<String, Double> componentWeights = new HashMap<>();
-            view.componentWeights.forEach((componentId, weight) ->
-                componentWeights.put(componentIdName(componentId), weight.doubleValue())
-            );
+            log.info("Role created: party={}, type={}, weights={}", view.party, roleType, components);
 
-            log.info("Role created: party={}, type={}, weights={}", view.party, roleType, componentWeights);
-
-            reputationService.upsertRole(view.party, roleType, contractId, configContractId, componentWeights);
+            reputationService.upsertRole(view.party, roleType, contractId, configContractId, components);
         } catch (Exception e) {
             log.error("Failed to handle Role event: {}", e.getMessage(), e);
         }
@@ -59,6 +70,10 @@ public class RoleHandler {
             return AgentRole.Contract.fromCreatedEvent(event).data.configCid.contractId;
         } else if (BuyerRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(event.getTemplateId())) {
             return BuyerRole.Contract.fromCreatedEvent(event).data.configCid.contractId;
+        } else if (LandlordRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(event.getTemplateId())) {
+            return LandlordRole.Contract.fromCreatedEvent(event).data.configCid.contractId;
+        } else if (TenantRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(event.getTemplateId())) {
+            return TenantRole.Contract.fromCreatedEvent(event).data.configCid.contractId;
         }
         return null;
     }

@@ -1,5 +1,6 @@
 module Reputation.Interface.Interaction where
 
+import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Types (RoleType, RecordedEvent)
 
 type I = Interaction
@@ -8,10 +9,12 @@ type V = View
 data View = View
     with 
         operator        : Party
+        initiator       : Party
         interactionId   : Text
         interactionType : Text
         participants    : [(Party, RoleType)]
         events          : [RecordedEvent]
+        configCid       : ContractId Configuration.I
         processed       : Bool
     deriving (Eq, Show)
 

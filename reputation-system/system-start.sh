@@ -14,8 +14,9 @@ echo "Canton is ready."
 OPERATOR=$(curl -s "${CANTON_JSON_URL}/v2/parties" \
   | python3 -c "
 import sys, json
-parties = json.load(sys.stdin)['partyDetails']
-operator = [p for p in parties if 'operator' in p['party'].lower()]
+data = json.load(sys.stdin)
+details = data.get('partyDetails') or (data if isinstance(data, list) else [])
+operator = [p for p in details if 'operator' in p.get('party', '').lower() or 'operator' in p.get('displayName', '').lower()]
 print(operator[0]['party'] if operator else '')
 ")
 

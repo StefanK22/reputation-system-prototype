@@ -3,30 +3,42 @@ module Reputation.Role.Agent where
 import DA.Map qualified as Map
 import Reputation.Interface.Role qualified as Role (I, View(..))
 import Reputation.Interface.Configuration qualified as Config (I)
-import Reputation.Types (ComponentId(..))
+import Reputation.Interface.Observation qualified as Observation (I)
+import Reputation.Types (ComponentId(..), RoleComponent(..))
+import Reputation.Utils (updateComponent)
 
 template AgentRole
     with
-        operator        : Party 
-        party           : Party
-        assignedAt      : Time
-        configCid       : ContractId Config.I
-        reliability     : Decimal
-        responsiveness  : Decimal
-        accuracy        : Decimal
+        operator            : Party 
+        party               : Party
+        assignedAt          : Time
+        configCid           : ContractId Config.I
+        lastObservationCid  : Optional (ContractId Observation.I)
+        lastUpdate          : Optional Time
+        reliability         : RoleComponent
+        responsiveness      : RoleComponent
+        accuracy            : RoleComponent
+
     where
         signatory operator
         observer party
-
-        ensure reliability + responsiveness + accuracy == 1.0 
-            && all (> 0.0) [reliability, responsiveness, accuracy]
-        
+       
         interface instance Role.I for AgentRole where
             view = Role.View with
                 operator
                 party
                 assignedAt
-                componentWeights = Map.fromList [
+                roleComponents = Map.fromList [
                   (Reliability, reliability), 
                   (Responsiveness, responsiveness), 
                   (Accuracy, accuracy)]
+                lastObservationCid
+                lastUpdate
+
+            updateScore arg =
+                toInterfaceContractId <$> create this with
+                    reliability         = updateComponent reliability      Reliability       arg.newUpdatedScores
+                    responsiveness      = updateComponent responsiveness   Responsiveness    arg.newUpdatedScores
+                    accuracy            = updateComponent accuracy         Accuracy          arg.newUpdatedScores
+                    lastObservationCid  = Some arg.observationCid
+                    lastUpdate          = Some arg.updatedAt

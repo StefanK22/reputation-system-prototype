@@ -173,6 +173,13 @@ export class LedgerClient {
     return created ? toEvent(created, res.transaction?.offset) : null;
   }
 
+  async exerciseMulti(contractId, templateId, choiceName, choiceArgument = {}, { actAs = [] } = {}) {
+    const encoded = applyMaps(choiceArgument, CHOICE_MAPS[choiceName]);
+    const res     = await this._submit([{ ExerciseCommand: { contractId, templateId, choice: choiceName, choiceArgument: encoded } }], actAs);
+    const events  = Array.isArray(res.transaction?.events) ? res.transaction.events : [];
+    return events.map((e) => e.CreatedEvent || e.created || e.createdEvent).filter(Boolean).map((c) => toEvent(c, res.transaction?.offset));
+  }
+
   async query(templateId, activeAtOffset) {
     const offset = activeAtOffset || await this._ledgerOffset();
     const res    = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {

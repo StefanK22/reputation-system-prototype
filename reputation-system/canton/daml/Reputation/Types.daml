@@ -13,8 +13,6 @@ data Event
     | TransactionClosed
     | TransactionCanceled
     | TransactionStateChanged
-    | ParticipantsAdded
-    | ParticipantsRemoved
     deriving (Eq, Show)
 
 data ComponentId
@@ -38,3 +36,9 @@ data RecordedEvent = RecordedEvent
         resourceId  : Optional Text
     deriving (Eq, Show)
 
+data RoleComponent = RoleComponent
+    with
+        weight  : Decimal
+        score   : Decimal
+        count   : Int
+    deriving (Eq, Show)    

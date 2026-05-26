@@ -1,8 +1,10 @@
 module Reputation.Utils where
 
-import Reputation.Types (Event, RecordedEvent)
+import Reputation.Types (Event, RecordedEvent, RoleComponent, ComponentId)
 import DA.Time (subTime, convertRelTimeToMicroseconds)
 import DA.Optional (mapOptional)
+import qualified DA.Map as Map
+import DA.Map (Map)
 
 hoursBetween : Time -> Time -> Int
 hoursBetween start end = 
@@ -38,3 +40,10 @@ mean list = intToDecimal (sum list) / intToDecimal (length list)
 
 normalize : Decimal -> Decimal -> Decimal 
 normalize cap value = max 0.0 (1.0 - (value / cap))
+
+
+updateComponent : RoleComponent -> ComponentId -> Map ComponentId Decimal -> RoleComponent
+updateComponent comp compId newScores = 
+    case Map.lookup compId newScores of
+        Some newScore   -> comp with score = newScore; count = comp.count + 1
+        None            -> comp

@@ -1,7 +1,6 @@
 package pt.ulisboa.tecnico.reputation.ledger.handlers;
 
 import com.daml.ledger.javaapi.data.CreatedEvent;
-import com.daml.ledger.javaapi.data.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -11,9 +10,6 @@ import pt.ulisboa.tecnico.reputation.ledger.LedgerSubmitter;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.observation.View;
-import reputation.propertypurchase.agentobservation.AgentObservation;
-import reputation.propertypurchase.buyerobservation.BuyerObservation;
-import reputation.propertypurchase.feedbackobservation.FeedbackObservation;
 import reputation.types.ComponentId;
 
 import java.util.HashMap;
@@ -35,7 +31,6 @@ public class ObservationHandler {
 
     @Transactional
     public void handle(CreatedEvent event) {
-        Identifier templateId = event.getTemplateId();
         try {
             var viewRecord = event.getInterfaceViews().get(Observation.INTERFACE_ID_WITH_PACKAGE_ID);
             if (viewRecord == null) {
@@ -43,18 +38,41 @@ public class ObservationHandler {
                 return;
             }
             View view = View.valueDecoder().decode(viewRecord);
+
             if (view.processed) {
                 log.debug("Skipping already-processed Observation: {}", event.getContractId());
                 return;
             }
+
             Map<String, Optional<Double>> componentValues = new HashMap<>();
             view.componentValues.forEach((componentId, optDecimal) ->
                 componentValues.put(componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
             );
             log.info("Observation: subject={}, interactionId={}, components={}",
                     view.subject, view.interactionId, componentValues);
+
             reputationService.applyObservation(view.subject, componentValues);
-            ledgerSubmitter.markObservationProcessed(event.getContractId());
+
+            String newObsCid = ledgerSubmitter.markObservationProcessed(event.getContractId());
+            if (newObsCid == null) {
+                log.warn("MarkProcessed failed for {}; skipping UpdateScore", event.getContractId());
+                return;
+            }
+
+            var subjectOpt = reputationService.getSubject(view.subject);
+            if (subjectOpt.isEmpty() || subjectOpt.get().contractId() == null) {
+                log.warn("No role contractId for party {}; skipping UpdateScore", view.subject);
+                return;
+            }
+
+            String newRoleContractId = ledgerSubmitter.submitUpdateScore(
+                    subjectOpt.get().contractId(),
+                    reputationService.getSubjectInternalScores(view.subject),
+                    newObsCid
+            );
+            if (newRoleContractId != null) {
+                reputationService.updateRoleContractId(view.subject, newRoleContractId);
+            }
         } catch (Exception e) {
             log.error("Failed to handle Observation: {}", e.getMessage(), e);
         }

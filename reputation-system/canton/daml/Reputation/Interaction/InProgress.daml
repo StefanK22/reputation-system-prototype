@@ -4,18 +4,20 @@ import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Interaction.Discarded (DiscardedInteraction(..))
 import Reputation.Interaction.Completed (CompletedInteraction(..))
-import Reputation.Types (RoleType, RecordedEvent(..), Event(ParticipantsAdded, ParticipantsRemoved))
+import Reputation.Types (RoleType, RecordedEvent(..))
 
 template InProgressInteraction 
     with
         operator        : Party
+        initiator       : Party
         interactionId   : Text
         interactionType : Text
         participants    : [(Party, RoleType)]
         events          : [RecordedEvent]
+        configCid       : ContractId Configuration.I
         startedAt       : Time
     where
-        signatory operator
+        signatory initiator
         observer map fst participants
 
         ensure interactionId /= ""
@@ -23,32 +25,36 @@ template InProgressInteraction
         interface instance Interaction.I for InProgressInteraction where
             view = Interaction.View with
                 operator
+                initiator
                 interactionId
                 interactionType
                 participants
                 events
+                configCid
                 processed = False
 
         choice Discard : ContractId DiscardedInteraction
             with
                 discardedAt : Time
-            controller operator
+            controller initiator
             do
                 create DiscardedInteraction with
                     operator
+                    initiator
                     interactionId
                     interactionType
                     participants
+                    configCid
                     discardedAt
 
         choice Complete : ContractId CompletedInteraction
             with
                 completedAt : Time
-                configCid   : ContractId Configuration.I
-            controller operator
+            controller initiator
             do
                 create CompletedInteraction with
                     operator
+                    initiator
                     interactionId
                     interactionType
                     participants
@@ -65,34 +71,3 @@ template InProgressInteraction
             do 
                 create this with 
                     events = events ++ [event]
-
-        choice AddParticipant : ContractId InProgressInteraction
-            with 
-                party       : Party
-                roleType    : RoleType
-                actor       : Party
-                addedAt     : Time
-            controller operator
-            do
-                create this with
-                    participants = participants ++ [(party, roleType)]
-                    events = events ++ [RecordedEvent with
-                        event = ParticipantsAdded
-                        actor
-                        occurredAt = addedAt
-                        resourceId = Some (partyToText party)]
-        
-        choice RemoveParticipant : ContractId InProgressInteraction
-            with
-                party       : Party
-                actor       : Party
-                removedAt   : Time
-            controller operator
-            do 
-                create this with
-                    participants = filter (\(p, _) -> p /= party) participants
-                    events = events ++ [RecordedEvent with
-                        event = ParticipantsRemoved
-                        actor
-                        occurredAt = removedAt
-                        resourceId = Some (partyToText party)]

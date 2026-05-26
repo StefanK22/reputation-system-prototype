@@ -15,18 +15,13 @@ public class EngineConfiguration {
     @Id
     private Long id = 1L;
 
-    private long ledgerOffset = 0L;
+    private Long ledgerOffset = 0L;
 
     private Double scoreFloor;
     private Double scoreCeiling;
-
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "engine_configuration_start_values", joinColumns = @JoinColumn(name = "config_id"))
-    @MapKeyColumn(name = "component_id")
-    @Column(name = "start_value")
-    private Map<String, Double> componentStartValues = new HashMap<>();
+    private Double startValue;
 
     public boolean isReputationConfigured() {
-        return scoreFloor != null && scoreCeiling != null;
+        return scoreFloor != null && scoreCeiling != null && startValue != null;
     }
 }

@@ -8,12 +8,7 @@ import org.springframework.stereotype.Component;
 
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.propertypurchase.configuration.PropertyPurchaseConfiguration;
-import reputation.configuration.scoring.ScoringConfiguration;
-import reputation.configuration.role.RoleConfiguration;
-import reputation.types.ComponentId;
-
-import java.util.HashMap;
-import java.util.Map;
+import reputation.role.configuration.RoleConfiguration;
 
 @Component
 public class ConfigurationHandler {
@@ -30,48 +25,31 @@ public class ConfigurationHandler {
         Identifier templateId = event.getTemplateId();
 
         if (RoleConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            RoleConfiguration.Contract contract = RoleConfiguration.Contract.fromCreatedEvent(event);
-            log.info("RoleConfiguration created: configId={}, contractId={}",
-                    contract.data.configId, contract.id.contractId);
+            handleRoleConfiguration(event);
         } else if (PropertyPurchaseConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
             log.info("PropertyPurchaseConfiguration created: contractId={}", event.getContractId());
         } else if (templateId.getEntityName().equals("RentalAgreementConfiguration")) {
             log.info("RentalAgreementConfiguration created: contractId={}", event.getContractId());
-        } else if (ScoringConfiguration.TEMPLATE_ID_WITH_PACKAGE_ID.equals(templateId)) {
-            handleScoringConfiguration(event);
         } else {
             log.warn("Unknown Configuration.I template: {}", templateId);
         }
     }
 
-    private void handleScoringConfiguration(CreatedEvent event) {
+    private void handleRoleConfiguration(CreatedEvent event) {
         try {
-            ScoringConfiguration.Contract contract = ScoringConfiguration.Contract.fromCreatedEvent(event);
-            ScoringConfiguration data = contract.data;
+            RoleConfiguration.Contract contract = RoleConfiguration.Contract.fromCreatedEvent(event);
+            RoleConfiguration data = contract.data;
 
-            Map<String, Double> startValues = new HashMap<>();
-            data.startValues.forEach((componentId, value) ->
-                startValues.put(componentIdName(componentId), value.doubleValue())
-            );
+            double floor      = data.scoreFloor.doubleValue();
+            double ceiling    = data.scoreCeiling.doubleValue();
+            double startValue = data.startValue.doubleValue();
 
-            log.info("ScoringConfiguration: configId={}, floor={}, ceiling={}, startValues={}",
-                    data.configId, data.scoreFloor, data.scoreCeiling, startValues);
+            log.info("RoleConfiguration: configId={}, floor={}, ceiling={}, startValue={}",
+                    data.configId, floor, ceiling, startValue);
 
-            reputationService.applyReputationConfiguration(
-                data.scoreFloor.doubleValue(),
-                data.scoreCeiling.doubleValue(),
-                startValues
-            );
+            reputationService.applyReputationConfiguration(floor, ceiling, startValue);
         } catch (Exception e) {
-            log.error("Failed to handle ScoringConfiguration: {}", e.getMessage(), e);
+            log.error("Failed to handle RoleConfiguration: {}", e.getMessage(), e);
         }
-    }
-
-    private String componentIdName(ComponentId id) {
-        return switch (id) {
-            case RELIABILITY    -> "Reliability";
-            case RESPONSIVENESS -> "Responsiveness";
-            case ACCURACY       -> "Accuracy";
-        };
     }
 }

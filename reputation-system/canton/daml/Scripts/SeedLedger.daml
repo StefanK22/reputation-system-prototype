@@ -10,8 +10,7 @@ import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(
 import Reputation.PropertyPurchase.Configuration qualified as PP
 import Reputation.RentalAgreement.Configuration (RentalAgreementConfiguration(..))
 import Reputation.RentalAgreement.Configuration qualified as RA
-import Reputation.Configuration.Scoring (ScoringConfiguration(..))
-import Reputation.Configuration.Role (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
+import Reputation.Role.Configuration (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
@@ -47,20 +46,6 @@ seedLedger = do
 
   let t0 = time (date 2026 May 1) 9 0 0
 
-  -- ── Scoring configuration ─────────────────────────────────────────────────
-  _ <- submit operator do
-    createCmd ScoringConfiguration with
-      operator
-      configId     = "REP-CONFIG-SEED"
-      scoreFloor   = 0.0
-      scoreCeiling = 100.0
-      startValues  = Map.fromList
-        [ (Reliability,    0.7)
-        , (Responsiveness, 0.7)
-        , (Accuracy,       0.7)
-        ]
-      createdAt = t0
-
   -- ── Role configuration ────────────────────────────────────────────────────
   roleConfigCid <- submit operator do
     createCmd RoleConfiguration with
@@ -71,6 +56,9 @@ seedLedger = do
       buyerWeights    = BuyerWeights    with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       landlordWeights = LandlordWeights with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       tenantWeights   = TenantWeights   with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
+      scoreFloor      = 0.0
+      scoreCeiling    = 100.0
+      startValue      = 70.0
 
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = alice; roleType = Agent;    assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = bob;   roleType = Buyer;    assignedAt = t0
@@ -134,8 +122,8 @@ seedLedger = do
 
   s1_draftCid <- submit operator do
     createCmd DraftInteraction with
-      operator; interactionId = "TX-SEED-001"; interactionType = "PropertyPurchase"
-      participants = [(alice, Agent), (bob, Buyer)]; openedAt = s1_t0
+      operator; initiator = operator; interactionId = "TX-SEED-001"; interactionType = "PropertyPurchase"
+      participants = [(alice, Agent), (bob, Buyer)]; configCid = iPPConfigCid; openedAt = s1_t0
 
   s1_ipCid <- submit operator do exerciseCmd s1_draftCid Begin with startedAt = s1_t0
 
@@ -188,7 +176,7 @@ seedLedger = do
         resourceId = Some "SELL_CLOSED"
 
   s1_completedCid <- submit operator do
-    exerciseCmd s1_ipCid Complete with completedAt = s1_t8; configCid = iPPConfigCid
+    exerciseCmd s1_ipCid Complete with completedAt = s1_t8
 
   (_, s1_reqs) <- submit operator do
     exerciseCmd ppConfigCid PP.CreateObservations with completedCid = s1_completedCid
@@ -225,8 +213,8 @@ seedLedger = do
 
   s2_draftCid <- submit operator do
     createCmd DraftInteraction with
-      operator; interactionId = "TX-SEED-002"; interactionType = "PropertyPurchase"
-      participants = [(carol, Agent), (dave, Buyer)]; openedAt = s2_t0
+      operator; initiator = operator; interactionId = "TX-SEED-002"; interactionType = "PropertyPurchase"
+      participants = [(carol, Agent), (dave, Buyer)]; configCid = iPPConfigCid; openedAt = s2_t0
 
   s2_ipCid <- submit operator do exerciseCmd s2_draftCid Begin with startedAt = s2_t0
 
@@ -279,7 +267,7 @@ seedLedger = do
         resourceId = Some "SELL_CLOSED"
 
   s2_completedCid <- submit operator do
-    exerciseCmd s2_ipCid Complete with completedAt = s2_t8; configCid = iPPConfigCid
+    exerciseCmd s2_ipCid Complete with completedAt = s2_t8
 
   _ <- submit operator do
     exerciseCmd ppConfigCid PP.CreateObservations with completedCid = s2_completedCid
@@ -302,8 +290,8 @@ seedLedger = do
 
   s3_draftCid <- submit operator do
     createCmd DraftInteraction with
-      operator; interactionId = "RA-SEED-001"; interactionType = "RentalAgreement"
-      participants = [(eve, Landlord), (frank, Tenant)]; openedAt = s3_t0
+      operator; initiator = operator; interactionId = "RA-SEED-001"; interactionType = "RentalAgreement"
+      participants = [(eve, Landlord), (frank, Tenant)]; configCid = iRAConfigCid; openedAt = s3_t0
 
   s3_ipCid <- submit operator do exerciseCmd s3_draftCid Begin with startedAt = s3_t0
 
@@ -350,7 +338,7 @@ seedLedger = do
         resourceId = Some "LEASE_SIGNED"
 
   s3_completedCid <- submit operator do
-    exerciseCmd s3_ipCid Complete with completedAt = s3_t8; configCid = iRAConfigCid
+    exerciseCmd s3_ipCid Complete with completedAt = s3_t8
 
   (_, s3_reqs) <- submit operator do
     exerciseCmd raConfigCid RA.CreateObservations with completedCid = s3_completedCid
@@ -372,8 +360,8 @@ seedLedger = do
 
   s4_draftCid <- submit operator do
     createCmd DraftInteraction with
-      operator; interactionId = "TX-SEED-003"; interactionType = "PropertyPurchase"
-      participants = [(alice, Agent), (dave, Buyer)]; openedAt = s4_t0
+      operator; initiator = operator; interactionId = "TX-SEED-003"; interactionType = "PropertyPurchase"
+      participants = [(alice, Agent), (dave, Buyer)]; configCid = iPPConfigCid; openedAt = s4_t0
 
   s4_ipCid <- submit operator do exerciseCmd s4_draftCid Begin with startedAt = s4_t0
 
@@ -391,7 +379,7 @@ seedLedger = do
 
   _ <- submit operator do
     createCmd DraftInteraction with
-      operator; interactionId = "RA-SEED-002"; interactionType = "RentalAgreement"
-      participants = [(eve, Landlord), (grace, Tenant)]; openedAt = s5_t0
+      operator; initiator = operator; interactionId = "RA-SEED-002"; interactionType = "RentalAgreement"
+      participants = [(eve, Landlord), (grace, Tenant)]; configCid = iRAConfigCid; openedAt = s5_t0
 
   pure ()

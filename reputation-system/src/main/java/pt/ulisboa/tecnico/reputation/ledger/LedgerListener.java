@@ -21,6 +21,7 @@ import pt.ulisboa.tecnico.reputation.ledger.handlers.ConfigurationHandler;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.ObservationHandler;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.RoleHandler;
 import pt.ulisboa.tecnico.reputation.repository.EngineConfigurationRepository;
+import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.interface$.configuration.Configuration;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.role.Role;
@@ -47,6 +48,7 @@ public class LedgerListener {
     private final ObservationHandler observationHandler;
     private final EngineConfigurationRepository configRepo;
     private final LedgerSubmitter ledgerSubmitter;
+    private final ReputationService reputationService;
 
     private ManagedChannel channel;
 
@@ -54,12 +56,14 @@ public class LedgerListener {
                           RoleHandler roleHandler,
                           ObservationHandler observationHandler,
                           EngineConfigurationRepository configRepo,
-                          LedgerSubmitter ledgerSubmitter) {
+                          LedgerSubmitter ledgerSubmitter,
+                          ReputationService reputationService) {
         this.configurationHandler = configurationHandler;
         this.roleHandler = roleHandler;
         this.observationHandler = observationHandler;
         this.configRepo = configRepo;
         this.ledgerSubmitter = ledgerSubmitter;
+        this.reputationService = reputationService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -162,7 +166,7 @@ public class LedgerListener {
     }
 
     private void saveOffset(long offset) {
-        EngineConfiguration config = configRepo.findById(1L).orElseGet(EngineConfiguration::new);
+        EngineConfiguration config = reputationService.getOrCreateConfig();
         config.setLedgerOffset(offset);
         configRepo.save(config);
     }

@@ -222,16 +222,7 @@ export default function Interactions() {
   }
 
   function handleComplete(ix) {
-    const key = ix.type?.toUpperCase().includes('RENTAL') ? 'RENTAL_AGREEMENT' : 'PROPERTY_PURCHASE';
-    const cfg = configMap[key];
-    if (!cfg) {
-      setActionError('No configuration contract found on the ledger.');
-      return;
-    }
-    return doExercise(ix, 'Complete', {
-      completedAt: new Date().toISOString(),
-      configCid:   cfg.contractId,
-    });
+    return doExercise(ix, 'Complete', { completedAt: new Date().toISOString() });
   }
 
   async function handleAddParticipant(ix) {
@@ -483,7 +474,7 @@ export default function Interactions() {
               <span style={{ fontSize: 10, textTransform: 'uppercase', color: '#999', letterSpacing: '0.08em' }}>
                 Participants ({sel.participants.length})
               </span>
-              {(sel.status === 'Draft' || sel.status === 'InProgress') && (
+              {(sel.status === 'Draft') && (
                 <button onClick={() => setShowAddParticipant(v => !v)} style={{ ...btnSt, fontSize: 10, padding: '2px 8px' }}>
                   + Add
                 </button>
@@ -521,20 +512,6 @@ export default function Interactions() {
                       </select>
                   }
                 </div>
-                {sel.status === 'InProgress' && (
-                  <div style={{ marginBottom: 8 }}>
-                    <label style={{ ...labelSt, fontSize: 10, marginBottom: 4 }}>Added by</label>
-                    {parties.length > 0
-                      ? <select value={newPartyActor} onChange={e => setNewPartyActor(e.target.value)} style={{ ...inputSt, fontSize: 11 }}>
-                          <option value="">— select party —</option>
-                          {parties.map(p => (
-                            <option key={p.party} value={p.party}>{p.displayName}</option>
-                          ))}
-                        </select>
-                      : <input value={newPartyActor} onChange={e => setNewPartyActor(e.target.value)} placeholder="Leave blank to use participant" style={{ ...inputSt, fontSize: 11 }} />
-                    }
-                  </div>
-                )}
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
                     onClick={() => handleAddParticipant(sel)}

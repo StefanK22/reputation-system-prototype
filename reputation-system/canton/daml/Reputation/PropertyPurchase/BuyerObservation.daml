@@ -24,22 +24,22 @@ computeAccuracy proposalRounds = Some (1.0 / intToDecimal proposalRounds)
 
 template BuyerObservation
     with
-        operator                    : Party
-        interactionId               : Text
-        subject                     : Party
+        operator                : Party
+        interactionId           : Text
+        subject                 : Party
         -- Reliability
-        uploadedContracts              : Int
-        signedContracts                : Int
+        uploadedContracts       : Int
+        signedContracts         : Int
         -- Responsiveness
-        contractSigningTimes        : [Int]
-        proposalResponseTimes       : [Int]
+        contractSigningTimes    : [Int]
+        proposalResponseTimes   : [Int]
         -- Accuracy
-        proposalRounds              : Int
+        proposalRounds          : Int
         -- Weights
-        buyerObsWeights             : BuyerObservationWeights
-        configCid                   : ContractId Configuration.I
-        recordedAt                  : Time
-        processed                   : Bool
+        buyerObsWeights         : BuyerObservationWeights
+        configCid               : ContractId Configuration.I
+        recordedAt              : Time
+        processed               : Bool
     where
         signatory operator
         observer subject

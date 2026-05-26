@@ -7,6 +7,7 @@ import Reputation.Types (RecordedEvent, RoleType)
 template CompletedInteraction
     with
         operator        : Party 
+        initiator       : Party
         interactionId   : Text
         interactionType : Text
         participants    : [(Party, RoleType)]
@@ -16,7 +17,7 @@ template CompletedInteraction
         configCid       : ContractId Configuration.I
         processed       : Bool
     where
-        signatory operator
+        signatory initiator
         observer map fst participants
 
         ensure
@@ -27,10 +28,12 @@ template CompletedInteraction
         interface instance Interaction.I for CompletedInteraction where
             view = Interaction.View with
                 operator 
+                initiator
                 interactionId
                 interactionType
                 participants
                 events
+                configCid
                 processed
         
         choice ProcessInteraction : ContractId CompletedInteraction 

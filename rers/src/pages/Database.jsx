@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllSubjects, getInterfaceIds, getSystemState, getReputationConfig } from '../api/reputation.js';
+import { getAllSubjects, getInterfaceIds, getReputationConfig } from '../api/reputation.js';
 import { Tag, ScoreBar, normalizeScore } from '../components/shared.jsx';
 
 const tdSt = { padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333', verticalAlign: 'middle' };
@@ -127,7 +127,6 @@ function Section({ title, children, defaultOpen = true }) {
 
 export default function Database() {
   const [subjects,      setSubjects]      = useState([]);
-  const [systemState,   setSystemState]   = useState(null);
   const [repConfig,     setRepConfig]     = useState(null);
   const [interfaceIds,  setInterfaceIds]  = useState(null);
   const [expanded,      setExpanded]      = useState(new Set());
@@ -138,14 +137,12 @@ export default function Database() {
     setLoading(true);
     setError(null);
     try {
-      const [subjects, state, cfg, ids] = await Promise.all([
+      const [subjects, cfg, ids] = await Promise.all([
         getAllSubjects(),
-        getSystemState().catch(() => null),
         getReputationConfig().catch(() => null),
         getInterfaceIds().catch(() => null),
       ]);
       setSubjects(subjects ?? []);
-      setSystemState(state);
       setRepConfig(cfg);
       setInterfaceIds(ids);
     } catch (e) {
@@ -181,7 +178,7 @@ export default function Database() {
       {/* ── Engine status ── */}
       <Section title="Engine Status">
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-          <StatCard label="Ledger Offset" value={systemState?.ledgerOffset ?? '—'} sub="last processed tx" />
+          <StatCard label="Ledger Offset" value={repConfig?.ledgerOffset ?? '—'} sub="last processed tx" />
           <StatCard label="Subjects"      value={subjects.length} sub={`${agentCount} agents · ${buyerCount} buyers`} />
           <StatCard
             label="Rep. Config"
@@ -295,13 +292,6 @@ export default function Database() {
                 </tbody>
               </table>
             ) : <p className="muted">Unavailable.</p>}
-          </div>
-
-          <div>
-            <div style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Raw System State</div>
-            <pre style={{ background: '#f5f5f5', border: '1px solid #eee', borderRadius: 3, padding: 12, fontSize: 11, color: '#555', overflowX: 'auto', margin: 0 }}>
-              {JSON.stringify(systemState, null, 2)}
-            </pre>
           </div>
 
         </div>
