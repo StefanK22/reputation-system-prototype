@@ -2,8 +2,7 @@ module Reputation.PropertyPurchase.BuyerObservation where
 
 import Reputation.Interface.Observation qualified as Observation (I, View(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
-import Reputation.PropertyPurchase.Types (BuyerObservationWeights)
-import Reputation.Types (ComponentId(..))
+import Reputation.Types (ComponentId(..), BuyerObservationWeights)
 import Reputation.Utils (normalize, mean)
 import DA.Map qualified as Map
 
@@ -36,7 +35,7 @@ template BuyerObservation
         -- Accuracy
         proposalRounds          : Int
         -- Weights
-        buyerObsWeights         : BuyerObservationWeights
+        weights                 : BuyerObservationWeights
         configCid               : ContractId Configuration.I
         recordedAt              : Time
         processed               : Bool
@@ -60,7 +59,7 @@ template BuyerObservation
                     (Responsiveness, computeResponsiveness
                         contractSigningTimes
                         proposalResponseTimes
-                        buyerObsWeights
+                        weights
                     ),
                     (Accuracy, computeAccuracy
                         proposalRounds

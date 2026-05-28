@@ -55,6 +55,8 @@ export const KNOWN_MODULE_PATHS = Object.freeze({
   RentalAgreementLandlordFeedback:     'Reputation.RentalAgreement.Feedback:RentalAgreementLandlordFeedback',
   RentalAgreementTenantFeedback:       'Reputation.RentalAgreement.Feedback:RentalAgreementTenantFeedback',
   ConfigurationInterface:              'Reputation.Interface.Configuration:Configuration',
+  DisclosureRequest:                   'Reputation.Disclosure:DisclosureRequest',
+  ConfigurationDisclosure:             'Reputation.Disclosure:ConfigurationDisclosure',
 });
 
 // Legacy template short names used by Contracts.jsx
@@ -63,6 +65,10 @@ export const TEMPLATES = Object.freeze({
   INTERACTION: 'CompletedInteraction',
   FEEDBACK:    'Feedback',
 });
+
+// Daml package name (from daml.yaml). Used to build package-name-qualified template IDs,
+// which Canton's HTTP API prefers over the deprecated hex package-ID form.
+export const DAML_PACKAGE_NAME = 'reputation';
 
 // ─── DAML Map field schema (used by LedgerClient to serialize map fields before submission)
 export const PAYLOAD_MAPS = Object.freeze({});

@@ -116,6 +116,19 @@ public class LedgerSubmitter {
         }
     }
 
+    public void completeDisclosureRequest(Identifier templateId, String requestContractId, String configCid) {
+        try {
+            var arg = new DamlRecord(List.of(
+                    new DamlRecord.Field("configCid", new ContractId(configCid))
+            ));
+            var cmd = new ExerciseCommand(templateId, requestContractId, "Complete", arg);
+            submit(List.of(cmd));
+            log.info("Complete submitted for DisclosureRequest {}", requestContractId);
+        } catch (Exception e) {
+            log.error("Failed to submit Complete for DisclosureRequest {}: {}", requestContractId, e.getMessage(), e);
+        }
+    }
+
     private static ComponentId nameToComponentId(String name) {
         return switch (name) {
             case "Reliability"    -> ComponentId.RELIABILITY;

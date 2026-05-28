@@ -4,11 +4,11 @@ import Reputation.Interface.Configuration qualified as Configuration (I, View(..
 import Reputation.Interface.Observation qualified as Observation (I)
 import Reputation.Interface.FeedbackRequest qualified as FeedbackRequest (I)
 import Reputation.Interaction.Completed (CompletedInteraction(..), ProcessInteraction(..))
-import Reputation.RentalAgreement.Types (LandlordObservationWeights, TenantObservationWeights)
 import Reputation.RentalAgreement.LandlordObservation (LandlordObservation(..))
 import Reputation.RentalAgreement.TenantObservation (TenantObservation(..))
 import Reputation.RentalAgreement.FeedbackRequest (RentalAgreementFeedbackRequest(..))
-import Reputation.Types (Event(..), RoleType(Landlord, Tenant))
+import Reputation.Types (Event(..), RoleType(Landlord, Tenant), LandlordObservationWeights, TenantObservationWeights,
+    ConfigDetail(RAConfigDetails), RAConfigDetail(..))
 import Reputation.Utils (computeHours, hoursBetween)
 import DA.Optional (isSome, mapOptional)
 import DA.List (dedup)
@@ -38,6 +38,10 @@ template RentalAgreementConfiguration
                 operator
                 configId
                 createdAt
+                details = RAConfigDetails (RAConfigDetail with
+                    landlordObsWeights
+                    tenantObsWeights
+                    feedbackWindowDays)
 
         nonconsuming choice CreateObservations : ([ContractId Observation.I], [ContractId FeedbackRequest.I])
             with

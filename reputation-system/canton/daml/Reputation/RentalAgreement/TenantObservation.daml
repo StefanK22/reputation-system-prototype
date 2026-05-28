@@ -2,8 +2,7 @@ module Reputation.RentalAgreement.TenantObservation where
 
 import Reputation.Interface.Observation qualified as Observation (I, View(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
-import Reputation.RentalAgreement.Types (TenantObservationWeights)
-import Reputation.Types (ComponentId(..))
+import Reputation.Types (ComponentId(..), TenantObservationWeights)
 import Reputation.Utils (normalize, mean)
 import DA.Map qualified as Map
 

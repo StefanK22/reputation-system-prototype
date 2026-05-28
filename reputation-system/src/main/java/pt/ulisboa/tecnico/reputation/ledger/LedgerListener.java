@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import pt.ulisboa.tecnico.reputation.entity.EngineConfiguration;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.ConfigurationHandler;
+import pt.ulisboa.tecnico.reputation.ledger.handlers.DisclosureHandler;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.ObservationHandler;
 import pt.ulisboa.tecnico.reputation.ledger.handlers.RoleHandler;
 import pt.ulisboa.tecnico.reputation.repository.EngineConfigurationRepository;
@@ -46,6 +47,7 @@ public class LedgerListener {
     private final ConfigurationHandler configurationHandler;
     private final RoleHandler roleHandler;
     private final ObservationHandler observationHandler;
+    private final DisclosureHandler disclosureHandler;
     private final EngineConfigurationRepository configRepo;
     private final LedgerSubmitter ledgerSubmitter;
     private final ReputationService reputationService;
@@ -55,12 +57,14 @@ public class LedgerListener {
     public LedgerListener(ConfigurationHandler configurationHandler,
                           RoleHandler roleHandler,
                           ObservationHandler observationHandler,
+                          DisclosureHandler disclosureHandler,
                           EngineConfigurationRepository configRepo,
                           LedgerSubmitter ledgerSubmitter,
                           ReputationService reputationService) {
         this.configurationHandler = configurationHandler;
         this.roleHandler = roleHandler;
         this.observationHandler = observationHandler;
+        this.disclosureHandler = disclosureHandler;
         this.configRepo = configRepo;
         this.ledgerSubmitter = ledgerSubmitter;
         this.reputationService = reputationService;
@@ -183,11 +187,14 @@ public class LedgerListener {
         var views = event.getInterfaceViews();
 
         if (views.containsKey(Configuration.INTERFACE_ID_WITH_PACKAGE_ID)) {
+            disclosureHandler.trackConfig(event);
             configurationHandler.handle(event);
         } else if (views.containsKey(Role.INTERFACE_ID_WITH_PACKAGE_ID)) {
             roleHandler.handle(event);
         } else if (views.containsKey(Observation.INTERFACE_ID_WITH_PACKAGE_ID)) {
             observationHandler.handle(event);
+        } else if ("DisclosureRequest".equals(event.getTemplateId().getEntityName())) {
+            disclosureHandler.handle(event);
         } else {
             log.debug("No handler for template: {}", event.getTemplateId());
         }

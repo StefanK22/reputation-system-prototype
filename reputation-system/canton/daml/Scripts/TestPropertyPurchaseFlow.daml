@@ -2,19 +2,17 @@ module Scripts.TestPropertyPurchaseFlow where
 
 import Daml.Script
 import DA.List (head)
-import DA.Map qualified as Map
 import DA.Time (time)
 import DA.Date (date, Month(..))
 
 import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..), CreateObservations(..))
-import Reputation.Role.Configuration (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
+import Reputation.Role.Configuration (RoleConfiguration(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.PropertyPurchase.AgentObservation (AgentObservation)
 import Reputation.PropertyPurchase.BuyerObservation (BuyerObservation)
 import Reputation.Types
-import Reputation.PropertyPurchase.Types (AgentObservationWeights(..), BuyerObservationWeights(..))
 
 
 testPropertyPurchaseFlow : Script ()

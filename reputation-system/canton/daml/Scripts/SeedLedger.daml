@@ -1,7 +1,6 @@
 module Scripts.SeedLedger where
 
 import Daml.Script
-import DA.Map qualified as Map
 import DA.Time (time)
 import DA.Date (date, Month(..))
 import DA.List (head)
@@ -10,13 +9,11 @@ import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(
 import Reputation.PropertyPurchase.Configuration qualified as PP
 import Reputation.RentalAgreement.Configuration (RentalAgreementConfiguration(..))
 import Reputation.RentalAgreement.Configuration qualified as RA
-import Reputation.Role.Configuration (RoleConfiguration(..), AgentWeights(..), BuyerWeights(..), LandlordWeights(..), TenantWeights(..), CreateRole(..))
+import Reputation.Role.Configuration (RoleConfiguration(..), CreateRole(..))
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
-import Reputation.Types
-import Reputation.PropertyPurchase.Types (AgentObservationWeights(..), BuyerObservationWeights(..))
-import Reputation.RentalAgreement.Types (LandlordObservationWeights(..), TenantObservationWeights(..))
+import Reputation.Types 
 import Reputation.PropertyPurchase.Feedback (PropertyPurchaseFeedbackRequest, SubmitFeedback(..))
 import Reputation.RentalAgreement.FeedbackRequest (RentalAgreementFeedbackRequest, SubmitFeedbackAsLandlord(..))
 

@@ -7,9 +7,9 @@ import Reputation.Interaction.Completed (CompletedInteraction(..), ProcessIntera
 import Reputation.PropertyPurchase.AgentObservation (AgentObservation(..))
 import Reputation.PropertyPurchase.BuyerObservation (BuyerObservation(..))
 import Reputation.PropertyPurchase.Feedback (PropertyPurchaseFeedbackRequest(..))
-import Reputation.PropertyPurchase.Types (AgentObservationWeights, BuyerObservationWeights)
 import Reputation.Utils (computeHours, hoursBetween)
-import Reputation.Types (Event(..), RoleType(Agent, Buyer))
+import Reputation.Types (Event(..), RoleType(Agent, Buyer),
+    AgentObservationWeights, BuyerObservationWeights, ConfigDetail(PPConfigDetails), PPConfigDetail(..))
 import DA.Optional (isSome, listToOptional)
 import DA.Time (days, addRelTime)
 
@@ -40,6 +40,10 @@ template PropertyPurchaseConfiguration
                 operator
                 configId
                 createdAt
+                details = PPConfigDetails (PPConfigDetail with
+                    agentObsWeights
+                    buyerObsWeights
+                    feedbackWindowDays)
 
         nonconsuming choice CreateObservations : ([ContractId Observation.I], [ContractId FeedbackRequest.I])
             with
@@ -116,7 +120,7 @@ createAgentObservation completed subject weights operator configCid = do
             contractSigningTimes
             proposalApprovedCount
             proposalRejectedCount
-            agentObsWeights         = weights
+            weights
             configCid               = configCid
             recordedAt              = completed.completedAt
             processed               = False
@@ -155,7 +159,7 @@ createBuyerObservation completed subject weights operator configCid = do
 
             proposalRounds
 
-            buyerObsWeights         = weights
+            weights
             configCid               = configCid
             recordedAt              = completed.completedAt
             processed               = False

@@ -6,35 +6,8 @@ import Reputation.Role.Agent (AgentRole(..))
 import Reputation.Role.Buyer (BuyerRole(..))
 import Reputation.Role.Landlord (LandlordRole(..))
 import Reputation.Role.Tenant (TenantRole(..))
-import Reputation.Types (RoleType(..), RoleComponent(..))
-
-data AgentWeights = AgentWeights
-    with
-        reliability     : Decimal
-        responsiveness  : Decimal
-        accuracy        : Decimal
-    deriving (Eq, Show)
-
-data BuyerWeights = BuyerWeights
-    with
-        reliability     : Decimal
-        responsiveness  : Decimal
-        accuracy        : Decimal
-    deriving (Eq, Show)
-
-data LandlordWeights = LandlordWeights
-    with
-        reliability     : Decimal
-        responsiveness  : Decimal
-        accuracy        : Decimal
-    deriving (Eq, Show)
-
-data TenantWeights = TenantWeights
-    with
-        reliability     : Decimal
-        responsiveness  : Decimal
-        accuracy        : Decimal
-    deriving (Eq, Show)
+import Reputation.Types (RoleType(..), RoleComponent(..), AgentWeights, BuyerWeights, LandlordWeights, TenantWeights,
+    ConfigDetail(RoleConfigDetails), RoleConfigDetail(..))
 
 template RoleConfiguration
     with
@@ -58,7 +31,14 @@ template RoleConfiguration
                 operator
                 configId
                 createdAt
-
+                details = RoleConfigDetails (RoleConfigDetail with
+                    agentWeights
+                    buyerWeights
+                    landlordWeights
+                    tenantWeights
+                    scoreFloor
+                    scoreCeiling
+                    startValue)
 
         nonconsuming choice CreateRole : ContractId Role.I
             with

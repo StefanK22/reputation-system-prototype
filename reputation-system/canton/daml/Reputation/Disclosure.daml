@@ -1,0 +1,47 @@
+module Reputation.Disclosure where
+
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Types (ConfigType(..), ConfigDetail(..))
+
+template DisclosureRequest
+    with 
+        requester   : Party
+        operator    : Party
+        configType  : ConfigType
+        requestedAt : Time
+    where
+        signatory requester
+        observer operator
+
+        ensure requester /= operator
+
+        choice Complete : ContractId ConfigurationDisclosure
+            with    
+                configCid : ContractId Configuration.I
+            controller operator
+            do
+                config <- fetch configCid
+                now <- getTime
+                let v = view config
+                create ConfigurationDisclosure with
+                    operator
+                    requester
+                    issuedAt    = now
+                    sourceCid   = configCid
+                    configId    = v.configId
+                    createdAt   = v.createdAt
+                    details     = v.details
+
+
+template ConfigurationDisclosure 
+    with 
+        operator    : Party
+        requester   : Party
+        issuedAt    : Time
+        sourceCid   : ContractId Configuration.I
+        configId    : Text
+        createdAt   : Time
+        details     : ConfigDetail
+    where
+        signatory operator
+        observer requester

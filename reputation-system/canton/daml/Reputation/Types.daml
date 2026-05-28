@@ -28,6 +28,12 @@ data RoleType
     | Tenant
     deriving (Eq, Show)
 
+data ConfigType
+    = RoleConfig
+    | PropertyPurchaseConfig
+    | RentalAgreementConfig
+    deriving (Eq, Show)
+
 data RecordedEvent = RecordedEvent
     with
         event       : Event
@@ -42,3 +48,90 @@ data RoleComponent = RoleComponent
         score   : Decimal
         count   : Int
     deriving (Eq, Show)    
+
+data AgentWeights = AgentWeights
+    with
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    deriving (Eq, Show)
+
+data BuyerWeights = BuyerWeights
+    with
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    deriving (Eq, Show)
+
+data LandlordWeights = LandlordWeights
+    with
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    deriving (Eq, Show)
+
+data TenantWeights = TenantWeights
+    with
+        reliability     : Decimal
+        responsiveness  : Decimal
+        accuracy        : Decimal
+    deriving (Eq, Show)
+
+data LandlordObservationWeights = LandlordObservationWeights
+    with
+        responsivenessCapHours        : Decimal
+    deriving (Eq, Show)
+
+data TenantObservationWeights = TenantObservationWeights
+    with
+        responsivenessFirstUploadWeight : Decimal
+        responsivenessReuploadWeight    : Decimal
+        responsivenessCapHours          : Decimal
+    deriving (Eq, Show)
+
+data AgentObservationWeights = AgentObservationWeights
+    with
+        reliabilityVoidedWeight                 : Decimal
+        reliabilityCompletionWeight             : Decimal
+        responsivenessProposalToContractWeight  : Decimal
+        responsivenessContractWeight            : Decimal
+        responsivenessCapHours                  : Decimal
+    deriving (Eq, Show)
+
+data BuyerObservationWeights = BuyerObservationWeights
+    with
+        responsivenessContractWeight    : Decimal
+        responsivenessProposalWeight    : Decimal
+        responsivenessCapHours          : Decimal
+    deriving (Eq, Show)
+
+data RoleConfigDetail = RoleConfigDetail
+    with
+        agentWeights    : AgentWeights
+        buyerWeights    : BuyerWeights
+        landlordWeights : LandlordWeights
+        tenantWeights   : TenantWeights
+        scoreFloor      : Decimal
+        scoreCeiling    : Decimal
+        startValue      : Decimal
+    deriving (Eq, Show)
+
+data PPConfigDetail = PPConfigDetail
+    with
+        agentObsWeights     : AgentObservationWeights
+        buyerObsWeights     : BuyerObservationWeights
+        feedbackWindowDays  : Int
+    deriving (Eq, Show)
+
+data RAConfigDetail = RAConfigDetail
+    with
+        landlordObsWeights  : LandlordObservationWeights
+        tenantObsWeights    : TenantObservationWeights
+        feedbackWindowDays  : Int
+    deriving (Eq, Show)
+
+data ConfigDetail
+    = RoleConfigDetails RoleConfigDetail
+    | PPConfigDetails PPConfigDetail
+    | RAConfigDetails RAConfigDetail
+    deriving (Eq, Show)

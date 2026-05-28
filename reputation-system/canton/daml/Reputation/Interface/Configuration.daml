@@ -1,5 +1,7 @@
 module Reputation.Interface.Configuration where
 
+import Reputation.Types (ConfigDetail)
+
 type I = Configuration
 type V = View
 
@@ -8,6 +10,7 @@ data View = View
         operator    : Party
         configId    : Text
         createdAt   : Time
+        details     : ConfigDetail
     deriving (Eq, Show)
 
 interface Configuration where

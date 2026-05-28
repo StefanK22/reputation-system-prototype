@@ -2,8 +2,7 @@ module Reputation.PropertyPurchase.AgentObservation where
 
 import Reputation.Interface.Observation qualified as Observation (I, View(..))
 import Reputation.Interface.Configuration qualified as Configuration (I)
-import Reputation.PropertyPurchase.Types (AgentObservationWeights)
-import Reputation.Types (ComponentId(..))
+import Reputation.Types (ComponentId(..), AgentObservationWeights)
 import Reputation.Utils (normalize, mean)
 import DA.Map qualified as Map
 
@@ -53,7 +52,7 @@ template AgentObservation
         proposalApprovedCount   : Int
         proposalRejectedCount   : Int
         -- Weights
-        agentObsWeights         : AgentObservationWeights
+        weights                 : AgentObservationWeights
         configCid               : ContractId Configuration.I
         recordedAt              : Time
         processed               : Bool
@@ -73,12 +72,12 @@ template AgentObservation
                     [(Reliability, Some (computeReliability
                         transactionCompleted
                         contractVoided
-                        agentObsWeights)
+                        weights)
                     ),
                     (Responsiveness, computeResponsiveness
                         proposalToContractTime
                         contractSigningTimes
-                        agentObsWeights
+                        weights
                     ),
                     (Accuracy, computeAccuracy
                         proposalApprovedCount

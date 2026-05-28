@@ -11,6 +11,7 @@ import Feedbacks       from './pages/Feedbacks.jsx';
 import Ledger          from './pages/Ledger.jsx';
 import Database        from './pages/Database.jsx';
 import Api             from './pages/Api.jsx';
+import Disclosures     from './pages/Disclosures.jsx';
 import Setup           from './pages/Setup.jsx';
 import './index.css';
 
@@ -54,6 +55,7 @@ function App() {
               <Route path="/interactions"      element={<Interactions />} />
               <Route path="/observations"      element={<Observations />} />
               <Route path="/feedback"          element={<Feedbacks />} />
+              <Route path="/disclosures"       element={<Disclosures />} />
               <Route path="/setup"             element={<Setup />} />
               <Route path="/ledger"            element={<div className="page-scroll"><Ledger /></div>} />
               <Route path="/database"          element={<div className="page-scroll"><Database /></div>} />

@@ -5,6 +5,7 @@ const USER_LINKS = [
   { to: '/interactions', label: 'Interactions' },
   { to: '/feedback',     label: 'Feedback'     },
   { to: '/observations', label: 'Observations' },
+  { to: '/disclosures',  label: 'Disclosures'  },
 ];
 
 const OPERATOR_LINKS = [
