@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
 import { getInterfaceIds } from '../api/reputation.js';
-import { FEEDBACK_REQUEST_TEMPLATES, FEEDBACK_TEMPLATES, ROLE_TEMPLATES } from '../api/contracts.js';
+import { FEEDBACK_REQUEST_TEMPLATES, FEEDBACK_TEMPLATES, ROLE_TEMPLATES, KNOWN_MODULE_PATHS } from '../api/contracts.js';
 import { optDecimal } from '../api/observations.js';
 import { Tag } from '../components/shared.jsx';
 
@@ -115,8 +115,10 @@ export default function Feedbacks() {
     setError(null);
     try {
       const interfaceIds = await getInterfaceIds().catch(() => ({}));
-      const queryParty   = activeParty || undefined;
-      const contracts    = await ledger.queryAll(queryParty, interfaceIds);
+      const pkgId        = Object.values(interfaceIds).map(v => String(v).split(':')[0]).find(Boolean);
+      const contracts    = pkgId
+        ? await ledger.queryByTemplates(Object.values(KNOWN_MODULE_PATHS).map(p => `${pkgId}:${p}`))
+        : await ledger.queryAll(activeParty || undefined, interfaceIds);
 
       const roleMap = {};
       contracts.forEach(c => {

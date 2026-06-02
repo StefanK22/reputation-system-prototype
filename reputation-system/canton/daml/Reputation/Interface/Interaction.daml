@@ -14,7 +14,7 @@ data View = View
         interactionType : Text
         participants    : [(Party, RoleType)]
         events          : [RecordedEvent]
-        configCid       : ContractId Configuration.I
+        configCid       : Optional (ContractId Configuration.I)
         processed       : Bool
     deriving (Eq, Show)
 

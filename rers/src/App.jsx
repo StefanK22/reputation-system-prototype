@@ -24,7 +24,7 @@ function TopBar() {
     <div className="top-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <span className="top-bar-page">{page.charAt(0).toUpperCase() + page.slice(1)}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 11, color: '#999' }}>Viewing as</span>
+        <span style={{ fontSize: 11, color: '#999' }}>Logged in as</span>
         <select
           value={activeParty || ''}
           onChange={e => setActiveParty(e.target.value || null)}

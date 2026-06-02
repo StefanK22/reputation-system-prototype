@@ -10,14 +10,14 @@ template DraftInteraction
     with 
         operator        : Party
         initiator       : Party
+        initiatorRole   : RoleType
         interactionId   : Text
         interactionType : Text
         participants    : [(Party, RoleType)]
-        configCid       : ContractId Configuration.I
         openedAt        : Time
     where
         signatory initiator
-        observer map fst participants
+        observer map fst participants ++ [operator]
 
         ensure 
             interactionId /= ""
@@ -29,13 +29,14 @@ template DraftInteraction
                 interactionId
                 interactionType
                 participants
-                events      = []
-                configCid
-                processed   = False
+                events          = []
+                configCid       = None
+                processed       = False
         
         choice Begin : ContractId InProgressInteraction
             with
                 startedAt : Time
+                configCid : ContractId Configuration.I
             controller initiator
             do
                 create InProgressInteraction with
@@ -43,9 +44,9 @@ template DraftInteraction
                     initiator
                     interactionId
                     interactionType
-                    participants
+                    participants    = participants ++ [(initiator, initiatorRole)]
                     events = []
-                    configCid
+                    configCid  
                     startedAt
 
         choice Discard : ContractId DiscardedInteraction
@@ -59,7 +60,7 @@ template DraftInteraction
                     interactionId
                     interactionType
                     participants
-                    configCid
+                    configCid       = None
                     discardedAt
 
         choice AddParticipant : ContractId DraftInteraction

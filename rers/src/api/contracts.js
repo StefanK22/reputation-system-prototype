@@ -41,7 +41,6 @@ export const KNOWN_MODULE_PATHS = Object.freeze({
   InProgressInteraction:               'Reputation.Interaction.InProgress:InProgressInteraction',
   CompletedInteraction:                'Reputation.Interaction.Completed:CompletedInteraction',
   DiscardedInteraction:                'Reputation.Interaction.Discarded:DiscardedInteraction',
-  ScoringConfiguration:                'Reputation.Configuration.Scoring:ScoringConfiguration',
   RoleConfiguration:                   'Reputation.Role.Configuration:RoleConfiguration',
   AgentRole:                           'Reputation.Role.Agent:AgentRole',
   BuyerRole:                           'Reputation.Role.Buyer:BuyerRole',
@@ -54,9 +53,15 @@ export const KNOWN_MODULE_PATHS = Object.freeze({
   RentalAgreementFeedbackRequest:      'Reputation.RentalAgreement.FeedbackRequest:RentalAgreementFeedbackRequest',
   RentalAgreementLandlordFeedback:     'Reputation.RentalAgreement.Feedback:RentalAgreementLandlordFeedback',
   RentalAgreementTenantFeedback:       'Reputation.RentalAgreement.Feedback:RentalAgreementTenantFeedback',
-  ConfigurationInterface:              'Reputation.Interface.Configuration:Configuration',
   DisclosureRequest:                   'Reputation.Disclosure:DisclosureRequest',
   ConfigurationDisclosure:             'Reputation.Disclosure:ConfigurationDisclosure',
+  AgentObservation:                    'Reputation.PropertyPurchase.AgentObservation:AgentObservation',
+  BuyerObservation:                    'Reputation.PropertyPurchase.BuyerObservation:BuyerObservation',
+  FeedbackObservation:                 'Reputation.PropertyPurchase.FeedbackObservation:FeedbackObservation',
+  LandlordObservation:                 'Reputation.RentalAgreement.LandlordObservation:LandlordObservation',
+  TenantObservation:                   'Reputation.RentalAgreement.TenantObservation:TenantObservation',
+  LandlordFeedbackObservation:         'Reputation.RentalAgreement.FeedbackObservation:LandlordFeedbackObservation',
+  TenantFeedbackObservation:           'Reputation.RentalAgreement.FeedbackObservation:TenantFeedbackObservation',
 });
 
 // Legacy template short names used by Contracts.jsx

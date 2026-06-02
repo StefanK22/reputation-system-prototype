@@ -18,7 +18,7 @@ template InProgressInteraction
         startedAt       : Time
     where
         signatory initiator
-        observer map fst participants
+        observer map fst participants ++ [operator]
 
         ensure interactionId /= ""
 
@@ -30,7 +30,7 @@ template InProgressInteraction
                 interactionType
                 participants
                 events
-                configCid
+                configCid           = Some configCid
                 processed = False
 
         choice Discard : ContractId DiscardedInteraction
@@ -44,7 +44,7 @@ template InProgressInteraction
                     interactionId
                     interactionType
                     participants
-                    configCid
+                    configCid       = Some configCid
                     discardedAt
 
         choice Complete : ContractId CompletedInteraction

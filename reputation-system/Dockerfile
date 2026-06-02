@@ -11,7 +11,6 @@ COPY --from=canton /app/daml/.daml/dist/reputation-0.0.1.dar daml/.daml/dist/rep
 WORKDIR /build/reputation-system
 COPY pom.xml .
 COPY src ./src
-RUN mvn dependency:go-offline
 
 RUN mvn package -DskipTests
 

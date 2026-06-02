@@ -28,6 +28,7 @@ function buildCompMap(subjects) {
 function SubjectPanel({ party, repConfig, onClose }) {
   const [subject, setSubject] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expandedContract, setExpandedContract] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -38,6 +39,37 @@ function SubjectPanel({ party, repConfig, onClose }) {
   }, [party]);
 
   const displayName = typeof party === 'string' ? party.split('::')[0] : String(party ?? '');
+
+  const formatContractId = (id) => {
+    if (!id) return '';
+    if (id.length <= 20) return id;
+    return `${id.slice(0, 8)}...${id.slice(-8)}`;
+  };
+
+  const ContractIdRow = ({ label, id, type }) => {
+    const isExpanded = expandedContract === type;
+    return (
+      <div
+        style={{ marginBottom: 8, cursor: 'pointer' }}
+        onClick={() => setExpandedContract(isExpanded ? null : type)}
+        title="Click to expand"
+      >
+        <div style={{ fontSize: 10, color: '#15803d', marginBottom: 3, opacity: 0.8 }}>{label}</div>
+        <div style={{
+          fontSize: 10,
+          color: '#15803d',
+          fontFamily: 'monospace',
+          wordBreak: 'break-all',
+          background: 'rgba(34, 197, 94, 0.1)',
+          padding: '4px 6px',
+          borderRadius: 3,
+          transition: 'all 0.2s ease'
+        }}>
+          {isExpanded ? id : formatContractId(id)}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="detail-panel" style={{ width: 300, borderLeft: '1px solid #e8e8e8', padding: 20, overflowY: 'auto', flexShrink: 0, background: '#fafafa' }}>
@@ -82,6 +114,22 @@ function SubjectPanel({ party, repConfig, onClose }) {
               ))}
             </div>
           )}
+
+          {subject.contractId && (
+            <div style={{ marginTop: 20, padding: 12, background: '#f0fdf4', borderRadius: 6, border: '1px solid #86efac' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="8" cy="8" r="7" fill="#22c55e" stroke="#16a34a" strokeWidth="1" />
+                  <path d="M5 8l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#15803d' }}>Ledger Verified</span>
+              </div>
+              <ContractIdRow label="Contract ID" id={subject.contractId} type="contract" />
+              {subject.configContractId && (
+                <ContractIdRow label="Config Contract ID" id={subject.configContractId} type="config" />
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -91,12 +139,13 @@ function SubjectPanel({ party, repConfig, onClose }) {
 }
 
 export default function Rankings() {
-  const [rankings,  setRankings]  = useState([]);
-  const [compMap,   setCompMap]   = useState({});
-  const [repConfig, setRepConfig] = useState(null);
-  const [selected,  setSelected]  = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState(null);
+  const [rankings,    setRankings]    = useState([]);
+  const [compMap,     setCompMap]     = useState({});
+  const [repConfig,   setRepConfig]   = useState(null);
+  const [selected,    setSelected]    = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
+  const [roleFilter,  setRoleFilter]  = useState(null);
 
   function load() {
     setLoading(true);
@@ -120,16 +169,41 @@ export default function Rankings() {
   if (loading) return <div className="page-scroll"><p className="muted">Loading...</p></div>;
   if (error)   return <div className="page-scroll"><p className="error">{error}</p></div>;
 
-  const sorted      = [...rankings].sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
+  const allRoles    = [...new Set(rankings.map(r => r.roleType).filter(Boolean))].sort();
+  const sorted      = [...rankings]
+    .filter(r => !roleFilter || r.roleType === roleFilter)
+    .sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
   const hasCompData = Object.keys(compMap).length > 0;
 
   return (
     <div className="page-with-panel">
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <h1 style={{ marginBottom: 0 }}>Rankings</h1>
           <button onClick={load}>Refresh</button>
         </div>
+
+        {allRoles.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+            <button
+              className={!roleFilter ? 'primary' : ''}
+              style={{ fontSize: 11, padding: '3px 10px' }}
+              onClick={() => setRoleFilter(null)}
+            >
+              All
+            </button>
+            {allRoles.map(role => (
+              <button
+                key={role}
+                className={roleFilter === role ? 'primary' : ''}
+                style={{ fontSize: 11, padding: '3px 10px' }}
+                onClick={() => setRoleFilter(roleFilter === role ? null : role)}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
+        )}
 
         {sorted.length === 0 ? (
           <p className="muted">No subjects found.</p>

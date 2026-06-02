@@ -104,10 +104,10 @@ export default function Interactions() {
 
   // New interaction form
   const [showNew,     setShowNew]     = useState(false);
-  const [newId,       setNewId]       = useState(() => `int-${Date.now()}`);
-  const [newType,     setNewType]     = useState('PROPERTY_PURCHASE');
-  const [creating,    setCreating]    = useState(false);
-  const [createError, setCreateError] = useState(null);
+  const [newId,            setNewId]            = useState(() => `int-${Date.now()}`);
+  const [newType,          setNewType]          = useState('PROPERTY_PURCHASE');
+  const [creating,         setCreating]         = useState(false);
+  const [createError,      setCreateError]      = useState(null);
 
   // Add participant form
   const [showAddParticipant, setShowAddParticipant] = useState(false);
@@ -135,10 +135,24 @@ export default function Interactions() {
     setLoading(true);
     setError(null);
     try {
-      const [contracts, { parties: pts }] = await Promise.all([
-        getInterfaceIds().catch(() => ({})).then(ids => ledger.queryAll(activeParty, ids)),
+      const [interfaceIds, { parties: pts }] = await Promise.all([
+        getInterfaceIds().catch(() => ({})),
         ledger.listAllParties().catch(() => ({ parties: [] })),
       ]);
+
+      // Extract pkgId from any interface ID so we can build concrete template IDs.
+      // Querying per-template avoids Canton's 200-contract-per-request hard limit.
+      const pkgId = Object.values(interfaceIds).map(v => String(v).split(':')[0]).find(Boolean);
+      let contracts;
+      if (pkgId) {
+        const allPaths    = KNOWN_MODULE_PATHS;
+        const obsKeys     = Object.keys(OBS_TEMPLATES);
+        const obsIds      = obsKeys.filter(k => allPaths[k]).map(k => `${pkgId}:${allPaths[k]}`);
+        const regularIds  = Object.entries(allPaths).filter(([k]) => !OBS_TEMPLATES[k]).map(([, p]) => `${pkgId}:${p}`);
+        contracts = await ledger.queryByTemplates(regularIds, undefined, obsIds, interfaceIds.observation);
+      } else {
+        contracts = await ledger.queryAll(activeParty, interfaceIds);
+      }
 
       setTemplateIdMap(buildTemplateIdMap(contracts));
       setParties(pts);
@@ -202,7 +216,7 @@ export default function Interactions() {
     setActionError(null);
     let err = null;
     try {
-      await ledger.exercise(ix.contractId, ix.rawTemplateId, choiceName, args);
+      await ledger.exercise(ix.contractId, ix.rawTemplateId, choiceName, args, { actAs: activeParty ? [activeParty] : [] });
     } catch (e) {
       err = e;
     }
@@ -214,7 +228,12 @@ export default function Interactions() {
   // ── Lifecycle actions ──────────────────────────────────────────────────────
 
   function handleBegin(ix) {
-    return doExercise(ix, 'Begin', { startedAt: new Date().toISOString() });
+    const cfg = configMap[ix.type];
+    if (!cfg) {
+      setActionError(`No ${ix.type} configuration contract found on the ledger. Ensure the ledger is seeded.`);
+      return;
+    }
+    return doExercise(ix, 'Begin', { startedAt: new Date().toISOString(), configCid: cfg.contractId });
   }
 
   function handleDiscard(ix) {
@@ -296,16 +315,21 @@ export default function Interactions() {
       return;
     }
     if (!newId.trim()) { setCreateError('Interaction ID is required.'); return; }
+    if (!activeParty) { setCreateError('No party selected. Select a party from the top bar first.'); return; }
+    const initiatorRole = partyRoleMap[activeParty];
+    if (!initiatorRole) { setCreateError(`No role found for the selected party. Ensure roles are configured on the ledger.`); return; }
     setCreating(true);
     setCreateError(null);
     try {
       await ledger.create(tid, {
         operator:        ledger.party,
+        initiator:       activeParty,
+        initiatorRole,
         interactionId:   newId.trim(),
         interactionType: newType,
         participants:    [],
         openedAt:        new Date().toISOString(),
-      });
+      }, { actAs: [activeParty] });
       setShowNew(false);
       setNewId(`int-${Date.now()}`);
       await load();
@@ -335,7 +359,8 @@ export default function Interactions() {
             <button onClick={load}>Refresh</button>
             <button
               onClick={() => { setShowNew(true); setCreateError(null); }}
-              style={{ ...btnSt, background: '#1a6abf', borderColor: '#1a6abf', color: '#fff' }}
+              disabled={!activeParty}
+              style={{ ...btnSt, background: '#1a6abf', borderColor: '#1a6abf', color: '#fff', opacity: activeParty ? 1 : 0.4, cursor: activeParty ? 'pointer' : 'not-allowed' }}
             >+ New Interaction</button>
           </div>
         </div>
@@ -348,7 +373,7 @@ export default function Interactions() {
               <label style={labelSt}>Interaction ID</label>
               <input value={newId} onChange={e => setNewId(e.target.value)} style={inputSt} onKeyDown={e => e.key === 'Enter' && createDraftInteraction()} />
             </div>
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 12 }}>
               <label style={labelSt}>Interaction Type</label>
               <select value={newType} onChange={e => setNewType(e.target.value)} style={inputSt}>
                 <option value="PROPERTY_PURCHASE">PROPERTY_PURCHASE</option>

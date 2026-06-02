@@ -18,7 +18,7 @@ template CompletedInteraction
         processed       : Bool
     where
         signatory initiator
-        observer map fst participants
+        observer map fst participants ++ [operator]
 
         ensure
             interactionId /= "" 
@@ -33,7 +33,7 @@ template CompletedInteraction
                 interactionType
                 participants
                 events
-                configCid
+                configCid = Some configCid
                 processed
         
         choice ProcessInteraction : ContractId CompletedInteraction 

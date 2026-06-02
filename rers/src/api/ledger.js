@@ -292,6 +292,93 @@ export class LedgerClient {
     return parseContracts(res);
   }
 
+  // Query a single template, optionally including an interface view via a
+  // second cumulative InterfaceFilter in the same request.
+  async queryWithView(templateId, interfaceId, activeAtOffset) {
+    const offset = activeAtOffset || await this._ledgerOffset();
+    const cumulative = [
+      { identifierFilter: { TemplateFilter: { value: { templateId, includeCreatedEventBlob: true } } } },
+      { identifierFilter: { InterfaceFilter: { value: { interfaceId, includeInterfaceView: true, includeCreatedEventBlob: false } } } },
+    ];
+    const res = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({
+        filter: { filtersByParty: { [this.party]: { cumulative } } },
+        verbose: true,
+        activeAtOffset: offset,
+      }),
+    });
+    // Merge duplicate entries for the same contractId: keep payload from TemplateFilter
+    // entry and interfaceViews from InterfaceFilter entry.
+    const raw = parseContracts(res);
+    const merged = new Map();
+    for (const c of raw) {
+      if (!merged.has(c.contractId)) {
+        merged.set(c.contractId, { ...c });
+      } else {
+        const existing = merged.get(c.contractId);
+        if (c.payload && !existing.payload) existing.payload = c.payload;
+        if (c.interfaceViews && Object.keys(c.interfaceViews).length > 0)
+          existing.interfaceViews = { ...existing.interfaceViews, ...c.interfaceViews };
+      }
+    }
+    return [...merged.values()];
+  }
+
+  // Query multiple concrete templates in parallel at the same ledger offset,
+  // then merge and deduplicate by contractId. Avoids the 200-element per-request
+  // limit by spreading contracts across individual template queries.
+  // Pass obsTemplateIds + obsInterfaceId to also fetch observations with their
+  // interface views without a separate unbounded InterfaceFilter request.
+  async queryByTemplates(templateIds, activeAtOffset, obsTemplateIds = [], obsInterfaceId = null) {
+    const offset  = activeAtOffset || await this._ledgerOffset();
+    const regular = templateIds.map(id => this.query(id, offset).catch(() => []));
+    const withView = (obsInterfaceId && obsTemplateIds.length)
+      ? obsTemplateIds.map(id => this.queryWithView(id, obsInterfaceId, offset).catch(() => []))
+      : [];
+    const batches = await Promise.all([...regular, ...withView]);
+    const seen = new Map();
+    for (const batch of batches) {
+      for (const c of batch) {
+        if (!seen.has(c.contractId)) {
+          seen.set(c.contractId, { ...c });
+        } else {
+          const existing = seen.get(c.contractId);
+          if (c.interfaceViews && Object.keys(c.interfaceViews).length > 0)
+            existing.interfaceViews = { ...existing.interfaceViews, ...c.interfaceViews };
+        }
+      }
+    }
+    return [...seen.values()];
+  }
+
+  async queryByInterface(interfaceId, activeAtOffset) {
+    const offset = activeAtOffset || await this._ledgerOffset();
+    const res = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({
+        filter: {
+          filtersByParty: {
+            [this.party]: {
+              cumulative: [{
+                identifierFilter: {
+                  InterfaceFilter: {
+                    value: { interfaceId, includeInterfaceView: true, includeCreatedEventBlob: false },
+                  },
+                },
+              }],
+            },
+          },
+        },
+        verbose:        true,
+        activeAtOffset: offset,
+      }),
+    });
+    return parseContracts(res);
+  }
+
   async queryAllParties(templateId) {
     const { parties }  = await this.listAllParties();
     const byParty      = {};
@@ -337,18 +424,19 @@ export class LedgerClient {
       },
     }));
 
+    // When interface filters are provided, use them exclusively — adding a WildcardFilter
+    // alongside would match all contracts and can exceed Canton's per-query node limit.
+    const cumulative = interfaceFilters.length > 0
+      ? interfaceFilters
+      : [{ identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: false } } } }];
+
     const res = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({
         filter: {
           filtersByParty: {
-            [party || this.party]: {
-              cumulative: [
-                { identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: false } } } },
-                ...interfaceFilters,
-              ],
-            },
+            [party || this.party]: { cumulative },
           },
         },
         verbose:        true,

@@ -84,13 +84,15 @@ function ContractDetail({ c }) {
 
 export default function Ledger() {
   const ledger = useLedger();
-  const [tab, setTab]             = useState('contracts');
-  const [parties, setParties]     = useState([]);
-  const [contracts, setContracts] = useState([]);
-  const [offset, setOffset]       = useState(null);
-  const [expanded, setExpanded]   = useState(new Set());
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(null);
+  const [tab, setTab]                   = useState('contracts');
+  const [parties, setParties]           = useState([]);
+  const [contracts, setContracts]       = useState([]);
+  const [offset, setOffset]             = useState(null);
+  const [expanded, setExpanded]         = useState(new Set());
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState(null);
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [partyFilter, setPartyFilter]   = useState('');
 
   async function load() {
     setLoading(true);
@@ -140,20 +142,47 @@ export default function Ledger() {
 
       {tab === 'contracts' && (
         <>
-          <h2>Active Contracts ({contracts.length})</h2>
-          <table>
-            <thead>
-              <tr>
-                <th></th>
-                <th>Template</th>
-                <th>Interfaces</th>
-                <th>Contract ID</th>
-                <th>Created At</th>
-                <th>Offset</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contracts.map((c) => (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <input
+              placeholder="Filter by template…"
+              value={templateSearch}
+              onChange={e => setTemplateSearch(e.target.value)}
+              style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 4, width: 200, fontFamily: 'inherit' }}
+            />
+            <input
+              placeholder="Filter by party…"
+              value={partyFilter}
+              onChange={e => setPartyFilter(e.target.value)}
+              style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #ddd', borderRadius: 4, width: 260, fontFamily: 'inherit' }}
+            />
+            {(templateSearch || partyFilter) && (
+              <button onClick={() => { setTemplateSearch(''); setPartyFilter(''); }} style={{ fontSize: 11, padding: '4px 10px' }}>
+                Clear
+              </button>
+            )}
+          </div>
+          {(() => {
+            const filtered = contracts.filter(c => {
+              const tMatch = !templateSearch || c.templateId.toLowerCase().includes(templateSearch.toLowerCase());
+              const pMatch = !partyFilter || [...(c.signatories || []), ...(c.observers || [])].some(p => p.toLowerCase().includes(partyFilter.toLowerCase()));
+              return tMatch && pMatch;
+            });
+            return (
+              <>
+                <h2>Active Contracts ({filtered.length}{filtered.length !== contracts.length ? ` of ${contracts.length}` : ''})</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Template</th>
+                      <th>Interfaces</th>
+                      <th>Contract ID</th>
+                      <th>Created At</th>
+                      <th>Offset</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((c) => (
                 <>
                   <tr key={c.contractId}>
                     <td>
@@ -180,8 +209,11 @@ export default function Ledger() {
                   )}
                 </>
               ))}
-            </tbody>
-          </table>
+                  </tbody>
+                </table>
+              </>
+            );
+          })()}
         </>
       )}
 

@@ -11,11 +11,11 @@ template DiscardedInteraction
         interactionId   : Text
         interactionType : Text
         participants    : [(Party, RoleType)]
-        configCid       : ContractId Configuration.I
+        configCid       : Optional (ContractId Configuration.I)
         discardedAt : Time
     where
-        signatory operator, initiator
-        observer map fst participants
+        signatory initiator
+        observer map fst participants ++ [operator]
 
         ensure interactionId /= ""
 
