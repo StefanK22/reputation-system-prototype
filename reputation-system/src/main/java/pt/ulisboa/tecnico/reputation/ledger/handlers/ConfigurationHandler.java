@@ -44,10 +44,14 @@ public class ConfigurationHandler {
             double ceiling    = data.scoreCeiling.doubleValue();
             double startValue = data.startValue.doubleValue();
 
-            log.info("RoleConfiguration: configId={}, floor={}, ceiling={}, startValue={}",
-                    data.configId, floor, ceiling, startValue);
+            java.util.LinkedHashMap<String, Double> tiersMap = new java.util.LinkedHashMap<>();
+            data.tiers.forEach(t -> tiersMap.put(t._1, t._2.doubleValue()));
+            String tiersJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(tiersMap);
 
-            reputationService.applyReputationConfiguration(floor, ceiling, startValue);
+            log.info("RoleConfiguration: configId={}, floor={}, ceiling={}, startValue={}, tiers={}",
+                    data.configId, floor, ceiling, startValue, tiersJson);
+
+            reputationService.applyReputationConfiguration(floor, ceiling, startValue, tiersJson);
         } catch (Exception e) {
             log.error("Failed to handle RoleConfiguration: {}", e.getMessage(), e);
         }

@@ -1,0 +1,93 @@
+module Scripts.EvalSeedAgentSetup where
+
+import Daml.Script
+import DA.Time (time)
+import DA.Date (date, Month(..))
+import DA.Text (isPrefixOf)
+
+import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..))
+import Reputation.Role.Configuration (RoleConfiguration(..), CreateRole(..))
+import Reputation.Types
+
+evalSeedAgentSetup : Script ()
+evalSeedAgentSetup = do
+
+  -- ── Parties ────────────────────────────────────────────────────────────
+  knownParties <- listKnownParties
+  operator <- case find (\pd -> "Operator::" `isPrefixOf` (partyToText pd.party)) knownParties of
+    None -> fail "Operator party not found. Run Setup first."
+    Some pd -> pure pd.party
+  agentHighReject        <- allocatePartyByHint (PartyIdHint "AgentHighReject")
+  agentPro               <- allocatePartyByHint (PartyIdHint "AgentPro")
+  agentSlowUploader      <- allocatePartyByHint (PartyIdHint "AgentSlowUploader")
+  agentUnreliable        <- allocatePartyByHint (PartyIdHint "AgentUnreliable")
+  buyerDemanding         <- allocatePartyByHint (PartyIdHint "BuyerDemanding")
+  buyerEager             <- allocatePartyByHint (PartyIdHint "BuyerEager")
+  buyerImpatient         <- allocatePartyByHint (PartyIdHint "BuyerImpatient")
+  buyerPersistent        <- allocatePartyByHint (PartyIdHint "BuyerPersistent")
+  landlordFair           <- allocatePartyByHint (PartyIdHint "LandlordFair")
+  landlordPicky          <- allocatePartyByHint (PartyIdHint "LandlordPicky")
+  landlordSlowReviewer   <- allocatePartyByHint (PartyIdHint "LandlordSlowReviewer")
+  landlordUnreliable     <- allocatePartyByHint (PartyIdHint "LandlordUnreliable")
+  tenantAbandonedFirst   <- allocatePartyByHint (PartyIdHint "TenantAbandonedFirst")
+  tenantAbandonedSecond  <- allocatePartyByHint (PartyIdHint "TenantAbandonedSecond")
+  tenantAbandonedThird   <- allocatePartyByHint (PartyIdHint "TenantAbandonedThird")
+  tenantAverage          <- allocatePartyByHint (PartyIdHint "TenantAverage")
+  tenantAverageRenter    <- allocatePartyByHint (PartyIdHint "TenantAverageRenter")
+  tenantCompliant        <- allocatePartyByHint (PartyIdHint "TenantCompliant")
+  tenantDisorganized     <- allocatePartyByHint (PartyIdHint "TenantDisorganized")
+  tenantFirstTime        <- allocatePartyByHint (PartyIdHint "TenantFirstTime")
+  tenantGood             <- allocatePartyByHint (PartyIdHint "TenantGood")
+  tenantLuckyRA          <- allocatePartyByHint (PartyIdHint "TenantLuckyRA")
+  tenantNewRenter        <- allocatePartyByHint (PartyIdHint "TenantNewRenter")
+  tenantOrganized        <- allocatePartyByHint (PartyIdHint "TenantOrganized")
+  tenantPerfect          <- allocatePartyByHint (PartyIdHint "TenantPerfect")
+  tenantPrepared         <- allocatePartyByHint (PartyIdHint "TenantPrepared")
+  tenantThorough         <- allocatePartyByHint (PartyIdHint "TenantThorough")
+  tenantTimePressed      <- allocatePartyByHint (PartyIdHint "TenantTimePressed")
+
+  let t0 = time (date 2026 Jun 1) 0 0 0
+
+  -- ── Role configuration ───────────────────────────────────────────
+  roleConfigCid <- submit operator do
+    createCmd RoleConfiguration with
+      operator
+      configId        = "EVAL-ROLE-CONFIG"
+      createdAt       = t0
+      agentWeights    = AgentWeights    with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
+      buyerWeights    = BuyerWeights    with reliability = 0.4; responsiveness = 0.4; accuracy = 0.2
+      landlordWeights = LandlordWeights with reliability = 0.3; responsiveness = 0.4; accuracy = 0.3
+      tenantWeights   = TenantWeights   with reliability = 0.35; responsiveness = 0.3; accuracy = 0.35
+      scoreFloor      = 0.0
+      scoreCeiling    = 100.0
+      startValue      = 50.0
+      tiers           = [("a", 0.0)]
+
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentHighReject; roleType = Agent; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentPro; roleType = Agent; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentSlowUploader; roleType = Agent; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentUnreliable; roleType = Agent; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerDemanding; roleType = Buyer; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerEager; roleType = Buyer; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerImpatient; roleType = Buyer; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerPersistent; roleType = Buyer; assignedAt = t0
+  
+  -- ── Property purchase configuration ──────────────────────────────
+  _ <- submit operator do
+    createCmd PropertyPurchaseConfiguration with
+      operator
+      configId  = "EVAL-PP-CONFIG"
+      createdAt = t0
+      agentObsWeights = AgentObservationWeights with
+        reliabilityVoidedWeight                = 0.3
+        reliabilityCompletionWeight            = 0.7
+        responsivenessProposalToContractWeight = 0.6
+        responsivenessContractWeight           = 0.4
+        responsivenessCapHours                 = 24.0
+      buyerObsWeights = BuyerObservationWeights with
+        responsivenessContractWeight = 0.6
+        responsivenessProposalWeight = 0.4
+        responsivenessCapHours       = 24.0
+      feedbackWindowDays = 30
+
+  pure ()

@@ -114,6 +114,7 @@ data RoleConfigDetail = RoleConfigDetail
         scoreFloor      : Decimal
         scoreCeiling    : Decimal
         startValue      : Decimal
+        tiers           : [(Text, Decimal)]
     deriving (Eq, Show)
 
 data PPConfigDetail = PPConfigDetail

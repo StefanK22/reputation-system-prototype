@@ -20,6 +20,7 @@ public class EngineConfiguration {
     private Double scoreFloor;
     private Double scoreCeiling;
     private Double startValue;
+    private String tiersJson;
 
     public boolean isReputationConfigured() {
         return scoreFloor != null && scoreCeiling != null && startValue != null;

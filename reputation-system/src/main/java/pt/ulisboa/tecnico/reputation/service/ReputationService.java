@@ -1,5 +1,6 @@
 package pt.ulisboa.tecnico.reputation.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
@@ -14,6 +15,8 @@ import pt.ulisboa.tecnico.reputation.repository.EngineConfigurationRepository;
 import pt.ulisboa.tecnico.reputation.repository.SubjectRepository;
 
 import java.time.Instant;
+import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,29 +42,40 @@ public class ReputationService {
     }
 
     @Transactional
-    public void applyReputationConfiguration(double floor, double ceiling, double startValue) {
+    public void applyReputationConfiguration(double floor, double ceiling, double startValue, String tiersJson) {
         EngineConfiguration config = getOrCreateConfig();
         config.setScoreFloor(floor);
         config.setScoreCeiling(ceiling);
         config.setStartValue(startValue);
+        config.setTiersJson(tiersJson);
         configRepo.save(config);
-        log.info("ReputationConfiguration applied: floor={}, ceiling={}, startValue={}",
-                floor, ceiling, startValue);
+        log.info("ReputationConfiguration applied: floor={}, ceiling={}, startValue={}, tiers={}",
+                floor, ceiling, startValue, tiersJson);
     }
 
     public Map<String, Object> getReputationConfiguration() {
         EngineConfiguration config = getOrCreateConfig();
-        double floor   = config.getScoreFloor()   != null ? config.getScoreFloor()   : 0.0;
-        double ceiling = config.getScoreCeiling() != null ? config.getScoreCeiling() : 100.0;
-        double startValue = config.getStartValue() != null ? config.getStartValue() : 70.0;
-        Long offset = config.getLedgerOffset() != null ? config.getLedgerOffset() : 0L;
+        if (!config.isReputationConfigured()) {
+            return Map.of("configured", false, "ledgerOffset", config.getLedgerOffset());
+        }
         return Map.of(
-            "configured",   config.isReputationConfigured(),
-            "scoreFloor",   floor,
-            "scoreCeiling", ceiling,
-            "startValue",   Math.round(startValue * 10000.0) / 10000.0,
-            "ledgerOffset", offset
+            "configured",   true,
+            "scoreFloor",   config.getScoreFloor(),
+            "scoreCeiling", config.getScoreCeiling(),
+            "startValue",   Math.round(config.getStartValue() * 10000.0) / 10000.0,
+            "ledgerOffset", config.getLedgerOffset()
         );
+    }
+
+    public Map<String, Double> getTiers() {
+        String tiersJson = getOrCreateConfig().getTiersJson();
+        if (tiersJson == null || tiersJson.isBlank()) return Map.of();
+        try {
+            return new ObjectMapper().readerForMapOf(Double.class).readValue(tiersJson);
+        } catch (Exception e) {
+            log.warn("Failed to parse tiersJson: {}", e.getMessage());
+            return Map.of();
+        }
     }
 
     @Transactional
@@ -101,6 +115,7 @@ public class ReputationService {
                     });
         });
         recomputeScore(s);
+        recomputeTier(s, getTiers());
         subjectRepo.save(s);
     }
 
@@ -135,10 +150,45 @@ public class ReputationService {
         );
 
         recomputeScore(subject);
+        recomputeTier(subject, getTiers());
+
+        if (subject.getVcTier() != null && subject.getOverallScore() < subject.getVcThreshold() + 0.05) {
+            log.info("VC revoked for party {}: vcTier={}, score={}", party, subject.getVcTier(), subject.getOverallScore());
+            subject.setVcTier(null);
+            subject.setVcThreshold(null);
+            subject.setVcIssuedAt(null);
+        }
+
         subjectRepo.save(subject);
     }
 
-    // ── Score ─────────────────────────────────────────────────────────────────
+    // ── VC ────────────────────────────────────────────────────────────────────
+
+    @Transactional
+    public Optional<String> issueMockVc(String party) {
+        Subject subject = subjectRepo.findById(party).orElse(null);
+        if (subject == null || subject.getTier() == null) return Optional.empty();
+
+        double threshold = getTiers().getOrDefault(subject.getTier(), 0.0);
+        subject.setVcTier(subject.getTier());
+        subject.setVcThreshold(threshold);
+        subject.setVcIssuedAt(Instant.now());
+        subjectRepo.save(subject);
+
+        return Optional.of(buildVcString(subject));
+    }
+
+    private String buildVcString(Subject s) {
+        String header  = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("{\"alg\":\"mock\",\"typ\":\"VC\"}".getBytes());
+        String payload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(String.format(
+                        "{\"sub\":\"%s\",\"tier\":\"%s\",\"threshold\":%s,\"iat\":\"%s\"}",
+                        s.getParty(), s.getVcTier(), s.getVcThreshold(), s.getVcIssuedAt()).getBytes());
+        return header + "." + payload + ".mocksig";
+    }
+
+    // ── Score & Tier ──────────────────────────────────────────────────────────
 
     private void recomputeScore(Subject subject) {
         double weightedSum = 0.0;
@@ -153,6 +203,18 @@ public class ReputationService {
         double clamped = Math.max(0.0, Math.min(1.0, raw));
         subject.setOverallScore(Math.round(clamped * 10000.0) / 10000.0);
         subject.setUpdatedAt(Instant.now());
+    }
+
+    private void recomputeTier(Subject subject, Map<String, Double> tiers) {
+        String bestTier = null;
+        double bestThreshold = -1;
+        for (Map.Entry<String, Double> entry : tiers.entrySet()) {
+            if (subject.getOverallScore() >= entry.getValue() && entry.getValue() > bestThreshold) {
+                bestTier = entry.getKey();
+                bestThreshold = entry.getValue();
+            }
+        }
+        subject.setTier(bestTier);
     }
 
     private double normalizeStartValue(EngineConfiguration config) {
@@ -193,11 +255,11 @@ public class ReputationService {
         return subjectRepo.findById(party).map(s -> toDto(s, config));
     }
 
-    public List<SubjectDto> getRanking(int limit) {
+    public List<SubjectDto> getRanking() {
         EngineConfiguration config = getOrCreateConfig();
         return subjectRepo.findAll(
                 Sort.by(Sort.Direction.DESC, "overallScore").and(Sort.by(Sort.Direction.ASC, "party"))
-        ).stream().limit(limit).map(s -> toDto(s, config)).toList();
+        ).stream().map(s -> toDto(s, config)).toList();
     }
 
     public List<SubjectDto> getAllSubjects() {

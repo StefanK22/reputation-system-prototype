@@ -180,7 +180,8 @@ export class LedgerClient {
     return events.map((e) => e.CreatedEvent || e.created || e.createdEvent).filter(Boolean).map((c) => toEvent(c, res.transaction?.offset));
   }
 
-  async query(templateId, activeAtOffset) {
+  async query(templateId, activeAtOffset, party) {
+    const queryParty = party || this.party;
     const offset = activeAtOffset || await this._ledgerOffset();
     const res    = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
       method:  'POST',
@@ -188,7 +189,7 @@ export class LedgerClient {
       body:    JSON.stringify({
         filter: {
           filtersByParty: {
-            [this.party]: {
+            [queryParty]: {
               cumulative: [{
                 identifierFilter: {
                   TemplateFilter: {
@@ -294,7 +295,8 @@ export class LedgerClient {
 
   // Query a single template, optionally including an interface view via a
   // second cumulative InterfaceFilter in the same request.
-  async queryWithView(templateId, interfaceId, activeAtOffset) {
+  async queryWithView(templateId, interfaceId, activeAtOffset, party) {
+    const queryParty = party || this.party;
     const offset = activeAtOffset || await this._ledgerOffset();
     const cumulative = [
       { identifierFilter: { TemplateFilter: { value: { templateId, includeCreatedEventBlob: true } } } },
@@ -304,7 +306,7 @@ export class LedgerClient {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({
-        filter: { filtersByParty: { [this.party]: { cumulative } } },
+        filter: { filtersByParty: { [queryParty]: { cumulative } } },
         verbose: true,
         activeAtOffset: offset,
       }),
@@ -331,11 +333,11 @@ export class LedgerClient {
   // limit by spreading contracts across individual template queries.
   // Pass obsTemplateIds + obsInterfaceId to also fetch observations with their
   // interface views without a separate unbounded InterfaceFilter request.
-  async queryByTemplates(templateIds, activeAtOffset, obsTemplateIds = [], obsInterfaceId = null) {
+  async queryByTemplates(templateIds, activeAtOffset, obsTemplateIds = [], obsInterfaceId = null, party = null) {
     const offset  = activeAtOffset || await this._ledgerOffset();
-    const regular = templateIds.map(id => this.query(id, offset).catch(() => []));
+    const regular = templateIds.map(id => this.query(id, offset, party).catch(() => []));
     const withView = (obsInterfaceId && obsTemplateIds.length)
-      ? obsTemplateIds.map(id => this.queryWithView(id, obsInterfaceId, offset).catch(() => []))
+      ? obsTemplateIds.map(id => this.queryWithView(id, obsInterfaceId, offset, party).catch(() => []))
       : [];
     const batches = await Promise.all([...regular, ...withView]);
     const seen = new Map();

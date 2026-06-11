@@ -8,8 +8,8 @@ async function fetchJson(pathname, options = {}) {
   return text ? JSON.parse(text) : {};
 }
 
-export function getRankings(limit = 10) {
-  return fetchJson(`/rankings?limit=${limit}`);
+export function getRankings() {
+  return fetchJson(`/rankings`);
 }
 
 export function getSubject(party) {

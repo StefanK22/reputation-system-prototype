@@ -28,16 +28,13 @@ function fmt(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
 
-function DetailCell({ details }) {
-  if (!details || typeof details !== 'object') return '—';
-  const tag   = details.tag   ?? Object.keys(details)[0];
-  const value = details.value ?? details[tag];
-  if (!tag) return '—';
+function DetailCell({ contractId, payload }) {
+  const data = { contractId, ...payload };
   return (
     <details>
-      <summary style={{ fontSize: 11, color: '#555', cursor: 'pointer' }}>{tag}</summary>
+      <summary style={{ fontSize: 11, color: '#555', cursor: 'pointer' }}>show</summary>
       <pre style={{ fontSize: 10, color: '#777', margin: '6px 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 8, borderRadius: 3 }}>
-        {JSON.stringify(value, null, 2)}
+        {JSON.stringify(data, null, 2)}
       </pre>
     </details>
   );
@@ -168,7 +165,7 @@ export default function Disclosures() {
                 <td style={tdSt}>{d.payload?.configId || '—'}</td>
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmt(d.payload?.issuedAt)}</td>
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmt(d.payload?.createdAt)}</td>
-                <td style={tdSt}><DetailCell details={d.payload?.details} /></td>
+                <td style={tdSt}><DetailCell contractId={d.contractId} payload={d.payload} /></td>
               </tr>
             ))}
           </tbody>

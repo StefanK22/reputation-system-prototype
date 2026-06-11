@@ -21,6 +21,7 @@ template RoleConfiguration
         scoreFloor      : Decimal
         scoreCeiling    : Decimal
         startValue      : Decimal
+        tiers           : [(Text, Decimal)]
     where
         signatory operator
 
@@ -38,7 +39,8 @@ template RoleConfiguration
                     tenantWeights
                     scoreFloor
                     scoreCeiling
-                    startValue)
+                    startValue
+                    tiers)
 
         nonconsuming choice CreateRole : ContractId Role.I
             with

@@ -140,16 +140,24 @@ export default function Interactions() {
         ledger.listAllParties().catch(() => ({ parties: [] })),
       ]);
 
-      // Extract pkgId from any interface ID so we can build concrete template IDs.
-      // Querying per-template avoids Canton's 200-contract-per-request hard limit.
       const pkgId = Object.values(interfaceIds).map(v => String(v).split(':')[0]).find(Boolean);
       let contracts;
       if (pkgId) {
-        const allPaths    = KNOWN_MODULE_PATHS;
-        const obsKeys     = Object.keys(OBS_TEMPLATES);
-        const obsIds      = obsKeys.filter(k => allPaths[k]).map(k => `${pkgId}:${allPaths[k]}`);
-        const regularIds  = Object.entries(allPaths).filter(([k]) => !OBS_TEMPLATES[k]).map(([, p]) => `${pkgId}:${p}`);
-        contracts = await ledger.queryByTemplates(regularIds, undefined, obsIds, interfaceIds.observation);
+        const allPaths = KNOWN_MODULE_PATHS;
+        const obsKeys  = Object.keys(OBS_TEMPLATES);
+        const obsIds   = obsKeys.filter(k => allPaths[k]).map(k => `${pkgId}:${allPaths[k]}`);
+        const ixKeys   = Object.keys(INTERACTION_TEMPLATES);
+        const ixIds    = ixKeys.filter(k => allPaths[k]).map(k => `${pkgId}:${allPaths[k]}`);
+        const adminIds = Object.entries(allPaths)
+          .filter(([k]) => !OBS_TEMPLATES[k] && !INTERACTION_TEMPLATES[k])
+          .map(([, p]) => `${pkgId}:${p}`);
+        const [ixContracts, adminContracts] = await Promise.all([
+          ixIds.length
+            ? ledger.queryByTemplates(ixIds, undefined, [], null, activeParty)
+            : Promise.resolve([]),
+          ledger.queryByTemplates(adminIds, undefined, obsIds, interfaceIds.observation),
+        ]);
+        contracts = [...ixContracts, ...adminContracts];
       } else {
         contracts = await ledger.queryAll(activeParty, interfaceIds);
       }

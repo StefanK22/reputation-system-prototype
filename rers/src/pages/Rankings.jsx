@@ -151,7 +151,7 @@ export default function Rankings() {
     setLoading(true);
     setError(null);
     Promise.all([
-      getRankings(50),
+      getRankings(),
       getAllSubjects().catch(() => []),
       getReputationConfig().catch(() => null),
     ])
