@@ -1,0 +1,481 @@
+-- Round 15: BuyerReluctant — Buyer downsizing after retirement; emotionally attached to their current home and slow to commit.
+module Scripts.EvalSeedAgentRound15 where
+
+import Daml.Script
+import DA.Time (time)
+import DA.Date (date, Month(..))
+import DA.Text (isPrefixOf)
+
+import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..))
+import Reputation.PropertyPurchase.Configuration qualified as PP
+import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
+import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
+import Reputation.Interface.Configuration qualified as Configuration (I)
+import Reputation.Types
+import Reputation.PropertyPurchase.Feedback (PropertyPurchaseFeedbackRequest, SubmitFeedback(..))
+
+evalSeedAgentRound15 : Script ()
+evalSeedAgentRound15 = do
+
+  -- ── Look up parties ───────────────────────────────────────────────
+  knownParties <- listKnownParties
+  let lookupParty name = case find (\pd -> (name <> "::") `isPrefixOf` (partyToText pd.party)) knownParties of
+        None -> fail $ "Party not found: " <> name
+        Some pd -> pure pd.party
+
+  operator         <- case find (\pd -> "Operator::" `isPrefixOf` (partyToText pd.party)) knownParties of
+    None -> fail "Operator party not found."
+    Some pd -> pure pd.party
+  agentHighReject    <- lookupParty "AgentHighReject"
+  agentPro           <- lookupParty "AgentPro"
+  agentSlowUploader  <- lookupParty "AgentSlowUploader"
+  agentUnreliable    <- lookupParty "AgentUnreliable"
+  buyerReluctant     <- lookupParty "BuyerReluctant"
+
+  -- ── Look up PP config ─────────────────────────────────────────────
+  ppConfigs <- query @PropertyPurchaseConfiguration operator
+  ppConfigCid <- case find (\(_, c) -> c.configId == "EVAL-PP-CONFIG") ppConfigs of
+    None -> fail "PropertyPurchaseConfiguration 'EVAL-PP-CONFIG' not found. Run EvalSeedAgentSetup first."
+    Some (cid, _) -> pure cid
+  let iPPConfigCid : ContractId Configuration.I = toInterfaceContractId ppConfigCid
+
+  -- ═══════════════════════════════════════════════════════════
+  -- TX-EVAL-057: AgentPro (Agent) + BuyerReluctant (Buyer)
+  -- ═══════════════════════════════════════════════════════════
+  let tx_eval_057_t0 = time (date 2035 Aug 13) 9 0 0
+      tx_eval_057_p1_submit  = time (date 2035 Aug 13) 9 0 0
+      tx_eval_057_p1_respond = time (date 2035 Aug 17) 9 0 0
+      tx_eval_057_p2_submit  = time (date 2035 Aug 17) 9 0 0
+      tx_eval_057_p2_respond = time (date 2035 Aug 20) 9 0 0
+      tx_eval_057_p3_submit  = time (date 2035 Aug 20) 9 0 0
+      tx_eval_057_p3_respond = time (date 2035 Aug 25) 9 0 0
+      tx_eval_057_cu1          = time (date 2035 Aug 25) 11 0 0
+      tx_eval_057_contract_sign   = time (date 2035 Aug 27) 23 0 0
+      tx_eval_057_close    = time (date 2035 Aug 28) 0 0 0
+      tx_eval_057_complete = time (date 2035 Aug 28) 1 0 0
+      tx_eval_057_feedback = time (date 2035 Aug 29) 1 0 0
+
+  tx_eval_057_draftCid <- submit agentPro do
+    createCmd DraftInteraction with
+      operator; initiator = agentPro; initiatorRole = Agent
+      interactionId = "TX-EVAL-057"
+      interactionType = "PropertyPurchase"
+      participants = [(buyerReluctant, Buyer)]
+      openedAt = tx_eval_057_t0
+
+  tx_eval_057_ipCid <- submit agentPro do
+    exerciseCmd tx_eval_057_draftCid Begin with startedAt = tx_eval_057_t0; configCid = iPPConfigCid
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentPro; occurredAt = tx_eval_057_p1_submit
+        resourceId = Some "proposal-001"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = buyerReluctant; occurredAt = tx_eval_057_p1_respond
+        resourceId = Some "proposal-001"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentPro; occurredAt = tx_eval_057_p2_submit
+        resourceId = Some "proposal-002"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = buyerReluctant; occurredAt = tx_eval_057_p2_respond
+        resourceId = Some "proposal-002"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentPro; occurredAt = tx_eval_057_p3_submit
+        resourceId = Some "proposal-003"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved; actor = buyerReluctant; occurredAt = tx_eval_057_p3_respond
+        resourceId = Some "proposal-003"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = agentPro; occurredAt = tx_eval_057_cu1
+        resourceId = Some "contract-001"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = agentPro; occurredAt = tx_eval_057_contract_sign
+        resourceId = Some "contract-001"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = buyerReluctant; occurredAt = tx_eval_057_contract_sign
+        resourceId = Some "contract-001"
+
+  tx_eval_057_ipCid <- submit operator do
+    exerciseCmd tx_eval_057_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged; actor = agentPro; occurredAt = tx_eval_057_close
+        resourceId = Some "SELL_CLOSED"
+
+  tx_eval_057_completedCid <- submit agentPro do
+    exerciseCmd tx_eval_057_ipCid Complete with completedAt = tx_eval_057_complete
+
+  (_, tx_eval_057_reqs) <- submit operator do
+    exerciseCmd ppConfigCid PP.CreateObservations with completedCid = tx_eval_057_completedCid
+
+  let [tx_eval_057_agentReq, tx_eval_057_buyerReq] = tx_eval_057_reqs
+
+  -- AgentPro (agent) gives feedback about BuyerReluctant (buyer)
+  submit agentPro do
+    exerciseCmd (fromInterfaceContractId tx_eval_057_agentReq : ContractId PropertyPurchaseFeedbackRequest)
+      SubmitFeedback with
+        professionalism = Some 0.50
+        availability    = Some 0.05
+        honesty         = Some 0.60
+        submittedAt = tx_eval_057_feedback
+
+  -- BuyerReluctant (buyer) gives feedback about AgentPro (agent)
+  submit buyerReluctant do
+    exerciseCmd (fromInterfaceContractId tx_eval_057_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
+      SubmitFeedback with
+        professionalism = Some 0.95
+        availability    = Some 0.98
+        honesty         = Some 0.35
+        submittedAt = tx_eval_057_feedback
+
+  -- ═══════════════════════════════════════════════════════════
+  -- TX-EVAL-058: AgentSlowUploader (Agent) + BuyerReluctant (Buyer)
+  -- ═══════════════════════════════════════════════════════════
+  let tx_eval_058_t0 = time (date 2035 Oct 12) 9 0 0
+      tx_eval_058_p1_submit  = time (date 2035 Oct 12) 9 0 0
+      tx_eval_058_p1_respond = time (date 2035 Oct 15) 9 0 0
+      tx_eval_058_p2_submit  = time (date 2035 Oct 15) 9 0 0
+      tx_eval_058_p2_respond = time (date 2035 Oct 19) 9 0 0
+      tx_eval_058_p3_submit  = time (date 2035 Oct 19) 9 0 0
+      tx_eval_058_p3_respond = time (date 2035 Oct 24) 9 0 0
+      tx_eval_058_cu1          = time (date 2035 Oct 28) 1 0 0
+      tx_eval_058_contract_sign   = time (date 2035 Oct 30) 7 0 0
+      tx_eval_058_close    = time (date 2035 Oct 30) 8 0 0
+      tx_eval_058_complete = time (date 2035 Oct 30) 9 0 0
+      tx_eval_058_feedback = time (date 2035 Oct 31) 9 0 0
+
+  tx_eval_058_draftCid <- submit agentSlowUploader do
+    createCmd DraftInteraction with
+      operator; initiator = agentSlowUploader; initiatorRole = Agent
+      interactionId = "TX-EVAL-058"
+      interactionType = "PropertyPurchase"
+      participants = [(buyerReluctant, Buyer)]
+      openedAt = tx_eval_058_t0
+
+  tx_eval_058_ipCid <- submit agentSlowUploader do
+    exerciseCmd tx_eval_058_draftCid Begin with startedAt = tx_eval_058_t0; configCid = iPPConfigCid
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentSlowUploader; occurredAt = tx_eval_058_p1_submit
+        resourceId = Some "proposal-001"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = buyerReluctant; occurredAt = tx_eval_058_p1_respond
+        resourceId = Some "proposal-001"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentSlowUploader; occurredAt = tx_eval_058_p2_submit
+        resourceId = Some "proposal-002"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = buyerReluctant; occurredAt = tx_eval_058_p2_respond
+        resourceId = Some "proposal-002"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentSlowUploader; occurredAt = tx_eval_058_p3_submit
+        resourceId = Some "proposal-003"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved; actor = buyerReluctant; occurredAt = tx_eval_058_p3_respond
+        resourceId = Some "proposal-003"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = agentSlowUploader; occurredAt = tx_eval_058_cu1
+        resourceId = Some "contract-001"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = agentSlowUploader; occurredAt = tx_eval_058_contract_sign
+        resourceId = Some "contract-001"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = buyerReluctant; occurredAt = tx_eval_058_contract_sign
+        resourceId = Some "contract-001"
+
+  tx_eval_058_ipCid <- submit operator do
+    exerciseCmd tx_eval_058_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged; actor = agentSlowUploader; occurredAt = tx_eval_058_close
+        resourceId = Some "SELL_CLOSED"
+
+  tx_eval_058_completedCid <- submit agentSlowUploader do
+    exerciseCmd tx_eval_058_ipCid Complete with completedAt = tx_eval_058_complete
+
+  (_, tx_eval_058_reqs) <- submit operator do
+    exerciseCmd ppConfigCid PP.CreateObservations with completedCid = tx_eval_058_completedCid
+
+  let [tx_eval_058_agentReq, tx_eval_058_buyerReq] = tx_eval_058_reqs
+
+  -- AgentSlowUploader (agent) gives feedback about BuyerReluctant (buyer)
+  submit agentSlowUploader do
+    exerciseCmd (fromInterfaceContractId tx_eval_058_agentReq : ContractId PropertyPurchaseFeedbackRequest)
+      SubmitFeedback with
+        professionalism = Some 0.45
+        availability    = Some 0.08
+        honesty         = Some 0.75
+        submittedAt = tx_eval_058_feedback
+
+  -- BuyerReluctant (buyer) gives feedback about AgentSlowUploader (agent)
+  submit buyerReluctant do
+    exerciseCmd (fromInterfaceContractId tx_eval_058_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
+      SubmitFeedback with
+        professionalism = Some 0.35
+        availability    = Some 0.10
+        honesty         = Some 0.35
+        submittedAt = tx_eval_058_feedback
+
+  -- ═══════════════════════════════════════════════════════════
+  -- TX-EVAL-059: AgentHighReject (Agent) + BuyerReluctant (Buyer)
+  -- ═══════════════════════════════════════════════════════════
+  let tx_eval_059_t0 = time (date 2035 Dec 11) 9 0 0
+      tx_eval_059_p1_submit  = time (date 2035 Dec 11) 9 0 0
+      tx_eval_059_p1_respond = time (date 2035 Dec 15) 9 0 0
+      tx_eval_059_p2_submit  = time (date 2035 Dec 15) 9 0 0
+      tx_eval_059_p2_respond = time (date 2035 Dec 18) 9 0 0
+      tx_eval_059_p3_submit  = time (date 2035 Dec 18) 9 0 0
+      tx_eval_059_p3_respond = time (date 2035 Dec 23) 9 0 0
+      tx_eval_059_cu1          = time (date 2035 Dec 23) 11 0 0
+      tx_eval_059_contract_sign   = time (date 2035 Dec 25) 11 0 0
+      tx_eval_059_close    = time (date 2035 Dec 25) 12 0 0
+      tx_eval_059_complete = time (date 2035 Dec 25) 13 0 0
+      tx_eval_059_feedback = time (date 2035 Dec 26) 13 0 0
+
+  tx_eval_059_draftCid <- submit agentHighReject do
+    createCmd DraftInteraction with
+      operator; initiator = agentHighReject; initiatorRole = Agent
+      interactionId = "TX-EVAL-059"
+      interactionType = "PropertyPurchase"
+      participants = [(buyerReluctant, Buyer)]
+      openedAt = tx_eval_059_t0
+
+  tx_eval_059_ipCid <- submit agentHighReject do
+    exerciseCmd tx_eval_059_draftCid Begin with startedAt = tx_eval_059_t0; configCid = iPPConfigCid
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentHighReject; occurredAt = tx_eval_059_p1_submit
+        resourceId = Some "proposal-001"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = buyerReluctant; occurredAt = tx_eval_059_p1_respond
+        resourceId = Some "proposal-001"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentHighReject; occurredAt = tx_eval_059_p2_submit
+        resourceId = Some "proposal-002"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = buyerReluctant; occurredAt = tx_eval_059_p2_respond
+        resourceId = Some "proposal-002"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentHighReject; occurredAt = tx_eval_059_p3_submit
+        resourceId = Some "proposal-003"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved; actor = buyerReluctant; occurredAt = tx_eval_059_p3_respond
+        resourceId = Some "proposal-003"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = agentHighReject; occurredAt = tx_eval_059_cu1
+        resourceId = Some "contract-001"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = agentHighReject; occurredAt = tx_eval_059_contract_sign
+        resourceId = Some "contract-001"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned; actor = buyerReluctant; occurredAt = tx_eval_059_contract_sign
+        resourceId = Some "contract-001"
+
+  tx_eval_059_ipCid <- submit operator do
+    exerciseCmd tx_eval_059_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged; actor = agentHighReject; occurredAt = tx_eval_059_close
+        resourceId = Some "SELL_CLOSED"
+
+  tx_eval_059_completedCid <- submit agentHighReject do
+    exerciseCmd tx_eval_059_ipCid Complete with completedAt = tx_eval_059_complete
+
+  (_, tx_eval_059_reqs) <- submit operator do
+    exerciseCmd ppConfigCid PP.CreateObservations with completedCid = tx_eval_059_completedCid
+
+  let [tx_eval_059_agentReq, tx_eval_059_buyerReq] = tx_eval_059_reqs
+
+  -- AgentHighReject (agent) gives feedback about BuyerReluctant (buyer)
+  submit agentHighReject do
+    exerciseCmd (fromInterfaceContractId tx_eval_059_agentReq : ContractId PropertyPurchaseFeedbackRequest)
+      SubmitFeedback with
+        professionalism = Some 0.50
+        availability    = Some 0.08
+        honesty         = Some 0.80
+        submittedAt = tx_eval_059_feedback
+
+  -- BuyerReluctant (buyer) gives feedback about AgentHighReject (agent)
+  submit buyerReluctant do
+    exerciseCmd (fromInterfaceContractId tx_eval_059_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
+      SubmitFeedback with
+        professionalism = Some 0.75
+        availability    = Some 0.98
+        honesty         = Some 0.35
+        submittedAt = tx_eval_059_feedback
+
+  -- ═══════════════════════════════════════════════════════════
+  -- TX-EVAL-060: AgentUnreliable (Agent) + BuyerReluctant (Buyer)
+  -- ═══════════════════════════════════════════════════════════
+  let tx_eval_060_t0 = time (date 2036 Feb 9) 9 0 0
+      tx_eval_060_p1_submit  = time (date 2036 Feb 9) 9 0 0
+      tx_eval_060_p1_respond = time (date 2036 Feb 12) 9 0 0
+      tx_eval_060_p2_submit  = time (date 2036 Feb 12) 9 0 0
+      tx_eval_060_p2_respond = time (date 2036 Feb 16) 9 0 0
+      tx_eval_060_p3_submit  = time (date 2036 Feb 16) 9 0 0
+      tx_eval_060_p3_respond = time (date 2036 Feb 18) 9 0 0
+      tx_eval_060_cu1          = time (date 2036 Feb 18) 12 0 0
+      tx_eval_060_close    = time (date 2036 Feb 18) 14 0 0
+      tx_eval_060_complete = time (date 2036 Feb 18) 15 0 0
+      tx_eval_060_feedback = time (date 2036 Feb 19) 15 0 0
+
+  tx_eval_060_draftCid <- submit agentUnreliable do
+    createCmd DraftInteraction with
+      operator; initiator = agentUnreliable; initiatorRole = Agent
+      interactionId = "TX-EVAL-060"
+      interactionType = "PropertyPurchase"
+      participants = [(buyerReluctant, Buyer)]
+      openedAt = tx_eval_060_t0
+
+  tx_eval_060_ipCid <- submit agentUnreliable do
+    exerciseCmd tx_eval_060_draftCid Begin with startedAt = tx_eval_060_t0; configCid = iPPConfigCid
+
+  tx_eval_060_ipCid <- submit operator do
+    exerciseCmd tx_eval_060_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentUnreliable; occurredAt = tx_eval_060_p1_submit
+        resourceId = Some "proposal-001"
+
+  tx_eval_060_ipCid <- submit operator do
+    exerciseCmd tx_eval_060_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = buyerReluctant; occurredAt = tx_eval_060_p1_respond
+        resourceId = Some "proposal-001"
+
+  tx_eval_060_ipCid <- submit operator do
+    exerciseCmd tx_eval_060_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentUnreliable; occurredAt = tx_eval_060_p2_submit
+        resourceId = Some "proposal-002"
+
+  tx_eval_060_ipCid <- submit operator do
+    exerciseCmd tx_eval_060_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalRejectedWithNotes; actor = buyerReluctant; occurredAt = tx_eval_060_p2_respond
+        resourceId = Some "proposal-002"
+
+  tx_eval_060_ipCid <- submit operator do
+    exerciseCmd tx_eval_060_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentUnreliable; occurredAt = tx_eval_060_p3_submit
+        resourceId = Some "proposal-003"
+
+  tx_eval_060_ipCid <- submit operator do
+    exerciseCmd tx_eval_060_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved; actor = buyerReluctant; occurredAt = tx_eval_060_p3_respond
+        resourceId = Some "proposal-003"
+
+  tx_eval_060_ipCid <- submit operator do
+    exerciseCmd tx_eval_060_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded; actor = agentUnreliable; occurredAt = tx_eval_060_cu1
+        resourceId = Some "contract-001"
+
+  tx_eval_060_ipCid <- submit operator do
+    exerciseCmd tx_eval_060_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged; actor = agentUnreliable; occurredAt = tx_eval_060_close
+        resourceId = Some "SELL_CANCELED"
+
+  tx_eval_060_completedCid <- submit agentUnreliable do
+    exerciseCmd tx_eval_060_ipCid Complete with completedAt = tx_eval_060_complete
+
+  (_, tx_eval_060_reqs) <- submit operator do
+    exerciseCmd ppConfigCid PP.CreateObservations with completedCid = tx_eval_060_completedCid
+
+  let [tx_eval_060_agentReq, tx_eval_060_buyerReq] = tx_eval_060_reqs
+
+  -- AgentUnreliable (agent) gives feedback about BuyerReluctant (buyer)
+  submit agentUnreliable do
+    exerciseCmd (fromInterfaceContractId tx_eval_060_agentReq : ContractId PropertyPurchaseFeedbackRequest)
+      SubmitFeedback with
+        professionalism = Some 0.35
+        availability    = Some 0.05
+        honesty         = Some 0.70
+        submittedAt = tx_eval_060_feedback
+
+  -- BuyerReluctant (buyer) gives feedback about AgentUnreliable (agent)
+  submit buyerReluctant do
+    exerciseCmd (fromInterfaceContractId tx_eval_060_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
+      SubmitFeedback with
+        professionalism = Some 0.02
+        availability    = Some 0.92
+        honesty         = Some 0.35
+        submittedAt = tx_eval_060_feedback
+
+  pure ()

@@ -54,8 +54,9 @@ _AGENT_UNRELIABLE = (
 # Expected: Reliability ~40 | Responsiveness ~67 | Accuracy ~78
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Shared buyer personalities — one per round, same across all four agents.
-# Each buyer stresses a different dimension of agent performance.
+# Buyer personality archetypes — each stresses a different dimension of agent
+# performance. All four agents are paired with the same buyer per round so
+# their scores are directly comparable within that round.
 # ─────────────────────────────────────────────────────────────────────────────
 
 _BUYER_IMPATIENT = (
@@ -95,117 +96,216 @@ _BUYER_PERSISTENT = (
 )
 # Moderate stress — a fair but thorough observer who captures agent weaknesses clearly.
 
+_BUYER_CAUTIOUS = (
+    "A meticulous, risk-averse buyer who takes his time on every decision. "
+    "He reads every document carefully and rarely responds in under 48 hours. "
+    "Not unfriendly — just deliberate. He will ask many clarifying questions before "
+    "approving a proposal and expects the agent to have patient, well-prepared answers. "
+    "Once committed, he honours his word completely. "
+    "His feedback is thorough and fair: he appreciates professionalism and punishes "
+    "sloppiness, but does not penalise agents for the time he himself takes."
+)
+# Stresses: Agent patience over long timelines; accuracy and reliability clearly differentiated.
+
+_BUYER_INVESTOR = (
+    "A seasoned property investor who treats every transaction as a pure business decision. "
+    "He moves fast, responds within the hour, and expects the same from everyone else. "
+    "He scrutinises proposals rigorously — any inaccuracy signals amateurism — but once "
+    "satisfied, he approves immediately and demands equally swift follow-through on contracts. "
+    "He is equally unforgiving of slow uploads and poor proposal quality. "
+    "His feedback is blunt, precise, and comprehensive: high marks only for agents who "
+    "deliver on both speed and accuracy."
+)
+# Stresses: Both responsiveness AND accuracy simultaneously — double exposure for weak agents.
+
+_BUYER_RELUCTANT = (
+    "A hesitant buyer pushed into the market by external circumstances rather than genuine "
+    "desire. He takes long pauses between responses and finds reasons to reject proposals "
+    "even when they are technically adequate. He needs more rounds of back-and-forth than "
+    "most buyers and may disengage for days without warning. Transactions do eventually "
+    "close, but only with sustained effort from the agent. "
+    "His feedback reflects his ambivalence: agents who kept him engaged and on track receive "
+    "grudging respect; those who lost patience or let things slip receive sharp criticism."
+)
+# Stresses: Agent persistence and accuracy under repeated rejection cycles.
+
+_BUYER_EXPERIENCED = (
+    "A highly experienced buyer on his third or fourth property purchase. "
+    "He knows exactly how the process should work and spots procedural missteps immediately. "
+    "Responds promptly, approves clean proposals on first pass, and expects the contract "
+    "stage to proceed without incident. "
+    "If an agent meets his standards, he says so clearly and fairly. "
+    "If they fall short — slow uploads, voided contracts, or excessive revisions — his "
+    "written feedback is precise and unsparing. He is not harsh without cause, but the "
+    "bar he holds is high and non-negotiable."
+)
+# Expected: Consistent, precise observer — clean signal because his own behaviour is predictable.
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. PERSONALITY PROFILES
+# Agent and round definitions.
+# _ROUNDS drives everything: 25 rounds, each with one buyer + one context.
+# All four agents interact with the same buyer/context within a round.
 # ─────────────────────────────────────────────────────────────────────────────
 
-PROPERTY_PURCHASE_PERSONALITIES = [
+_AGENTS = [
+    {"partyName": "AgentPro",          "personality": _AGENT_PRO},
+    {"partyName": "AgentSlowUploader", "personality": _AGENT_SLOW_UPLOADER},
+    {"partyName": "AgentHighReject",   "personality": _AGENT_HIGH_REJECT},
+    {"partyName": "AgentUnreliable",   "personality": _AGENT_UNRELIABLE},
+]
 
-    # ════════════════════════════════════════════════════════════════════
-    # Round 1 — BuyerImpatient (stresses responsiveness)
-    # AgentSlowUploader's weak dimension dominates; others reveal contrast.
-    # ════════════════════════════════════════════════════════════════════
-
+_ROUNDS = [
+    # ── Cycle A (rounds 1–5): Baseline — one buyer per dimension ────────────
     {
-        "interactionId": "TX-EVAL-001",
-        "agent": {"partyName": "AgentPro", "personality": _AGENT_PRO},
-        "buyer": {"partyName": "BuyerImpatient", "personality": _BUYER_IMPATIENT},
+        "buyer_name": "BuyerImpatient",
+        "buyer_personality": _BUYER_IMPATIENT,
+        "context": "Standard mid-market residential sale in a stable suburban area.",
     },
     {
-        "interactionId": "TX-EVAL-002",
-        "agent": {"partyName": "AgentSlowUploader", "personality": _AGENT_SLOW_UPLOADER},
-        "buyer": {"partyName": "BuyerImpatient", "personality": _BUYER_IMPATIENT},
+        "buyer_name": "BuyerDemanding",
+        "buyer_personality": _BUYER_DEMANDING,
+        "context": "Premium detached family home; buyer commissioning a full independent survey.",
     },
     {
-        "interactionId": "TX-EVAL-003",
-        "agent": {"partyName": "AgentHighReject", "personality": _AGENT_HIGH_REJECT},
-        "buyer": {"partyName": "BuyerImpatient", "personality": _BUYER_IMPATIENT},
+        "buyer_name": "BuyerEager",
+        "buyer_personality": _BUYER_EAGER,
+        "context": "Modern apartment in a popular neighbourhood; buyer ready to move quickly.",
     },
     {
-        "interactionId": "TX-EVAL-004",
-        "agent": {"partyName": "AgentUnreliable", "personality": _AGENT_UNRELIABLE},
-        "buyer": {"partyName": "BuyerImpatient", "personality": _BUYER_IMPATIENT},
-    },
-
-    # ════════════════════════════════════════════════════════════════════
-    # Round 2 — BuyerDemanding (stresses accuracy)
-    # AgentHighReject's weak dimension dominates; others reveal contrast.
-    # ════════════════════════════════════════════════════════════════════
-
-    {
-        "interactionId": "TX-EVAL-005",
-        "agent": {"partyName": "AgentPro", "personality": _AGENT_PRO},
-        "buyer": {"partyName": "BuyerDemanding", "personality": _BUYER_DEMANDING},
+        "buyer_name": "BuyerPersistent",
+        "buyer_personality": _BUYER_PERSISTENT,
+        "context": "Semi-detached house in a competitive market with several competing offers.",
     },
     {
-        "interactionId": "TX-EVAL-006",
-        "agent": {"partyName": "AgentSlowUploader", "personality": _AGENT_SLOW_UPLOADER},
-        "buyer": {"partyName": "BuyerDemanding", "personality": _BUYER_DEMANDING},
-    },
-    {
-        "interactionId": "TX-EVAL-007",
-        "agent": {"partyName": "AgentHighReject", "personality": _AGENT_HIGH_REJECT},
-        "buyer": {"partyName": "BuyerDemanding", "personality": _BUYER_DEMANDING},
-    },
-    {
-        "interactionId": "TX-EVAL-008",
-        "agent": {"partyName": "AgentUnreliable", "personality": _AGENT_UNRELIABLE},
-        "buyer": {"partyName": "BuyerDemanding", "personality": _BUYER_DEMANDING},
+        "buyer_name": "BuyerCautious",
+        "buyer_personality": _BUYER_CAUTIOUS,
+        "context": "Rural property with a complex title history; buyer taking time to verify all details.",
     },
 
-    # ════════════════════════════════════════════════════════════════════
-    # Round 3 — BuyerEager (neutral baseline)
-    # Clean signal for all four agents without extreme pressure.
-    # ════════════════════════════════════════════════════════════════════
+    # ── Cycle B (rounds 6–10): New archetypes introduced ────────────────────
+    {
+        "buyer_name": "BuyerInvestor",
+        "buyer_personality": _BUYER_INVESTOR,
+        "context": "City-centre buy-to-let apartment; buyer focused on rental yield and fast execution.",
+    },
+    {
+        "buyer_name": "BuyerReluctant",
+        "buyer_personality": _BUYER_RELUCTANT,
+        "context": "Three-bedroom semi; buyer was persuaded by their spouse and is not fully committed.",
+    },
+    {
+        "buyer_name": "BuyerExperienced",
+        "buyer_personality": _BUYER_EXPERIENCED,
+        "context": "Seasoned buyer on their third property purchase in five years; expects a smooth process.",
+    },
+    {
+        "buyer_name": "BuyerImpatient",
+        "buyer_personality": _BUYER_IMPATIENT,
+        "context": "Hot market with a competing offer already on the table; every hour of delay risks losing the property.",
+    },
+    {
+        "buyer_name": "BuyerDemanding",
+        "buyer_personality": _BUYER_DEMANDING,
+        "context": "Heritage-listed townhouse; buyer conducting intensive due diligence and a detailed legal review.",
+    },
 
+    # ── Cycle C (rounds 11–15): Cross-stress and favourable matchups ─────────
     {
-        "interactionId": "TX-EVAL-009",
-        "agent": {"partyName": "AgentPro", "personality": _AGENT_PRO},
-        "buyer": {"partyName": "BuyerEager", "personality": _BUYER_EAGER},
+        "buyer_name": "BuyerEager",
+        "buyer_personality": _BUYER_EAGER,
+        "context": "Off-plan new-development flat; buyer excited about the project and eager to exchange.",
     },
     {
-        "interactionId": "TX-EVAL-010",
-        "agent": {"partyName": "AgentSlowUploader", "personality": _AGENT_SLOW_UPLOADER},
-        "buyer": {"partyName": "BuyerEager", "personality": _BUYER_EAGER},
+        "buyer_name": "BuyerCautious",
+        "buyer_personality": _BUYER_CAUTIOUS,
+        "context": "Cross-border purchase; overseas buyer in a different time zone adds significant communication lag.",
     },
     {
-        "interactionId": "TX-EVAL-011",
-        "agent": {"partyName": "AgentHighReject", "personality": _AGENT_HIGH_REJECT},
-        "buyer": {"partyName": "BuyerEager", "personality": _BUYER_EAGER},
+        "buyer_name": "BuyerInvestor",
+        "buyer_personality": _BUYER_INVESTOR,
+        "context": "Portfolio expansion; third acquisition this quarter for a mid-sized property investment company.",
     },
     {
-        "interactionId": "TX-EVAL-012",
-        "agent": {"partyName": "AgentUnreliable", "personality": _AGENT_UNRELIABLE},
-        "buyer": {"partyName": "BuyerEager", "personality": _BUYER_EAGER},
+        "buyer_name": "BuyerPersistent",
+        "buyer_personality": _BUYER_PERSISTENT,
+        "context": "Distressed sale with a motivated seller; buyer expects a fair but thorough process.",
+    },
+    {
+        "buyer_name": "BuyerReluctant",
+        "buyer_personality": _BUYER_RELUCTANT,
+        "context": "Buyer downsizing after retirement; emotionally attached to their current home and slow to commit.",
     },
 
-    # ════════════════════════════════════════════════════════════════════
-    # Round 4 — BuyerPersistent (moderate stress)
-    # Fair, thorough observer; captures weaknesses without extreme amplification.
-    # ════════════════════════════════════════════════════════════════════
+    # ── Cycle D (rounds 16–20): Adverse and high-pressure conditions ─────────
+    {
+        "buyer_name": "BuyerExperienced",
+        "buyer_personality": _BUYER_EXPERIENCED,
+        "context": "Luxury penthouse purchase; buyer expects white-glove service and zero tolerance for procedural errors.",
+    },
+    {
+        "buyer_name": "BuyerImpatient",
+        "buyer_personality": _BUYER_IMPATIENT,
+        "context": "Chain sale under time pressure; buyer's own sale completes within days and any delay collapses the chain.",
+    },
+    {
+        "buyer_name": "BuyerCautious",
+        "buyer_personality": _BUYER_CAUTIOUS,
+        "context": "Probate sale with a pending legal dispute; buyer taking extra precautions throughout the process.",
+    },
+    {
+        "buyer_name": "BuyerInvestor",
+        "buyer_personality": _BUYER_INVESTOR,
+        "context": "Auction purchase with a legally binding 28-day completion deadline; every day of delay is contractually costly.",
+    },
+    {
+        "buyer_name": "BuyerEager",
+        "buyer_personality": _BUYER_EAGER,
+        "context": "Overseas relocation; buyer purchasing remotely and trusting the agent entirely to manage the local process.",
+    },
 
+    # ── Cycle E (rounds 21–25): Statistical tail — final convergence ─────────
     {
-        "interactionId": "TX-EVAL-013",
-        "agent": {"partyName": "AgentPro", "personality": _AGENT_PRO},
-        "buyer": {"partyName": "BuyerPersistent", "personality": _BUYER_PERSISTENT},
+        "buyer_name": "BuyerPersistent",
+        "buyer_personality": _BUYER_PERSISTENT,
+        "context": "Slow market; property has been listed for six months and buyer knows they have negotiating leverage.",
     },
     {
-        "interactionId": "TX-EVAL-014",
-        "agent": {"partyName": "AgentSlowUploader", "personality": _AGENT_SLOW_UPLOADER},
-        "buyer": {"partyName": "BuyerPersistent", "personality": _BUYER_PERSISTENT},
+        "buyer_name": "BuyerDemanding",
+        "buyer_personality": _BUYER_DEMANDING,
+        "context": "New-build with a snagging list; buyer will not sign until every defect is formally documented and addressed.",
     },
     {
-        "interactionId": "TX-EVAL-015",
-        "agent": {"partyName": "AgentHighReject", "personality": _AGENT_HIGH_REJECT},
-        "buyer": {"partyName": "BuyerPersistent", "personality": _BUYER_PERSISTENT},
+        "buyer_name": "BuyerReluctant",
+        "buyer_personality": _BUYER_RELUCTANT,
+        "context": "Buyer making an offer under family pressure; their resolve is fragile and they may withdraw at any point.",
     },
     {
-        "interactionId": "TX-EVAL-016",
-        "agent": {"partyName": "AgentUnreliable", "personality": _AGENT_UNRELIABLE},
-        "buyer": {"partyName": "BuyerPersistent", "personality": _BUYER_PERSISTENT},
+        "buyer_name": "BuyerExperienced",
+        "buyer_personality": _BUYER_EXPERIENCED,
+        "context": "High-value commercial-residential conversion; buyer well-versed in complex mixed-use transactions.",
+    },
+    {
+        "buyer_name": "BuyerInvestor",
+        "buyer_personality": _BUYER_INVESTOR,
+        "context": "Short-lease apartment requiring urgent action to avoid a penalty; any process delay invalidates the deal.",
     },
 ]
+
+# Build the flat profiles list: 25 rounds × 4 agents = 100 interactions.
+# All agents in a round share the same buyer and context for direct comparability.
+PROPERTY_PURCHASE_PERSONALITIES = []
+for _round_idx, _rnd in enumerate(_ROUNDS):
+    for _agent_idx, _agent in enumerate(_AGENTS):
+        _tx_num = _round_idx * 4 + _agent_idx + 1
+        PROPERTY_PURCHASE_PERSONALITIES.append({
+            "interactionId": f"TX-EVAL-{_tx_num:03d}",
+            "agent": _agent,
+            "buyer": {
+                "partyName": _rnd["buyer_name"],
+                "personality": _rnd["buyer_personality"],
+            },
+            "context": _rnd["context"],
+        })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -277,7 +377,6 @@ Return JSON matching this exact shape:
 """
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. GEMINI CALLS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -298,13 +397,13 @@ def call_gemini(client, model_name: str, system_prompt: str, user_message: str) 
 def generate_pp_params(client, model_name: str, profile: dict) -> dict:
     agent_p = profile["agent"]["personality"]
     buyer_p = profile["buyer"]["personality"]
-    user_msg = f"Agent personality: {agent_p}\n\nBuyer personality: {buyer_p}"
+    context = profile.get("context", "")
+    context_line = f"Transaction context: {context}\n\n" if context else ""
+    user_msg = f"{context_line}Agent personality: {agent_p}\n\nBuyer personality: {buyer_p}"
     print(f"  Calling Gemini for {profile['interactionId']}...", end=" ", flush=True)
     result = call_gemini(client, model_name, PP_SYSTEM_PROMPT, user_msg)
     print("done")
     return result
-
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -331,7 +430,7 @@ def fmt_decimal(v: float) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. INTERACTION DAML GENERATORS (unchanged logic)
+# 5. INTERACTION DAML GENERATORS
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_pp_daml(profile: dict, params: dict, base_date: datetime) -> str:
@@ -498,7 +597,6 @@ def generate_pp_daml(profile: dict, params: dict, base_date: datetime) -> str:
     return "\n".join(lines)
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. MULTI-FILE DAML ASSEMBLY
 # ─────────────────────────────────────────────────────────────────────────────
@@ -595,7 +693,12 @@ def build_round_daml(round_num: int, profiles: list, params_list: list, start_ba
     agents = sorted({p["agent"]["partyName"] for p in profiles})
     buyers = sorted({p["buyer"]["partyName"] for p in profiles})
 
+    # All profiles in a round share the same buyer and context.
+    round_buyer   = profiles[0]["buyer"]["partyName"]
+    round_context = profiles[0].get("context", "")
+
     lines = []
+    lines.append(f"-- Round {round_num}: {round_buyer} — {round_context}")
     lines.append(f"module {module} where")
     lines.append("")
     lines.append("import Daml.Script")
@@ -650,6 +753,7 @@ def build_round_daml(round_num: int, profiles: list, params_list: list, start_ba
     lines.append("")
     return "\n".join(lines)
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 9. ENTRYPOINT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -660,14 +764,15 @@ def main():
     parser.add_argument("--model", required=True, help="Gemini model to use (e.g. gemini-2.0-flash)")
     args = parser.parse_args()
 
-    pp_count = len(PROPERTY_PURCHASE_PERSONALITIES)
-    n_agents = len({p["agent"]["partyName"] for p in PROPERTY_PURCHASE_PERSONALITIES})
-    n_buyers = len({p["buyer"]["partyName"] for p in PROPERTY_PURCHASE_PERSONALITIES})
+    n_rounds  = len(_ROUNDS)
+    n_agents  = len(_AGENTS)
+    pp_count  = len(PROPERTY_PURCHASE_PERSONALITIES)
+    n_buyers  = len({p["buyer"]["partyName"] for p in PROPERTY_PURCHASE_PERSONALITIES})
 
     print(f"Reputation System — AI Agent Evaluation Simulator")
     print(f"Model     : {args.model}")
     print(f"Output    : {os.path.abspath(args.output_dir)}/")
-    print(f"PP        : {pp_count} interactions  ({n_agents} agents × 4 rounds, {n_buyers} shared buyers)")
+    print(f"PP        : {pp_count} interactions  ({n_agents} agents × {n_rounds} rounds, {n_buyers} buyer archetypes)")
     print()
     print("Agent archetypes:")
     print("  AgentPro          — high reliability, high responsiveness, high accuracy")
@@ -675,11 +780,19 @@ def main():
     print("  AgentHighReject   — high responsiveness, normal reliability, LOW accuracy")
     print("  AgentUnreliable   — LOW reliability (backs out), medium responsiveness, medium accuracy")
     print()
-    print("Shared buyer personalities (one per round):")
-    print("  Round 1 — BuyerImpatient  : stresses responsiveness")
-    print("  Round 2 — BuyerDemanding  : stresses accuracy")
-    print("  Round 3 — BuyerEager      : neutral baseline")
-    print("  Round 4 — BuyerPersistent : moderate stress")
+    print("Buyer archetypes (all agents share same buyer + context per round):")
+    print("  BuyerImpatient  — stresses responsiveness (rounds 1, 9, 17)")
+    print("  BuyerDemanding  — stresses accuracy       (rounds 2, 10, 22)")
+    print("  BuyerEager      — neutral baseline         (rounds 3, 11, 20)")
+    print("  BuyerPersistent — moderate stress          (rounds 4, 14, 21)")
+    print("  BuyerCautious   — long timelines, patience (rounds 5, 12, 18)")
+    print("  BuyerInvestor   — stresses speed + accuracy (rounds 6, 13, 19, 25)")
+    print("  BuyerReluctant  — high rejection rate      (rounds 7, 15, 23)")
+    print("  BuyerExperienced— precise, high standards  (rounds 8, 16, 24)")
+    print()
+    print("Cycle structure:")
+    for i, rnd in enumerate(_ROUNDS, 1):
+        print(f"  Round {i:2d}: {rnd['buyer_name']:<18} — {rnd['context']}")
     print()
 
     gemini_client = genai.Client(
@@ -699,15 +812,15 @@ def main():
 
     print("\nAssembling round files...")
     base = datetime(2026, 6, 1, 9, 0, 0)
-    for round_num in range(1, 5):
-        idx = (round_num - 1) * 4
-        round_profiles = PROPERTY_PURCHASE_PERSONALITIES[idx : idx + 4]
-        round_params   = pp_params[idx : idx + 4]
+    for round_num in range(1, n_rounds + 1):
+        idx = (round_num - 1) * n_agents
+        round_profiles = PROPERTY_PURCHASE_PERSONALITIES[idx : idx + n_agents]
+        round_params   = pp_params[idx : idx + n_agents]
         round_path = os.path.join(out, f"EvalSeedAgentRound{round_num}.daml")
         with open(round_path, "w") as f:
             f.write(build_round_daml(round_num, round_profiles, round_params, base))
         print(f"  Written: {round_path}")
-        base += timedelta(days=60 * 4)
+        base += timedelta(days=60 * n_agents)
 
     print()
 

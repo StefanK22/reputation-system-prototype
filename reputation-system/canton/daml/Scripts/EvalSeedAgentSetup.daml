@@ -17,34 +17,18 @@ evalSeedAgentSetup = do
   operator <- case find (\pd -> "Operator::" `isPrefixOf` (partyToText pd.party)) knownParties of
     None -> fail "Operator party not found. Run Setup first."
     Some pd -> pure pd.party
-  agentHighReject        <- allocatePartyByHint (PartyIdHint "AgentHighReject")
-  agentPro               <- allocatePartyByHint (PartyIdHint "AgentPro")
-  agentSlowUploader      <- allocatePartyByHint (PartyIdHint "AgentSlowUploader")
-  agentUnreliable        <- allocatePartyByHint (PartyIdHint "AgentUnreliable")
-  buyerDemanding         <- allocatePartyByHint (PartyIdHint "BuyerDemanding")
-  buyerEager             <- allocatePartyByHint (PartyIdHint "BuyerEager")
-  buyerImpatient         <- allocatePartyByHint (PartyIdHint "BuyerImpatient")
-  buyerPersistent        <- allocatePartyByHint (PartyIdHint "BuyerPersistent")
-  landlordFair           <- allocatePartyByHint (PartyIdHint "LandlordFair")
-  landlordPicky          <- allocatePartyByHint (PartyIdHint "LandlordPicky")
-  landlordSlowReviewer   <- allocatePartyByHint (PartyIdHint "LandlordSlowReviewer")
-  landlordUnreliable     <- allocatePartyByHint (PartyIdHint "LandlordUnreliable")
-  tenantAbandonedFirst   <- allocatePartyByHint (PartyIdHint "TenantAbandonedFirst")
-  tenantAbandonedSecond  <- allocatePartyByHint (PartyIdHint "TenantAbandonedSecond")
-  tenantAbandonedThird   <- allocatePartyByHint (PartyIdHint "TenantAbandonedThird")
-  tenantAverage          <- allocatePartyByHint (PartyIdHint "TenantAverage")
-  tenantAverageRenter    <- allocatePartyByHint (PartyIdHint "TenantAverageRenter")
-  tenantCompliant        <- allocatePartyByHint (PartyIdHint "TenantCompliant")
-  tenantDisorganized     <- allocatePartyByHint (PartyIdHint "TenantDisorganized")
-  tenantFirstTime        <- allocatePartyByHint (PartyIdHint "TenantFirstTime")
-  tenantGood             <- allocatePartyByHint (PartyIdHint "TenantGood")
-  tenantLuckyRA          <- allocatePartyByHint (PartyIdHint "TenantLuckyRA")
-  tenantNewRenter        <- allocatePartyByHint (PartyIdHint "TenantNewRenter")
-  tenantOrganized        <- allocatePartyByHint (PartyIdHint "TenantOrganized")
-  tenantPerfect          <- allocatePartyByHint (PartyIdHint "TenantPerfect")
-  tenantPrepared         <- allocatePartyByHint (PartyIdHint "TenantPrepared")
-  tenantThorough         <- allocatePartyByHint (PartyIdHint "TenantThorough")
-  tenantTimePressed      <- allocatePartyByHint (PartyIdHint "TenantTimePressed")
+  agentHighReject    <- allocatePartyByHint (PartyIdHint "AgentHighReject")
+  agentPro           <- allocatePartyByHint (PartyIdHint "AgentPro")
+  agentSlowUploader  <- allocatePartyByHint (PartyIdHint "AgentSlowUploader")
+  agentUnreliable    <- allocatePartyByHint (PartyIdHint "AgentUnreliable")
+  buyerCautious      <- allocatePartyByHint (PartyIdHint "BuyerCautious")
+  buyerDemanding     <- allocatePartyByHint (PartyIdHint "BuyerDemanding")
+  buyerEager         <- allocatePartyByHint (PartyIdHint "BuyerEager")
+  buyerExperienced   <- allocatePartyByHint (PartyIdHint "BuyerExperienced")
+  buyerImpatient     <- allocatePartyByHint (PartyIdHint "BuyerImpatient")
+  buyerInvestor      <- allocatePartyByHint (PartyIdHint "BuyerInvestor")
+  buyerPersistent    <- allocatePartyByHint (PartyIdHint "BuyerPersistent")
+  buyerReluctant     <- allocatePartyByHint (PartyIdHint "BuyerReluctant")
 
   let t0 = time (date 2026 Jun 1) 0 0 0
 
@@ -56,22 +40,26 @@ evalSeedAgentSetup = do
       createdAt       = t0
       agentWeights    = AgentWeights    with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       buyerWeights    = BuyerWeights    with reliability = 0.4; responsiveness = 0.4; accuracy = 0.2
-      landlordWeights = LandlordWeights with reliability = 0.3; responsiveness = 0.4; accuracy = 0.3
-      tenantWeights   = TenantWeights   with reliability = 0.35; responsiveness = 0.3; accuracy = 0.35
+      landlordWeights = LandlordWeights with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
+      tenantWeights   = TenantWeights   with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       scoreFloor      = 0.0
       scoreCeiling    = 100.0
-      startValue      = 50.0
+      startValue      = 75.0
       tiers           = [("a", 0.0)]
 
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentHighReject; roleType = Agent; assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentPro; roleType = Agent; assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentSlowUploader; roleType = Agent; assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentUnreliable; roleType = Agent; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerCautious; roleType = Buyer; assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerDemanding; roleType = Buyer; assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerEager; roleType = Buyer; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerExperienced; roleType = Buyer; assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerImpatient; roleType = Buyer; assignedAt = t0
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerInvestor; roleType = Buyer; assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerPersistent; roleType = Buyer; assignedAt = t0
-  
+  _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = buyerReluctant; roleType = Buyer; assignedAt = t0
+
   -- ── Property purchase configuration ──────────────────────────────
   _ <- submit operator do
     createCmd PropertyPurchaseConfiguration with

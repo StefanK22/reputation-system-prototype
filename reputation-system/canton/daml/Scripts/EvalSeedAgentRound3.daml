@@ -1,3 +1,4 @@
+-- Round 3: BuyerEager — Modern apartment in a popular neighbourhood; buyer ready to move quickly.
 module Scripts.EvalSeedAgentRound3 where
 
 import Daml.Script
@@ -109,7 +110,7 @@ evalSeedAgentRound3 = do
   submit agentPro do
     exerciseCmd (fromInterfaceContractId tx_eval_009_agentReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.98
+        professionalism = Some 0.95
         availability    = Some 0.98
         honesty         = Some 0.95
         submittedAt = tx_eval_009_feedback
@@ -118,7 +119,7 @@ evalSeedAgentRound3 = do
   submit buyerEager do
     exerciseCmd (fromInterfaceContractId tx_eval_009_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.99
+        professionalism = Some 0.98
         availability    = Some 0.98
         honesty         = Some 1.00
         submittedAt = tx_eval_009_feedback
@@ -129,11 +130,11 @@ evalSeedAgentRound3 = do
   let tx_eval_010_t0 = time (date 2027 Nov 23) 9 0 0
       tx_eval_010_p1_submit  = time (date 2027 Nov 23) 9 0 0
       tx_eval_010_p1_respond = time (date 2027 Nov 23) 11 0 0
-      tx_eval_010_cu1          = time (date 2027 Nov 26) 23 0 0
-      tx_eval_010_contract_sign   = time (date 2027 Nov 27) 3 0 0
-      tx_eval_010_close    = time (date 2027 Nov 27) 4 0 0
-      tx_eval_010_complete = time (date 2027 Nov 27) 5 0 0
-      tx_eval_010_feedback = time (date 2027 Nov 28) 5 0 0
+      tx_eval_010_cu1          = time (date 2027 Nov 26) 19 0 0
+      tx_eval_010_contract_sign   = time (date 2027 Nov 26) 23 0 0
+      tx_eval_010_close    = time (date 2027 Nov 27) 0 0 0
+      tx_eval_010_complete = time (date 2027 Nov 27) 1 0 0
+      tx_eval_010_feedback = time (date 2027 Nov 28) 1 0 0
 
   tx_eval_010_draftCid <- submit agentSlowUploader do
     createCmd DraftInteraction with
@@ -203,9 +204,9 @@ evalSeedAgentRound3 = do
   submit buyerEager do
     exerciseCmd (fromInterfaceContractId tx_eval_010_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.45
-        availability    = Some 0.10
-        honesty         = Some 0.95
+        professionalism = Some 0.40
+        availability    = Some 0.05
+        honesty         = Some 1.00
         submittedAt = tx_eval_010_feedback
 
   -- ═══════════════════════════════════════════════════════════
@@ -316,8 +317,8 @@ evalSeedAgentRound3 = do
   submit buyerEager do
     exerciseCmd (fromInterfaceContractId tx_eval_011_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.75
-        availability    = Some 0.98
+        professionalism = Some 0.80
+        availability    = Some 0.95
         honesty         = Some 0.35
         submittedAt = tx_eval_011_feedback
 
@@ -380,15 +381,15 @@ evalSeedAgentRound3 = do
     exerciseCmd (fromInterfaceContractId tx_eval_012_agentReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
         professionalism = Some 0.95
-        availability    = Some 0.98
-        honesty         = Some 0.95
+        availability    = Some 0.95
+        honesty         = Some 1.00
         submittedAt = tx_eval_012_feedback
 
   -- BuyerEager (buyer) gives feedback about AgentUnreliable (agent)
   submit buyerEager do
     exerciseCmd (fromInterfaceContractId tx_eval_012_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.03
+        professionalism = Some 0.04
         availability    = Some 0.92
         honesty         = Some 0.95
         submittedAt = tx_eval_012_feedback

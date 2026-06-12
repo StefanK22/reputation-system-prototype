@@ -1,3 +1,4 @@
+-- Round 2: BuyerDemanding — Premium detached family home; buyer commissioning a full independent survey.
 module Scripts.EvalSeedAgentRound2 where
 
 import Daml.Script
@@ -43,14 +44,16 @@ evalSeedAgentRound2 = do
   -- ═══════════════════════════════════════════════════════════
   let tx_eval_005_t0 = time (date 2027 Jan 27) 9 0 0
       tx_eval_005_p1_submit  = time (date 2027 Jan 27) 9 0 0
-      tx_eval_005_p1_respond = time (date 2027 Jan 30) 21 0 0
-      tx_eval_005_p2_submit  = time (date 2027 Jan 30) 21 0 0
-      tx_eval_005_p2_respond = time (date 2027 Feb 2) 11 0 0
-      tx_eval_005_cu1          = time (date 2027 Feb 2) 14 0 0
-      tx_eval_005_contract_sign   = time (date 2027 Feb 2) 22 0 0
-      tx_eval_005_close    = time (date 2027 Feb 2) 23 0 0
-      tx_eval_005_complete = time (date 2027 Feb 3) 0 0 0
-      tx_eval_005_feedback = time (date 2027 Feb 4) 0 0 0
+      tx_eval_005_p1_respond = time (date 2027 Jan 31) 9 0 0
+      tx_eval_005_p2_submit  = time (date 2027 Jan 31) 9 0 0
+      tx_eval_005_p2_respond = time (date 2027 Feb 3) 9 0 0
+      tx_eval_005_p3_submit  = time (date 2027 Feb 3) 9 0 0
+      tx_eval_005_p3_respond = time (date 2027 Feb 5) 9 0 0
+      tx_eval_005_cu1          = time (date 2027 Feb 5) 12 0 0
+      tx_eval_005_contract_sign   = time (date 2027 Feb 7) 12 0 0
+      tx_eval_005_close    = time (date 2027 Feb 7) 13 0 0
+      tx_eval_005_complete = time (date 2027 Feb 7) 14 0 0
+      tx_eval_005_feedback = time (date 2027 Feb 8) 14 0 0
 
   tx_eval_005_draftCid <- submit agentPro do
     createCmd DraftInteraction with
@@ -84,8 +87,20 @@ evalSeedAgentRound2 = do
   tx_eval_005_ipCid <- submit operator do
     exerciseCmd tx_eval_005_ipCid RecordEvent with
       event = RecordedEvent with
-        event = ProposalApproved; actor = buyerDemanding; occurredAt = tx_eval_005_p2_respond
+        event = ProposalRejectedWithNotes; actor = buyerDemanding; occurredAt = tx_eval_005_p2_respond
         resourceId = Some "proposal-002"
+
+  tx_eval_005_ipCid <- submit operator do
+    exerciseCmd tx_eval_005_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted; actor = agentPro; occurredAt = tx_eval_005_p3_submit
+        resourceId = Some "proposal-003"
+
+  tx_eval_005_ipCid <- submit operator do
+    exerciseCmd tx_eval_005_ipCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved; actor = buyerDemanding; occurredAt = tx_eval_005_p3_respond
+        resourceId = Some "proposal-003"
 
   tx_eval_005_ipCid <- submit operator do
     exerciseCmd tx_eval_005_ipCid RecordEvent with
@@ -123,9 +138,9 @@ evalSeedAgentRound2 = do
   submit agentPro do
     exerciseCmd (fromInterfaceContractId tx_eval_005_agentReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.85
-        availability    = Some 0.10
-        honesty         = Some 0.90
+        professionalism = Some 0.90
+        availability    = Some 0.15
+        honesty         = Some 0.95
         submittedAt = tx_eval_005_feedback
 
   -- BuyerDemanding (buyer) gives feedback about AgentPro (agent)
@@ -134,7 +149,7 @@ evalSeedAgentRound2 = do
       SubmitFeedback with
         professionalism = Some 0.98
         availability    = Some 0.98
-        honesty         = Some 0.75
+        honesty         = Some 0.35
         submittedAt = tx_eval_005_feedback
 
   -- ═══════════════════════════════════════════════════════════
@@ -142,14 +157,14 @@ evalSeedAgentRound2 = do
   -- ═══════════════════════════════════════════════════════════
   let tx_eval_006_t0 = time (date 2027 Mar 28) 9 0 0
       tx_eval_006_p1_submit  = time (date 2027 Mar 28) 9 0 0
-      tx_eval_006_p1_respond = time (date 2027 Mar 30) 9 0 0
-      tx_eval_006_p2_submit  = time (date 2027 Mar 30) 9 0 0
-      tx_eval_006_p2_respond = time (date 2027 Mar 31) 21 0 0
-      tx_eval_006_cu1          = time (date 2027 Apr 4) 9 0 0
-      tx_eval_006_contract_sign   = time (date 2027 Apr 6) 9 0 0
-      tx_eval_006_close    = time (date 2027 Apr 6) 10 0 0
-      tx_eval_006_complete = time (date 2027 Apr 6) 11 0 0
-      tx_eval_006_feedback = time (date 2027 Apr 7) 11 0 0
+      tx_eval_006_p1_respond = time (date 2027 Mar 30) 15 0 0
+      tx_eval_006_p2_submit  = time (date 2027 Mar 30) 15 0 0
+      tx_eval_006_p2_respond = time (date 2027 Apr 2) 15 0 0
+      tx_eval_006_cu1          = time (date 2027 Apr 6) 9 0 0
+      tx_eval_006_contract_sign   = time (date 2027 Apr 8) 9 0 0
+      tx_eval_006_close    = time (date 2027 Apr 8) 10 0 0
+      tx_eval_006_complete = time (date 2027 Apr 8) 11 0 0
+      tx_eval_006_feedback = time (date 2027 Apr 9) 11 0 0
 
   tx_eval_006_draftCid <- submit agentSlowUploader do
     createCmd DraftInteraction with
@@ -222,18 +237,18 @@ evalSeedAgentRound2 = do
   submit agentSlowUploader do
     exerciseCmd (fromInterfaceContractId tx_eval_006_agentReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.75
-        availability    = Some 0.10
-        honesty         = Some 0.80
+        professionalism = Some 0.80
+        availability    = Some 0.15
+        honesty         = Some 0.90
         submittedAt = tx_eval_006_feedback
 
   -- BuyerDemanding (buyer) gives feedback about AgentSlowUploader (agent)
   submit buyerDemanding do
     exerciseCmd (fromInterfaceContractId tx_eval_006_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.25
+        professionalism = Some 0.45
         availability    = Some 0.05
-        honesty         = Some 0.70
+        honesty         = Some 0.75
         submittedAt = tx_eval_006_feedback
 
   -- ═══════════════════════════════════════════════════════════
@@ -241,16 +256,16 @@ evalSeedAgentRound2 = do
   -- ═══════════════════════════════════════════════════════════
   let tx_eval_007_t0 = time (date 2027 May 27) 9 0 0
       tx_eval_007_p1_submit  = time (date 2027 May 27) 9 0 0
-      tx_eval_007_p1_respond = time (date 2027 May 30) 9 0 0
-      tx_eval_007_p2_submit  = time (date 2027 May 30) 9 0 0
-      tx_eval_007_p2_respond = time (date 2027 Jun 1) 9 0 0
-      tx_eval_007_p3_submit  = time (date 2027 Jun 1) 9 0 0
-      tx_eval_007_p3_respond = time (date 2027 Jun 5) 9 0 0
-      tx_eval_007_cu1          = time (date 2027 Jun 5) 11 0 0
-      tx_eval_007_contract_sign   = time (date 2027 Jun 7) 11 0 0
-      tx_eval_007_close    = time (date 2027 Jun 7) 12 0 0
-      tx_eval_007_complete = time (date 2027 Jun 7) 13 0 0
-      tx_eval_007_feedback = time (date 2027 Jun 8) 13 0 0
+      tx_eval_007_p1_respond = time (date 2027 May 29) 9 0 0
+      tx_eval_007_p2_submit  = time (date 2027 May 29) 9 0 0
+      tx_eval_007_p2_respond = time (date 2027 May 31) 17 0 0
+      tx_eval_007_p3_submit  = time (date 2027 May 31) 17 0 0
+      tx_eval_007_p3_respond = time (date 2027 Jun 3) 17 0 0
+      tx_eval_007_cu1          = time (date 2027 Jun 3) 19 0 0
+      tx_eval_007_contract_sign   = time (date 2027 Jun 5) 7 0 0
+      tx_eval_007_close    = time (date 2027 Jun 5) 8 0 0
+      tx_eval_007_complete = time (date 2027 Jun 5) 9 0 0
+      tx_eval_007_feedback = time (date 2027 Jun 6) 9 0 0
 
   tx_eval_007_draftCid <- submit agentHighReject do
     createCmd DraftInteraction with
@@ -335,8 +350,8 @@ evalSeedAgentRound2 = do
   submit agentHighReject do
     exerciseCmd (fromInterfaceContractId tx_eval_007_agentReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.95
-        availability    = Some 0.12
+        professionalism = Some 0.90
+        availability    = Some 0.15
         honesty         = Some 1.00
         submittedAt = tx_eval_007_feedback
 
@@ -344,9 +359,9 @@ evalSeedAgentRound2 = do
   submit buyerDemanding do
     exerciseCmd (fromInterfaceContractId tx_eval_007_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.65
+        professionalism = Some 0.75
         availability    = Some 0.98
-        honesty         = Some 0.15
+        honesty         = Some 0.35
         submittedAt = tx_eval_007_feedback
 
   -- ═══════════════════════════════════════════════════════════
@@ -354,15 +369,15 @@ evalSeedAgentRound2 = do
   -- ═══════════════════════════════════════════════════════════
   let tx_eval_008_t0 = time (date 2027 Jul 26) 9 0 0
       tx_eval_008_p1_submit  = time (date 2027 Jul 26) 9 0 0
-      tx_eval_008_p1_respond = time (date 2027 Jul 28) 9 0 0
-      tx_eval_008_p2_submit  = time (date 2027 Jul 28) 9 0 0
+      tx_eval_008_p1_respond = time (date 2027 Jul 29) 9 0 0
+      tx_eval_008_p2_submit  = time (date 2027 Jul 29) 9 0 0
       tx_eval_008_p2_respond = time (date 2027 Jul 31) 9 0 0
       tx_eval_008_p3_submit  = time (date 2027 Jul 31) 9 0 0
-      tx_eval_008_p3_respond = time (date 2027 Aug 2) 11 0 0
-      tx_eval_008_cu1          = time (date 2027 Aug 2) 15 0 0
-      tx_eval_008_close    = time (date 2027 Aug 2) 17 0 0
-      tx_eval_008_complete = time (date 2027 Aug 2) 18 0 0
-      tx_eval_008_feedback = time (date 2027 Aug 3) 18 0 0
+      tx_eval_008_p3_respond = time (date 2027 Aug 1) 21 0 0
+      tx_eval_008_cu1          = time (date 2027 Aug 2) 1 0 0
+      tx_eval_008_close    = time (date 2027 Aug 2) 3 0 0
+      tx_eval_008_complete = time (date 2027 Aug 2) 4 0 0
+      tx_eval_008_feedback = time (date 2027 Aug 3) 4 0 0
 
   tx_eval_008_draftCid <- submit agentUnreliable do
     createCmd DraftInteraction with
@@ -435,8 +450,8 @@ evalSeedAgentRound2 = do
   submit agentUnreliable do
     exerciseCmd (fromInterfaceContractId tx_eval_008_agentReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
-        professionalism = Some 0.95
-        availability    = Some 0.05
+        professionalism = Some 0.90
+        availability    = Some 0.15
         honesty         = Some 0.95
         submittedAt = tx_eval_008_feedback
 
@@ -445,7 +460,7 @@ evalSeedAgentRound2 = do
     exerciseCmd (fromInterfaceContractId tx_eval_008_buyerReq : ContractId PropertyPurchaseFeedbackRequest)
       SubmitFeedback with
         professionalism = Some 0.03
-        availability    = Some 0.95
+        availability    = Some 0.90
         honesty         = Some 0.35
         submittedAt = tx_eval_008_feedback
 
