@@ -44,7 +44,7 @@ evalSeedAgentSetup = do
       tenantWeights   = TenantWeights   with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       scoreFloor      = 0.0
       scoreCeiling    = 100.0
-      startValue      = 75.0
+      startValue      = 50.0
       tiers           = [("a", 0.0)]
 
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentHighReject; roleType = Agent; assignedAt = t0

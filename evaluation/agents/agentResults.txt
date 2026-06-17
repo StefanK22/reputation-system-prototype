@@ -1,3 +1,15 @@
+agentObsWeights = AgentObservationWeights with
+reliabilityVoidedWeight                = 0.3
+reliabilityCompletionWeight            = 0.7
+responsivenessProposalToContractWeight = 0.6
+responsivenessContractWeight           = 0.4
+responsivenessCapHours                 = 24.0
+buyerObsWeights = BuyerObservationWeights with
+responsivenessContractWeight = 0.6
+responsivenessProposalWeight = 0.4
+responsivenessCapHours       = 24.0
+feedbackWindowDays = 30
+
 # prior 50
 
 DATA = {
