@@ -45,7 +45,7 @@ evalSeedAgentSetup = do
       scoreFloor      = 0.0
       scoreCeiling    = 100.0
       startValue      = 50.0
-      tiers           = [("a", 0.0)]
+      tiers           = [("Bronze", 60.0), ("Silver", 75.0), ("Gold", 90.0)]
 
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentHighReject; roleType = Agent; assignedAt = t0
   _ <- submit operator do exerciseCmd roleConfigCid CreateRole with party = agentPro; roleType = Agent; assignedAt = t0

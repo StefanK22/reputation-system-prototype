@@ -52,6 +52,23 @@ export function normalizeScore(scaled, config) {
   return ((typeof scaled === 'number' ? scaled : 0) - floor) / (ceiling - floor);
 }
 
+const TIER_COLORS = {
+  gold:   { bg: '#fff7e0', text: '#9a6b00', border: '#f0d98a' },
+  silver: { bg: '#f3f4f6', text: '#5a5a5a', border: '#d8dbe0' },
+  bronze: { bg: '#fbeee3', text: '#9a4f1f', border: '#e8c19a' },
+};
+const DEFAULT_TIER_COLOR = { bg: '#f5f5f5', text: '#666', border: '#e0e0e0' };
+
+export function TierTag({ tier }) {
+  if (!tier) return <span className="muted" style={{ fontSize: 11 }}>—</span>;
+  const s = TIER_COLORS[tier.toLowerCase()] ?? DEFAULT_TIER_COLOR;
+  return (
+    <span style={{ display: 'inline-block', background: s.bg, border: `1px solid ${s.border}`, color: s.text, padding: '2px 8px', fontSize: 11, borderRadius: 10, fontWeight: 600, letterSpacing: '0.02em' }}>
+      {tier}
+    </span>
+  );
+}
+
 export function ScoreDelta({ delta }) {
   if (!delta || Math.abs(delta) < 0.05) return null;
   const pos = delta > 0;

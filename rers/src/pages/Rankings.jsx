@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getRankings, getAllSubjects, getSubject, getReputationConfig } from '../api/reputation.js';
-import { Tag, ScoreBar, ScoreGauge, normalizeScore } from '../components/shared.jsx';
+import { getRankings, getAllSubjects, getSubject, getReputationConfig, getTiers } from '../api/reputation.js';
+import { Tag, TierTag, ScoreBar, ScoreGauge, normalizeScore } from '../components/shared.jsx';
 
 const COMP_IDS    = ['Reliability', 'Responsiveness', 'Accuracy'];
 const COMP_COLORS = ['#1a6abf', '#7a5abf', '#2a7a6a'];
@@ -25,7 +25,7 @@ function buildCompMap(subjects) {
   return map;
 }
 
-function SubjectPanel({ party, repConfig, onClose }) {
+function SubjectPanel({ party, repConfig, tierOrder, onClose }) {
   const [subject, setSubject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedContract, setExpandedContract] = useState(null);
@@ -89,7 +89,10 @@ function SubjectPanel({ party, repConfig, onClose }) {
               displayLabel={(subject.overallScore ?? 0).toFixed(1)}
             />
             <div>
-              <Tag>{subject.roleType || '—'}</Tag>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <Tag>{subject.roleType || '—'}</Tag>
+                <TierTag tier={subject.tier} />
+              </div>
               {subject.components?.length > 0 && (
                 <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>
                   {Math.max(...(subject.components.map(c => c.count ?? 0)))} observations
@@ -146,6 +149,8 @@ export default function Rankings() {
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
   const [roleFilter,  setRoleFilter]  = useState(null);
+  const [tierFilter,  setTierFilter]  = useState(null);
+  const [tierOrder,   setTierOrder]   = useState([]);
 
   function load() {
     setLoading(true);
@@ -154,11 +159,13 @@ export default function Rankings() {
       getRankings(),
       getAllSubjects().catch(() => []),
       getReputationConfig().catch(() => null),
+      getTiers().catch(() => ({})),
     ])
-      .then(([rows, subjects, cfg]) => {
+      .then(([rows, subjects, cfg, tiers]) => {
         setRankings(rows ?? []);
         setCompMap(buildCompMap(subjects));
         setRepConfig(cfg);
+        setTierOrder(Object.entries(tiers ?? {}).sort((a, b) => b[1] - a[1]).map(([name]) => name));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -170,8 +177,10 @@ export default function Rankings() {
   if (error)   return <div className="page-scroll"><p className="error">{error}</p></div>;
 
   const allRoles    = [...new Set(rankings.map(r => r.roleType).filter(Boolean))].sort();
+  const allTiers    = tierOrder.filter(t => rankings.some(r => r.tier === t));
   const sorted      = [...rankings]
     .filter(r => !roleFilter || r.roleType === roleFilter)
+    .filter(r => !tierFilter || r.tier === tierFilter)
     .sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
   const hasCompData = Object.keys(compMap).length > 0;
 
@@ -205,6 +214,28 @@ export default function Rankings() {
           </div>
         )}
 
+        {allTiers.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+            <button
+              className={!tierFilter ? 'primary' : ''}
+              style={{ fontSize: 11, padding: '3px 10px' }}
+              onClick={() => setTierFilter(null)}
+            >
+              All tiers
+            </button>
+            {allTiers.map(tier => (
+              <button
+                key={tier}
+                className={tierFilter === tier ? 'primary' : ''}
+                style={{ fontSize: 11, padding: '3px 10px' }}
+                onClick={() => setTierFilter(tierFilter === tier ? null : tier)}
+              >
+                {tier}
+              </button>
+            ))}
+          </div>
+        )}
+
         {sorted.length === 0 ? (
           <p className="muted">No subjects found.</p>
         ) : (
@@ -214,6 +245,7 @@ export default function Rankings() {
                 <th style={thSt}>#</th>
                 <th style={thSt}>Party</th>
                 <th style={thSt}>Role</th>
+                <th style={thSt}>Tier</th>
                 <th style={thSt}>Score</th>
                 {hasCompData && <>
                   <th style={thSt}>Reliability</th>
@@ -241,6 +273,7 @@ export default function Rankings() {
                       <div className="party">{r.party}</div>
                     </td>
                     <td style={tdSt}><Tag>{r.roleType || '—'}</Tag></td>
+                    <td style={tdSt}><TierTag tier={r.tier} /></td>
                     <td style={tdSt}>
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontSize: 16, fontWeight: 700, color: '#1a6abf' }}>
@@ -276,7 +309,7 @@ export default function Rankings() {
       </div>
 
       {selected && (
-        <SubjectPanel party={selected} repConfig={repConfig} onClose={() => setSelected(null)} />
+        <SubjectPanel party={selected} repConfig={repConfig} tierOrder={tierOrder} onClose={() => setSelected(null)} />
       )}
     </div>
   );

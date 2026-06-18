@@ -36,7 +36,7 @@ import matplotlib.pyplot as plt
 from evaluation.landlords.weightsRank import ARCHETYPES, COLORS
 
 # Matches landlordWeights in EvalSeedAgentSetup.daml.
-LANDLORD_WEIGHTS = {"rel": 0.334, "resp": 0.333, "acc": 0.333}
+LANDLORD_WEIGHTS = {"rel": 0.5, "resp": 0.3, "acc": 0.2}
 START_VALUE = 50.0  # 0-100 display scale, matches RoleConfiguration.startValue
 
 CONCENTRATION = 12.0  # higher = tighter noise around each archetype's mean

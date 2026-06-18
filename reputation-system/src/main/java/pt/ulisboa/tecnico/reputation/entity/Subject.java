@@ -32,8 +32,4 @@ public class Subject {
     private Instant updatedAt;
 
     private String tier;
-
-    private String vcTier;
-    private Double vcThreshold;
-    private Instant vcIssuedAt;
 }

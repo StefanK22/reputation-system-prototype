@@ -9,6 +9,7 @@ public record SubjectDto(
     String contractId,
     String configContractId,
     double overallScore,
+    String tier,
     Instant createdAt,
     Instant updatedAt,
     List<ComponentDto> components

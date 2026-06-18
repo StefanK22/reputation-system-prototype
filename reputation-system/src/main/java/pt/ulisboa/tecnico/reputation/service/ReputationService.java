@@ -8,17 +8,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import pt.ulisboa.tecnico.reputation.dto.SubjectDto;
+import pt.ulisboa.tecnico.reputation.dto.VcStatus;
 import pt.ulisboa.tecnico.reputation.entity.EngineConfiguration;
 import pt.ulisboa.tecnico.reputation.entity.Subject;
 import pt.ulisboa.tecnico.reputation.entity.SubjectComponent;
 import pt.ulisboa.tecnico.reputation.repository.EngineConfigurationRepository;
 import pt.ulisboa.tecnico.reputation.repository.SubjectRepository;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -47,10 +52,24 @@ public class ReputationService {
         config.setScoreFloor(floor);
         config.setScoreCeiling(ceiling);
         config.setStartValue(startValue);
-        config.setTiersJson(tiersJson);
+        config.setTiersJson(normalizeTiersJson(tiersJson, floor, ceiling));
         configRepo.save(config);
         log.info("ReputationConfiguration applied: floor={}, ceiling={}, startValue={}, tiers={}",
                 floor, ceiling, startValue, tiersJson);
+    }
+
+    /** Tiers are configured (in DAML) in display-range units, like startValue — normalize to [0,1] for internal comparisons. */
+    private String normalizeTiersJson(String tiersJson, double floor, double ceiling) {
+        if (tiersJson == null || tiersJson.isBlank()) return tiersJson;
+        try {
+            Map<String, Double> raw = new ObjectMapper().readerForMapOf(Double.class).readValue(tiersJson);
+            Map<String, Double> normalized = new LinkedHashMap<>();
+            raw.forEach((k, v) -> normalized.put(k, ceiling > floor ? (v - floor) / (ceiling - floor) : 0.0));
+            return new ObjectMapper().writeValueAsString(normalized);
+        } catch (Exception e) {
+            log.warn("Failed to normalize tiersJson: {}", e.getMessage());
+            return tiersJson;
+        }
     }
 
     public Map<String, Object> getReputationConfiguration() {
@@ -67,6 +86,7 @@ public class ReputationService {
         );
     }
 
+    /** Internal [0,1]-scale tier thresholds, comparable against Subject.overallScore. */
     public Map<String, Double> getTiers() {
         String tiersJson = getOrCreateConfig().getTiersJson();
         if (tiersJson == null || tiersJson.isBlank()) return Map.of();
@@ -76,6 +96,14 @@ public class ReputationService {
             log.warn("Failed to parse tiersJson: {}", e.getMessage());
             return Map.of();
         }
+    }
+
+    /** Tier thresholds scaled to the configured display range, for API/VC consumption. */
+    public Map<String, Double> getDisplayTiers() {
+        EngineConfiguration config = getOrCreateConfig();
+        Map<String, Double> display = new LinkedHashMap<>();
+        getTiers().forEach((k, v) -> display.put(k, scaleValue(v, config)));
+        return display;
     }
 
     @Transactional
@@ -152,40 +180,102 @@ public class ReputationService {
         recomputeScore(subject);
         recomputeTier(subject, getTiers());
 
-        if (subject.getVcTier() != null && subject.getOverallScore() < subject.getVcThreshold() + 0.05) {
-            log.info("VC revoked for party {}: vcTier={}, score={}", party, subject.getVcTier(), subject.getOverallScore());
-            subject.setVcTier(null);
-            subject.setVcThreshold(null);
-            subject.setVcIssuedAt(null);
-        }
-
         subjectRepo.save(subject);
     }
 
     // ── VC ────────────────────────────────────────────────────────────────────
 
-    @Transactional
+    private static final String ISSUER_ID = "https://reputation-system.example/issuer";
+    private static final String MOCK_SIGNING_SECRET = "mock-issuer-secret";
+
     public Optional<String> issueMockVc(String party) {
         Subject subject = subjectRepo.findById(party).orElse(null);
         if (subject == null || subject.getTier() == null) return Optional.empty();
 
-        double threshold = getTiers().getOrDefault(subject.getTier(), 0.0);
-        subject.setVcTier(subject.getTier());
-        subject.setVcThreshold(threshold);
-        subject.setVcIssuedAt(Instant.now());
-        subjectRepo.save(subject);
-
-        return Optional.of(buildVcString(subject));
+        String issuanceDate = Instant.now().truncatedTo(ChronoUnit.MILLIS).toString();
+        return Optional.of(buildVcString(party, subject.getTier(), issuanceDate));
     }
 
-    private String buildVcString(Subject s) {
-        String header  = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString("{\"alg\":\"mock\",\"typ\":\"VC\"}".getBytes());
+    private String reputationRangeLabel(String tier) {
+        EngineConfiguration config = getOrCreateConfig();
+        Map<String, Double> tiers = getDisplayTiers();
+        Double lower = tiers.get(tier);
+        if (lower == null) return null;
+
+        double upper = tiers.values().stream()
+                .filter(v -> v > lower)
+                .min(Double::compareTo)
+                .orElse(config.getScoreCeiling());
+
+        return lower + "-" + upper;
+    }
+
+    private Map<String, Object> buildCredential(String party, String tier, String issuanceDate) {
+        Map<String, Object> credentialSubject = new LinkedHashMap<>();
+        credentialSubject.put("id", party);
+        credentialSubject.put("tier", tier);
+        credentialSubject.put("reputationRange", reputationRangeLabel(tier));
+
+        Map<String, Object> credential = new LinkedHashMap<>();
+        credential.put("@context", List.of(
+                "https://www.w3.org/2018/credentials/v1",
+                "https://www.w3.org/2018/credentials/examples/v1"));
+        credential.put("id", "urn:vc:reputation:" + party);
+        credential.put("type", List.of("VerifiableCredential", "ReputationCredential"));
+        credential.put("issuer", ISSUER_ID);
+        credential.put("issuanceDate", issuanceDate);
+        credential.put("credentialSubject", credentialSubject);
+        return credential;
+    }
+
+    private String buildVcString(String party, String tier, String issuanceDate) {
+        try {
+            Map<String, Object> credential = buildCredential(party, tier, issuanceDate);
+
+            Map<String, Object> proof = new LinkedHashMap<>();
+            proof.put("type", "RsaSignature2018");
+            proof.put("created", issuanceDate);
+            proof.put("proofPurpose", "assertionMethod");
+            proof.put("verificationMethod", ISSUER_ID + "#key-1");
+            proof.put("jws", mockSign(credential));
+
+            Map<String, Object> signed = new LinkedHashMap<>(credential);
+            signed.put("proof", proof);
+
+            return new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(signed);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to build VC", e);
+        }
+    }
+
+    private String mockSign(Map<String, Object> credential) throws Exception {
+        String canonical = new ObjectMapper().writeValueAsString(credential);
+        String header = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("{\"alg\":\"mock256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
         String payload = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(String.format(
-                        "{\"sub\":\"%s\",\"tier\":\"%s\",\"threshold\":%s,\"iat\":\"%s\"}",
-                        s.getParty(), s.getVcTier(), s.getVcThreshold(), s.getVcIssuedAt()).getBytes());
-        return header + "." + payload + ".mocksig";
+                .encodeToString(canonical.getBytes(StandardCharsets.UTF_8));
+
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.update((header + "." + payload + "." + MOCK_SIGNING_SECRET).getBytes(StandardCharsets.UTF_8));
+        String signature = Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest());
+
+        return header + "." + payload + "." + signature;
+    }
+
+    public VcStatus verifyMockVc(String party, String tier, String issuanceDate, String jws) {
+        Subject subject = subjectRepo.findById(party).orElse(null);
+        if (subject == null) return VcStatus.INVALID;
+
+        try {
+            Map<String, Object> credential = buildCredential(party, tier, issuanceDate);
+            String expectedJws = mockSign(credential);
+            if (!expectedJws.equals(jws)) return VcStatus.INVALID;
+        } catch (Exception e) {
+            return VcStatus.INVALID;
+        }
+
+        // The signature proves the VC was genuinely issued for this tier; this checks it's still current.
+        return Objects.equals(tier, subject.getTier()) ? VcStatus.VALID : VcStatus.REVOKED;
     }
 
     // ── Score & Tier ──────────────────────────────────────────────────────────
@@ -276,6 +366,6 @@ public class ReputationService {
                 .toList();
         return new SubjectDto(
                 s.getParty(), s.getRoleType(), s.getContractId(), s.getConfigContractId(),
-                scaleValue(s.getOverallScore(), config), s.getCreatedAt(), s.getUpdatedAt(), comps);
+                scaleValue(s.getOverallScore(), config), s.getTier(), s.getCreatedAt(), s.getUpdatedAt(), comps);
     }
 }

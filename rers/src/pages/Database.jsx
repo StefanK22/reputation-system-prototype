@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllSubjects, getInterfaceIds, getReputationConfig } from '../api/reputation.js';
-import { Tag, ScoreBar, normalizeScore } from '../components/shared.jsx';
+import { Tag, TierTag, ScoreBar, normalizeScore } from '../components/shared.jsx';
 
 const tdSt = { padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333', verticalAlign: 'middle' };
 const thSt = { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #eee', color: '#999', fontWeight: 'normal', fontSize: 11, textTransform: 'uppercase' };
@@ -73,6 +73,7 @@ function SubjectRow({ s, repConfig, expanded, onToggle }) {
           <div style={{ fontSize: 10, color: '#bbb', wordBreak: 'break-all' }}>{s.party}</div>
         </td>
         <td style={tdSt}><Tag>{s.roleType || '—'}</Tag></td>
+        <td style={tdSt}><TierTag tier={s.tier} /></td>
         <td style={tdSt}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: '#1a6abf' }}>
@@ -88,7 +89,7 @@ function SubjectRow({ s, repConfig, expanded, onToggle }) {
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={6} style={{ background: '#f7f9ff', padding: '16px 24px 16px 40px', borderBottom: '1px solid #e8e8e8' }}>
+          <td colSpan={7} style={{ background: '#f7f9ff', padding: '16px 24px 16px 40px', borderBottom: '1px solid #e8e8e8' }}>
             <div style={{ marginBottom: 12 }}>
               <ComponentsDetail components={s.components} repConfig={repConfig} />
             </div>
@@ -206,30 +207,10 @@ export default function Database() {
                     <td style={{ ...tdSt, color: '#888', paddingLeft: 0 }}>Score Ceiling</td>
                     <td style={{ ...tdSt, fontWeight: 600 }}>{repConfig.scoreCeiling}</td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Component Start Values</div>
-              <table style={{ borderCollapse: 'collapse' }}>
-                <thead>
                   <tr>
-                    <th style={{ ...thSt, paddingLeft: 0 }}>Component</th>
-                    <th style={thSt}>Start Value</th>
+                    <td style={{ ...tdSt, color: '#888', paddingLeft: 0 }}>Start Value</td>
+                    <td style={{ ...tdSt, fontWeight: 600 }}>{repConfig.startValue}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(repConfig.componentStartValues ?? {}).map(([comp, val]) => (
-                    <tr key={comp}>
-                      <td style={{ ...tdSt, paddingLeft: 0, color: COMP_COLORS[comp] ?? '#333', fontWeight: 500 }}>{comp}</td>
-                      <td style={tdSt}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontWeight: 600 }}>{val}</span>
-                          <ScoreBar value={val} color={COMP_COLORS[comp]} height={4} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
                 </tbody>
               </table>
             </div>
@@ -248,6 +229,7 @@ export default function Database() {
                 <th style={thSt}></th>
                 <th style={thSt}>Party</th>
                 <th style={thSt}>Role</th>
+                <th style={thSt}>Tier</th>
                 <th style={thSt}>Score</th>
                 <th style={thSt}>Updated</th>
                 <th style={thSt}>Created</th>

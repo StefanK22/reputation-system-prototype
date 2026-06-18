@@ -18,11 +18,12 @@ import './index.css';
 function TopBar() {
   const { pathname } = useLocation();
   const { parties, activeParty, setActiveParty } = usePartyCtx();
-  const page = pathname.replace('/', '').split('/')[0] || 'rankings';
+  const page  = pathname.replace('/', '').split('/')[0] || 'rankings';
+  const title = page === 'api-caller' ? 'API' : page.charAt(0).toUpperCase() + page.slice(1);
 
   return (
     <div className="top-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <span className="top-bar-page">{page.charAt(0).toUpperCase() + page.slice(1)}</span>
+      <span className="top-bar-page">{title}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 11, color: '#999' }}>Logged in as</span>
         <select
@@ -59,7 +60,7 @@ function App() {
               <Route path="/setup"             element={<Setup />} />
               <Route path="/ledger"            element={<div className="page-scroll"><Ledger /></div>} />
               <Route path="/database"          element={<div className="page-scroll"><Database /></div>} />
-              <Route path="/api"               element={<div className="page-scroll"><Api /></div>} />
+              <Route path="/api-caller"      element={<div className="page-scroll"><Api /></div>} />
             </Routes>
           </main>
         </div>

@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { getRankings, getSubject } from '../api/reputation.js';
+import { getRankings, getSubject, getTiers, issueVc, verifyVc } from '../api/reputation.js';
+
+function formatResult(data) {
+  if (typeof data !== 'string') return JSON.stringify(data, null, 2);
+  try {
+    return JSON.stringify(JSON.parse(data), null, 2);
+  } catch {
+    return data;
+  }
+}
 
 function ApiCard({ title, params, onCall }) {
   const [values,  setValues]  = useState(() => Object.fromEntries(params.map(p => [p.name, p.default ?? ''])));
@@ -42,8 +51,8 @@ function ApiCard({ title, params, onCall }) {
       </button>
       {result && (
         result.ok
-          ? <pre style={{ marginTop: 12, fontSize: 11, overflowX: 'auto', background: 'var(--bg-subtle, #f8f8f8)', padding: 10, borderRadius: 4 }}>
-              {JSON.stringify(result.data, null, 2)}
+          ? <pre style={{ marginTop: 12, fontSize: 11, overflowX: 'auto', background: 'var(--bg-subtle, #f8f8f8)', padding: 10, borderRadius: 4, whiteSpace: 'pre-wrap' }}>
+              {formatResult(result.data)}
             </pre>
           : <p className="error" style={{ marginTop: 10 }}>{result.error}</p>
       )}
@@ -69,6 +78,37 @@ export default function Api() {
           onCall={({ party }) => {
             if (!party.trim()) throw new Error('Party is required.');
             return getSubject(party.trim());
+          }}
+        />
+
+        <ApiCard
+          title="GET /tiers"
+          params={[]}
+          onCall={() => getTiers()}
+        />
+
+        <ApiCard
+          title="GET /vc/issue/:party"
+          params={[{ name: 'party', label: 'Party', placeholder: 'Party ID' }]}
+          onCall={({ party }) => {
+            if (!party.trim()) throw new Error('Party is required.');
+            return issueVc(party.trim());
+          }}
+        />
+
+        <ApiCard
+          title="GET /vc/verify"
+          params={[
+            { name: 'party', label: 'Party', placeholder: 'Party ID' },
+            { name: 'tier', label: 'Tier', placeholder: 'Tier name' },
+            { name: 'issuanceDate', label: 'Issuance Date', placeholder: 'issuanceDate from the VC' },
+            { name: 'jws', label: 'JWS', placeholder: 'proof.jws from the VC' },
+          ]}
+          onCall={({ party, tier, issuanceDate, jws }) => {
+            if (!party.trim() || !tier.trim() || !issuanceDate.trim() || !jws.trim()) {
+              throw new Error('All fields are required.');
+            }
+            return verifyVc({ party: party.trim(), tier: tier.trim(), issuanceDate: issuanceDate.trim(), jws: jws.trim() });
           }}
         />
 

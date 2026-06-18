@@ -1,0 +1,29 @@
+══════════════════════════════════════════════════════════════════════════════
+  Rounds to stabilize (trailing-window volatility, no ground truth used)
+══════════════════════════════════════════════════════════════════════════════
+  Archetype           mean  median     p90   % converged
+  Ideal               26.6    26.0    33.0        100.0%
+  SlowReviewer        25.2    24.0    34.0        100.0%
+  GhostReviewer       28.8    28.0    40.0        100.0%
+  Picky               29.5    28.0    41.0        100.0%
+  Abandoner           32.0    31.0    44.0        100.0%
+  Chaotic             31.2    30.0    43.0        100.0%
+
+
+══════════════════════════════════════════════════════════════════════════════
+  Rank crossovers per weight sweep
+══════════════════════════════════════════════════════════════════════════════
+  Reliability Weight Value = 0.278: SlowReviewer <-> GhostReviewer swap rank order
+  Reliability Weight Value = 0.382: GhostReviewer <-> Picky swap rank order
+  Reliability Weight Value = 0.646: GhostReviewer <-> Abandoner swap rank order
+  Reliability Weight Value = 0.895: GhostReviewer <-> Chaotic swap rank order
+  Responsiveness Weight = 0.000: GhostReviewer <-> Abandoner swap rank order
+  Responsiveness Weight = 0.217: GhostReviewer <-> Picky swap rank order
+  Responsiveness Weight = 0.380: SlowReviewer <-> GhostReviewer swap rank order
+  Responsiveness Weight = 0.453: SlowReviewer <-> Picky swap rank order
+  Responsiveness Weight = 0.762: SlowReviewer <-> Abandoner swap rank order
+  Responsiveness Weight = 0.870: SlowReviewer <-> Chaotic swap rank order
+  Accountability Weight = 0.034: SlowReviewer <-> GhostReviewer swap rank order
+  Accountability Weight = 0.193: SlowReviewer <-> Picky swap rank order
+  Accountability Weight = 0.250: GhostReviewer <-> Picky swap rank order
+  Accountability Weight = 0.662: Picky <-> Abandoner swap rank order

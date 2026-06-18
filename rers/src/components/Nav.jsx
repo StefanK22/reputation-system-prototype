@@ -8,14 +8,11 @@ const USER_LINKS = [
   { to: '/disclosures',  label: 'Disclosures'  },
 ];
 
-const OPERATOR_LINKS = [
-  { to: '/setup', label: 'Setup' },
-];
-
 const DEBUG_LINKS = [
+  { to: '/setup', label: 'Setup' },
   { to: '/ledger',   label: 'Ledger'   },
   { to: '/database', label: 'Database' },
-  { to: '/api',      label: 'API'      },
+  { to: '/api-caller', label: 'API'  },
 ];
 
 function NavGroup({ links }) {
@@ -31,8 +28,6 @@ export default function Nav() {
     <nav>
       <div className="nav-title">Real Estate<br />Reputation System</div>
       <NavGroup links={USER_LINKS} />
-      <div className="nav-section-label">Operator</div>
-      <NavGroup links={OPERATOR_LINKS} />
       <div className="nav-section-label">Debug</div>
       <NavGroup links={DEBUG_LINKS} />
     </nav>
