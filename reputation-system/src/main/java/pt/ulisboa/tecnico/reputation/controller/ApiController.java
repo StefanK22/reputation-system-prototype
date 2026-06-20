@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import pt.ulisboa.tecnico.reputation.dto.SubjectDto;
 import pt.ulisboa.tecnico.reputation.dto.VcStatus;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
+import pt.ulisboa.tecnico.reputation.service.VcService;
 
 import java.util.List;
 import java.util.Map;
@@ -14,9 +15,11 @@ import java.util.Map;
 public class ApiController {
 
     private final ReputationService service;
+    private final VcService vcService;
 
-    public ApiController(ReputationService service) {
+    public ApiController(ReputationService service, VcService vcService) {
         this.service = service;
+        this.vcService = vcService;
     }
 
     @GetMapping("/rankings")
@@ -38,7 +41,7 @@ public class ApiController {
 
     @GetMapping("/vc/issue/{party}")
     public ResponseEntity<String> issueVc(@PathVariable String party) {
-        return service.issueMockVc(party)
+        return vcService.issueMockVc(party)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.badRequest().body("No qualifying tier for party: " + party));
     }
@@ -48,6 +51,6 @@ public class ApiController {
                               @RequestParam String tier,
                               @RequestParam String issuanceDate,
                               @RequestParam String jws) {
-        return service.verifyMockVc(party, tier, issuanceDate, jws);
+        return vcService.verifyMockVc(party, tier, issuanceDate, jws);
     }
 }

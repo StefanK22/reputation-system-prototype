@@ -1,35 +1,26 @@
 package pt.ulisboa.tecnico.reputation.ledger;
 
-import com.daml.ledger.api.v2.StateServiceGrpc;
-import com.daml.ledger.api.v2.StateServiceOuterClass;
 import com.daml.ledger.api.v2.UpdateServiceGrpc;
 import com.daml.ledger.api.v2.UpdateServiceOuterClass;
 import com.daml.ledger.javaapi.data.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import pt.ulisboa.tecnico.reputation.entity.EngineConfiguration;
-import pt.ulisboa.tecnico.reputation.ledger.handlers.ConfigurationHandler;
-import pt.ulisboa.tecnico.reputation.ledger.handlers.DisclosureHandler;
-import pt.ulisboa.tecnico.reputation.ledger.handlers.ObservationHandler;
-import pt.ulisboa.tecnico.reputation.ledger.handlers.RoleHandler;
-import pt.ulisboa.tecnico.reputation.repository.EngineConfigurationRepository;
-import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.interface$.configuration.Configuration;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.role.Role;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 
+/** Low-level gRPC transport: connects to the Canton participant and streams raw ledger events. */
 @Component
 public class LedgerListener {
 
@@ -44,60 +35,25 @@ public class LedgerListener {
     @Value("${canton.operator-party-id}")
     String operatorPartyId;
 
-    private final ConfigurationHandler configurationHandler;
-    private final RoleHandler roleHandler;
-    private final ObservationHandler observationHandler;
-    private final DisclosureHandler disclosureHandler;
-    private final EngineConfigurationRepository configRepo;
-    private final LedgerSubmitter ledgerSubmitter;
-    private final ReputationService reputationService;
-
-    private ManagedChannel channel;
-
-    public LedgerListener(ConfigurationHandler configurationHandler,
-                          RoleHandler roleHandler,
-                          ObservationHandler observationHandler,
-                          DisclosureHandler disclosureHandler,
-                          EngineConfigurationRepository configRepo,
-                          LedgerSubmitter ledgerSubmitter,
-                          ReputationService reputationService) {
-        this.configurationHandler = configurationHandler;
-        this.roleHandler = roleHandler;
-        this.observationHandler = observationHandler;
-        this.disclosureHandler = disclosureHandler;
-        this.configRepo = configRepo;
-        this.ledgerSubmitter = ledgerSubmitter;
-        this.reputationService = reputationService;
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void onStart() {
-        log.info("Starting LedgerListener - connecting to Canton gRPC at {}:{}", grpcHost, grpcPort);
-
-        channel = ManagedChannelBuilder
+    public ManagedChannel connect() {
+        log.info("Connecting to Canton gRPC at {}:{}", grpcHost, grpcPort);
+        return ManagedChannelBuilder
                 .forAddress(grpcHost, grpcPort)
                 .maxInboundMessageSize(10485760)
                 .usePlaintext()
                 .build();
-
-        ledgerSubmitter.setChannel(channel);
-        startEventStream();
     }
 
-    @PreDestroy
-    public void onStop() {
+    public void disconnect(ManagedChannel channel) {
         log.info("Shutting down LedgerListener");
         if (channel != null && !channel.isShutdown()) {
             channel.shutdown();
         }
     }
 
-    private void startEventStream() {
+    public void streamUpdates(ManagedChannel channel, long resumeOffset,
+                               Consumer<CreatedEvent> onCreatedEvent, LongConsumer onOffsetAdvance) {
         try {
-            long resumeOffset = configRepo.findById(1L)
-                    .map(EngineConfiguration::getLedgerOffset)
-                    .orElse(0L);
-
             log.info("Resuming ledger stream from offset {}", resumeOffset);
 
             var interfaceFilters = Map.of(
@@ -130,7 +86,7 @@ public class LedgerListener {
                         @Override
                         public void onNext(UpdateServiceOuterClass.GetUpdatesResponse response) {
                             try {
-                                processResponse(GetUpdatesResponse.fromProto(response));
+                                processResponse(GetUpdatesResponse.fromProto(response), onCreatedEvent, onOffsetAdvance);
                             } catch (Exception e) {
                                 log.error("Error processing update: {}", e.getMessage(), e);
                             }
@@ -155,24 +111,19 @@ public class LedgerListener {
         }
     }
 
-    private void processResponse(GetUpdatesResponse response) {
+    private void processResponse(GetUpdatesResponse response, Consumer<CreatedEvent> onCreatedEvent,
+                                  LongConsumer onOffsetAdvance) {
         response.getTransaction().ifPresentOrElse(transaction -> {
             for (Event event : transaction.getEvents()) {
                 if (event instanceof CreatedEvent createdEvent) {
                     log.info("+ {} [{}]", shortTemplate(createdEvent.getTemplateId()), shortId(createdEvent.getContractId()));
-                    processNewEvent(createdEvent);
+                    onCreatedEvent.accept(createdEvent);
                 } else if (event instanceof ArchivedEvent archivedEvent) {
                     log.info("- {} [{}]", shortTemplate(archivedEvent.getTemplateId()), shortId(archivedEvent.getContractId()));
                 }
             }
-            saveOffset(transaction.getOffset());
+            onOffsetAdvance.accept(transaction.getOffset());
         }, () -> {});
-    }
-
-    private void saveOffset(long offset) {
-        EngineConfiguration config = reputationService.getOrCreateConfig();
-        config.setLedgerOffset(offset);
-        configRepo.save(config);
     }
 
     private static String shortTemplate(Identifier id) {
@@ -181,22 +132,5 @@ public class LedgerListener {
 
     private static String shortId(String contractId) {
         return contractId.length() > 8 ? contractId.substring(0, 8) + "…" : contractId;
-    }
-
-    private void processNewEvent(CreatedEvent event) {
-        var views = event.getInterfaceViews();
-
-        if (views.containsKey(Configuration.INTERFACE_ID_WITH_PACKAGE_ID)) {
-            disclosureHandler.trackConfig(event);
-            configurationHandler.handle(event);
-        } else if (views.containsKey(Role.INTERFACE_ID_WITH_PACKAGE_ID)) {
-            roleHandler.handle(event);
-        } else if (views.containsKey(Observation.INTERFACE_ID_WITH_PACKAGE_ID)) {
-            observationHandler.handle(event);
-        } else if ("DisclosureRequest".equals(event.getTemplateId().getEntityName())) {
-            disclosureHandler.handle(event);
-        } else {
-            log.debug("No handler for template: {}", event.getTemplateId());
-        }
     }
 }

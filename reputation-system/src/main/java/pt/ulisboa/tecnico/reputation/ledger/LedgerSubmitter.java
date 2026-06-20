@@ -32,7 +32,7 @@ public class LedgerSubmitter {
 
     private volatile ManagedChannel channel;
 
-    void setChannel(ManagedChannel channel) {
+    public void setChannel(ManagedChannel channel) {
         this.channel = channel;
     }
 
