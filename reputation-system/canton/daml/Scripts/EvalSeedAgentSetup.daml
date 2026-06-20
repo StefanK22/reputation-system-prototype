@@ -39,7 +39,7 @@ evalSeedAgentSetup = do
       configId        = "EVAL-ROLE-CONFIG"
       createdAt       = t0
       agentWeights    = AgentWeights    with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
-      buyerWeights    = BuyerWeights    with reliability = 0.4; responsiveness = 0.4; accuracy = 0.2
+      buyerWeights    = BuyerWeights    with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       landlordWeights = LandlordWeights with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       tenantWeights   = TenantWeights   with reliability = 0.5; responsiveness = 0.3; accuracy = 0.2
       scoreFloor      = 0.0

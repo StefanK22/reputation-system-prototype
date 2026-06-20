@@ -38,7 +38,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-WEIGHT_AXES = ["Reliability Weight Value", "Responsiveness Weight", "Accountability Weight"]
+WEIGHT_AXES = ["Reliability Weight", "Responsiveness Weight", "Accountability Weight"]
 
 # ── Archetype definitions ────────────────────────────────────────────────────
 # Mean parameter values per archetype, expressed as fractions in [0, 1]
