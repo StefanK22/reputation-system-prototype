@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useLedger } from '../LedgerContext.jsx';
+import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
 import { getInterfaceIds } from '../api/reputation.js';
 import { resolveTemplateIds } from '../api/contracts.js';
 
@@ -172,7 +172,7 @@ function RoleConfigCard({ tids, ledger, deployed, parties, onDone }) {
   const [configId,   setConfigId]   = useState('ROLE-CONFIG-001');
   const [floor,      setFloor]      = useState(0);
   const [ceiling,    setCeiling]    = useState(100);
-  const [startValue, setStartValue] = useState(70);
+  const [startValue, setStartValue] = useState(50);
   const [weights,    setWeights]    = useState({ Agent: dflt(), Buyer: dflt(), Landlord: dflt(), Tenant: dflt() });
   const [tiers,      setTiers]      = useState([{ name: 'Bronze', value: 0 }, { name: 'Silver', value: 50 }, { name: 'Gold', value: 80 }]);
   const [busy,       setBusy]       = useState(false);
@@ -268,7 +268,7 @@ function RoleConfigCard({ tids, ledger, deployed, parties, onDone }) {
           ))}
         </tbody>
       </table>
-      <button type="button" onClick={addTier} style={{ fontSize: 11, marginBottom: 14 }}>+ Add tier</button>
+      <button type="button" onClick={addTier} style={{ fontSize: 11, marginBottom: 14, marginRight: 8 }}>+ Add tier</button>
 
       <button className="primary" disabled={busy || result} onClick={deploy}>{busy ? 'Deploying…' : 'Deploy'}</button>
       <CardResult result={result} />
@@ -482,6 +482,7 @@ function RAConfigCard({ tids, ledger, deployed, onDone }) {
 
 export default function Setup() {
   const ledger = useLedger();
+  const { refreshParties } = usePartyCtx();
   const [tids,      setTids]      = useState({});
   const [status,    setStatus]    = useState({});
   const [parties,   setParties]   = useState([]);
@@ -494,11 +495,12 @@ export default function Setup() {
       const [st, { parties: pts }] = await Promise.all([
         loadStatus(ledger, t),
         ledger.listAllParties().catch(() => ({ parties: [] })),
+        refreshParties(),
       ]);
       setTids(t); setStatus(st); setParties(pts);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [ledger]);
+  }, [ledger, refreshParties]);
 
   useEffect(() => { reload(); }, [reload]);
 
