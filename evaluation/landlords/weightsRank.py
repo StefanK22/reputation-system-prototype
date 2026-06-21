@@ -1,50 +1,9 @@
-"""
-Rank-reversal analysis for the landlord reputation score (Q3).
-
-Answers: "at what exact weight value does one landlord archetype overtake
-another, and how robust is that crossover to noise?"
-
-Unlike parameter_impact.py (which measures how strongly the score
-correlates with each metric, for one homogeneous population) and
-evaluation/agents/agentEvaluation.py (which runs a handful of LLM-narrated
-personas through the real Canton ledger at a single fixed default weight),
-this script:
-  - simulates the 6 known landlord archetypes as noisy clusters (~3000
-    samples each) around characteristic parameter values,
-  - sweeps each role weight (w_rel, w_resp, w_acc) from 0 to 1 (remainder
-    split evenly), entirely in closed-form Python — no ledger involved,
-  - tracks each archetype's mean score and rank at every step, and
-  - detects and reports the exact weight value where two archetypes swap
-    rank order (a "crossover"), which is the actually interesting result:
-    the weighted-sum formula is flat/monotonic per metric (see
-    parameter_impact.py), but *rankings* between distinct behavior
-    profiles are not — they flip at specific, discoverable thresholds.
-
-Score formula (matches the Daml contracts' per-event component blend):
-  Rel  = (eval_ratio                              + fb_fairness)     / 2
-  Resp = (max(0, 1 - mean_eval_hours / capHours)   + fb_availability) / 2
-  Acc  = (first_round_ratio                        + fb_clarity)      / 2
-  score = (w_rel * Rel + w_resp * Resp + w_acc * Acc) * 100
-
-Usage:
-    python3.9 -m evaluation.landlords.rank_reversals
-    python3.9 -m evaluation.landlords.rank_reversals --samples 5000 --steps 200
-"""
-
-from __future__ import annotations
-
 import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 WEIGHT_AXES = ["Reliability Weight", "Responsiveness Weight", "Accountability Weight"]
-
-# ── Archetype definitions ────────────────────────────────────────────────────
-# Mean parameter values per archetype, expressed as fractions in [0, 1]
-# (mean_eval_hours is a fraction of cap_hours, converted at sample time).
-# Concentration controls how tight the noise is around the mean (higher =
-# tighter), mirroring the underlying behavior consistently across samples.
 
 ARCHETYPES: dict[str, dict[str, float]] = {
     "Ideal":         {"eval_ratio": 0.95, "mean_eval_hours_frac": 0.15, "first_round_ratio": 0.90, "fb_fairness": 0.92, "fb_availability": 0.90, "fb_clarity": 0.90},

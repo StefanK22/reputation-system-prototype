@@ -656,7 +656,7 @@ def build_setup_daml(pp_profiles: list) -> str:
     lines.append("      scoreFloor      = 0.0")
     lines.append("      scoreCeiling    = 100.0")
     lines.append("      startValue      = 50.0")
-    lines.append('      tiers           = [("a", 0.0)]')
+    lines.append('      tiers           = [("Bronze", 60.0), ("Silver", 75.0), ("Gold", 90.0)]')
     lines.append("")
     for party, role in sorted(all_parties, key=lambda x: x[0]):
         var = to_daml_var(party)
