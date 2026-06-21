@@ -1,178 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLedger } from '../LedgerContext.jsx';
 import { getInterfaceIds } from '../api/reputation.js';
-import { KNOWN_MODULE_PATHS } from '../api/contracts.js';
-
-// ── Template ID resolution ────────────────────────────────────────────────────
-
-async function resolveTemplateIds() {
-  const interfaceIds = await getInterfaceIds().catch(() => ({}));
-  const pkgId = Object.values(interfaceIds)[0]?.split(':')[0];
-  if (!pkgId) throw new Error('Could not resolve package ID from backend.');
-  const map = {};
-  for (const [key, modEntity] of Object.entries(KNOWN_MODULE_PATHS)) {
-    map[key] = `${pkgId}:${modEntity}`;
-  }
-  return map;
-}
-
-// ── Seed function ─────────────────────────────────────────────────────────────
-
-function ts(base, daysOffset, hourOffset) {
-  const d = new Date(base.getTime() + daysOffset * 86_400_000 + hourOffset * 3_600_000);
-  d.setMinutes(0, 0, 0);
-  return d.toISOString();
-}
-
-async function runSeed(ledger, tids, log) {
-  log('Allocating parties…');
-  const { parties: existing } = await ledger.listAllParties();
-  const findParty = (hint) => existing.find((p) =>
-    p.displayName === hint || p.party.startsWith(hint + '::')
-  )?.party;
-  const alloc = async (hint) => {
-    const found = findParty(hint);
-    if (found) return found;
-    const res = await ledger.allocateParty(hint);
-    return res.partyDetails?.party || res.party;
-  };
-  const alice = await alloc('AgentAlice');
-  const bob   = await alloc('BuyerBob');
-  const carol = await alloc('AgentCarol');
-  const dave  = await alloc('BuyerDave');
-  const eve   = await alloc('LandlordEve');
-  const frank = await alloc('TenantFrank');
-  const grace = await alloc('TenantGrace');
-
-  const base = new Date(); base.setHours(9, 0, 0, 0);
-  const t0 = ts(base, -17, 0);
-
-  log('Creating RoleConfiguration and roles…');
-  const w = { reliability: '0.5', responsiveness: '0.3', accuracy: '0.2' };
-  const roleConfigEvent = await ledger.create(tids.RoleConfiguration, {
-    operator: ledger.party, configId: 'ROLE-CONFIG-SEED', createdAt: t0,
-    agentWeights: w, buyerWeights: w, landlordWeights: w, tenantWeights: w,
-    scoreFloor: '0.0', scoreCeiling: '100.0', startValue: '70.0',
-  });
-  const rcId = roleConfigEvent.contractId;
-  const mkRole = (party, roleType) =>
-    ledger.exercise(rcId, tids.RoleConfiguration, 'CreateRole', { party, roleType, assignedAt: t0 });
-  await mkRole(alice, 'Agent');   await mkRole(bob,   'Buyer');
-  await mkRole(carol, 'Agent');   await mkRole(dave,  'Buyer');
-  await mkRole(eve,   'Landlord'); await mkRole(frank, 'Tenant'); await mkRole(grace, 'Tenant');
-
-  log('Creating PropertyPurchaseConfiguration…');
-  const ppEvent = await ledger.create(tids.PropertyPurchaseConfiguration, {
-    operator: ledger.party, configId: 'PP-CONFIG-SEED', createdAt: t0,
-    agentObsWeights: { reliabilityVoidedWeight: '0.3', reliabilityCompletionWeight: '0.7',
-      responsivenessProposalToContractWeight: '0.6', responsivenessContractWeight: '0.4', responsivenessCapHours: '24.0' },
-    buyerObsWeights: { responsivenessContractWeight: '0.6', responsivenessProposalWeight: '0.4', responsivenessCapHours: '24.0' },
-    feedbackWindowDays: 30,
-  });
-  const ppId = ppEvent.contractId;
-
-  log('Creating RentalAgreementConfiguration…');
-  const raEvent = await ledger.create(tids.RentalAgreementConfiguration, {
-    operator: ledger.party, configId: 'RA-CONFIG-SEED', createdAt: t0,
-    landlordObsWeights: { responsivenessCapHours: '24.0' },
-    tenantObsWeights: { responsivenessFirstUploadWeight: '0.4', responsivenessReuploadWeight: '0.6', responsivenessCapHours: '24.0' },
-    feedbackWindowDays: 30,
-  });
-  const raId = raEvent.contractId;
-
-  const draft = (id, type, parts, configCid, openedAt) => ledger.create(tids.DraftInteraction,
-    { operator: ledger.party, initiator: ledger.party, interactionId: id, interactionType: type, participants: parts, configCid, openedAt });
-  const begin = (dId, startedAt) => ledger.exercise(dId, tids.DraftInteraction, 'Begin', { startedAt });
-  const rec   = (iId, event, actor, occurredAt, resourceId) =>
-    ledger.exercise(iId, tids.InProgressInteraction, 'RecordEvent', { event: { event, actor, occurredAt, resourceId } });
-  const complete = (iId, completedAt) =>
-    ledger.exercise(iId, tids.InProgressInteraction, 'Complete', { completedAt });
-
-  log('Scenario 1: TX-SEED-001 (Alice + Bob, completed + feedback)…');
-  {
-    const b = new Date(base); b.setDate(b.getDate() - 17);
-    const dId = (await draft('TX-SEED-001', 'PropertyPurchase',
-      [{ _1: alice, _2: 'Agent' }, { _1: bob, _2: 'Buyer' }], ppId, ts(b, 0, 9))).contractId;
-    let iId = (await begin(dId, ts(b, 0, 9))).contractId;
-    iId = (await rec(iId, 'ProposalSubmitted',         alice, ts(b, 0,  9), 'proposal-001')).contractId;
-    iId = (await rec(iId, 'ProposalRejectedWithNotes',  bob,  ts(b, 0, 21), 'proposal-001')).contractId;
-    iId = (await rec(iId, 'ProposalSubmitted',         alice, ts(b, 1,  9), 'proposal-001')).contractId;
-    iId = (await rec(iId, 'ProposalApproved',           bob,  ts(b, 2,  9), 'proposal-001')).contractId;
-    iId = (await rec(iId, 'ContractUploaded',          alice, ts(b, 2, 21), 'contract-001')).contractId;
-    iId = (await rec(iId, 'ContractSigned',            alice, ts(b, 3,  9), 'contract-001')).contractId;
-    iId = (await rec(iId, 'ContractSigned',             bob,  ts(b, 3,  9), 'contract-001')).contractId;
-    iId = (await rec(iId, 'TransactionStateChanged',   alice, ts(b, 3, 14), 'SELL_CLOSED')).contractId;
-    const cId = (await complete(iId, ts(b, 3, 15))).contractId;
-    const evs = await ledger.exerciseMulti(ppId, tids.PropertyPurchaseConfiguration, 'CreateObservations', { completedCid: cId });
-    const reqs = evs.filter((e) => e.templateId === 'PropertyPurchaseFeedbackRequest');
-    const aReq = reqs.find((e) => e.payload?.from === alice);
-    const bReq = reqs.find((e) => e.payload?.from === bob);
-    const now = new Date().toISOString();
-    if (aReq) await ledger.exercise(aReq.contractId, tids.PropertyPurchaseFeedbackRequest,
-      'SubmitFeedback', { professionalism: '0.85', availability: '0.9', honesty: '0.8', submittedAt: now }, { actAs: [alice] });
-    if (bReq) await ledger.exercise(bReq.contractId, tids.PropertyPurchaseFeedbackRequest,
-      'SubmitFeedback', { professionalism: '0.9', availability: '0.85', honesty: '0.95', submittedAt: now }, { actAs: [bob] });
-  }
-
-  log('Scenario 2: TX-SEED-002 (Carol + Dave, completed, no feedback)…');
-  {
-    const b = new Date(base); b.setDate(b.getDate() - 15);
-    const dId = (await draft('TX-SEED-002', 'PropertyPurchase',
-      [{ _1: carol, _2: 'Agent' }, { _1: dave, _2: 'Buyer' }], ppId, ts(b, 0, 9))).contractId;
-    let iId = (await begin(dId, ts(b, 0, 9))).contractId;
-    iId = (await rec(iId, 'ProposalSubmitted',        carol, ts(b, 0,  9), 'proposal-001')).contractId;
-    iId = (await rec(iId, 'ProposalApproved',          dave, ts(b, 2,  9), 'proposal-001')).contractId;
-    iId = (await rec(iId, 'ContractUploaded',         carol, ts(b, 2, 21), 'contract-001')).contractId;
-    iId = (await rec(iId, 'ContractVoided',           carol, ts(b, 3,  9), 'contract-001')).contractId;
-    iId = (await rec(iId, 'ContractUploaded',         carol, ts(b, 3, 21), 'contract-002')).contractId;
-    iId = (await rec(iId, 'ContractSigned',           carol, ts(b, 4,  9), 'contract-002')).contractId;
-    iId = (await rec(iId, 'ContractSigned',            dave, ts(b, 4,  9), 'contract-002')).contractId;
-    iId = (await rec(iId, 'TransactionStateChanged',  carol, ts(b, 4, 12), 'SELL_CLOSED')).contractId;
-    const cId = (await complete(iId, ts(b, 4, 13))).contractId;
-    await ledger.exerciseMulti(ppId, tids.PropertyPurchaseConfiguration, 'CreateObservations', { completedCid: cId });
-  }
-
-  log('Scenario 3: RA-SEED-001 (Eve + Frank, completed + landlord feedback)…');
-  {
-    const b = new Date(base); b.setDate(b.getDate() - 13);
-    const dId = (await draft('RA-SEED-001', 'RentalAgreement',
-      [{ _1: eve, _2: 'Landlord' }, { _1: frank, _2: 'Tenant' }], raId, ts(b, 0, 9))).contractId;
-    let iId = (await begin(dId, ts(b, 0, 9))).contractId;
-    iId = (await rec(iId, 'DocumentUploaded',           frank, ts(b, 0, 11), 'doc-001')).contractId;
-    iId = (await rec(iId, 'DocumentRejectedWithNotes',    eve, ts(b, 0, 23), 'doc-001')).contractId;
-    iId = (await rec(iId, 'DocumentUploaded',           frank, ts(b, 1,  5), 'doc-001')).contractId;
-    iId = (await rec(iId, 'DocumentApproved',             eve, ts(b, 1, 17), 'doc-001')).contractId;
-    iId = (await rec(iId, 'DocumentUploaded',           frank, ts(b, 2,  9), 'doc-002')).contractId;
-    iId = (await rec(iId, 'DocumentApproved',             eve, ts(b, 3,  9), 'doc-002')).contractId;
-    iId = (await rec(iId, 'TransactionStateChanged',      eve, ts(b, 3, 14), 'LEASE_SIGNED')).contractId;
-    const cId = (await complete(iId, ts(b, 3, 15))).contractId;
-    const evs = await ledger.exerciseMulti(raId, tids.RentalAgreementConfiguration, 'CreateObservations', { completedCid: cId });
-    const reqs = evs.filter((e) => e.templateId === 'RentalAgreementFeedbackRequest');
-    const eReq = reqs.find((e) => e.payload?.from === eve);
-    if (eReq) await ledger.exercise(eReq.contractId, tids.RentalAgreementFeedbackRequest,
-      'SubmitFeedbackAsLandlord',
-      { documentHonesty: '0.9', communicationTimeliness: '0.8', requirementCompliance: '0.85', submittedAt: new Date().toISOString() },
-      { actAs: [eve] });
-  }
-
-  log('Scenario 4: TX-SEED-003 (Alice + Dave, in-progress)…');
-  {
-    const b = new Date(base); b.setDate(b.getDate() - 4);
-    const dId = (await draft('TX-SEED-003', 'PropertyPurchase',
-      [{ _1: alice, _2: 'Agent' }, { _1: dave, _2: 'Buyer' }], ppId, ts(b, 0, 9))).contractId;
-    const iId = (await begin(dId, ts(b, 0, 9))).contractId;
-    await rec(iId, 'ProposalSubmitted', alice, ts(b, 0, 9), 'proposal-001');
-  }
-
-  log('Scenario 5: RA-SEED-002 (Eve + Grace, draft)…');
-  {
-    const b = new Date(base); b.setDate(b.getDate() - 3);
-    await draft('RA-SEED-002', 'RentalAgreement',
-      [{ _1: eve, _2: 'Landlord' }, { _1: grace, _2: 'Tenant' }], raId, ts(b, 0, 9));
-  }
-
-  log('Done.');
-}
+import { resolveTemplateIds } from '../api/contracts.js';
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -345,11 +174,17 @@ function RoleConfigCard({ tids, ledger, deployed, parties, onDone }) {
   const [ceiling,    setCeiling]    = useState(100);
   const [startValue, setStartValue] = useState(70);
   const [weights,    setWeights]    = useState({ Agent: dflt(), Buyer: dflt(), Landlord: dflt(), Tenant: dflt() });
+  const [tiers,      setTiers]      = useState([{ name: 'Bronze', value: 0 }, { name: 'Silver', value: 50 }, { name: 'Gold', value: 80 }]);
   const [busy,       setBusy]       = useState(false);
   const [result,     setResult]     = useState(null);
 
   const setW = (role, field, val) =>
     setWeights((prev) => ({ ...prev, [role]: { ...prev[role], [field]: val } }));
+
+  const setTier = (i, field, val) =>
+    setTiers((prev) => prev.map((t, idx) => (idx === i ? { ...t, [field]: val } : t)));
+  const addTier = () => setTiers((prev) => [...prev, { name: '', value: 0 }]);
+  const removeTier = (i) => setTiers((prev) => prev.filter((_, idx) => idx !== i));
 
   const toStr = (w) => ({ reliability: String(w.reliability), responsiveness: String(w.responsiveness), accuracy: String(w.accuracy) });
 
@@ -365,6 +200,7 @@ function RoleConfigCard({ tids, ledger, deployed, parties, onDone }) {
         scoreFloor:  String(floor),
         scoreCeiling: String(ceiling),
         startValue:  String(startValue),
+        tiers: tiers.filter((t) => t.name.trim()).map((t) => ({ _1: t.name.trim(), _2: String(t.value) })),
       });
       setResult({ ok: true, contractId: ev.contractId });
       onDone();
@@ -416,6 +252,24 @@ function RoleConfigCard({ tids, ledger, deployed, parties, onDone }) {
           </tbody>
         </table>
       </div>
+      <SectionLabel>Tiers</SectionLabel>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10 }}>
+        <tbody>
+          {tiers.map((t, i) => (
+            <tr key={i}>
+              <td style={tdSt}>
+                <input value={t.name} onChange={(e) => setTier(i, 'name', e.target.value)} placeholder="Tier name" style={{ width: '100%' }} />
+              </td>
+              <td style={tdSt}><NInput value={t.value} onChange={(v) => setTier(i, 'value', v)} step={1} width={80} /></td>
+              <td style={tdSt}>
+                <button type="button" onClick={() => removeTier(i)} style={{ fontSize: 11 }}>✕</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button type="button" onClick={addTier} style={{ fontSize: 11, marginBottom: 14 }}>+ Add tier</button>
+
       <button className="primary" disabled={busy || result} onClick={deploy}>{busy ? 'Deploying…' : 'Deploy'}</button>
       <CardResult result={result} />
 
@@ -632,14 +486,11 @@ export default function Setup() {
   const [status,    setStatus]    = useState({});
   const [parties,   setParties]   = useState([]);
   const [loading,   setLoading]   = useState(true);
-  const [seedBusy,  setSeedBusy]  = useState(false);
-  const [seedLog,   setSeedLog]   = useState([]);
-  const [seedError, setSeedError] = useState(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const t = await resolveTemplateIds();
+      const t = await resolveTemplateIds(getInterfaceIds);
       const [st, { parties: pts }] = await Promise.all([
         loadStatus(ledger, t),
         ledger.listAllParties().catch(() => ({ parties: [] })),
@@ -650,15 +501,6 @@ export default function Setup() {
   }, [ledger]);
 
   useEffect(() => { reload(); }, [reload]);
-
-  async function handleSeed() {
-    setSeedBusy(true); setSeedLog([]); setSeedError(null);
-    try {
-      await runSeed(ledger, tids, (msg) => setSeedLog((l) => [...l, msg]));
-      await reload();
-    } catch (e) { setSeedError(e.message); }
-    finally { setSeedBusy(false); }
-  }
 
   const hasTids = Object.keys(tids).length > 0;
 
@@ -679,35 +521,6 @@ export default function Setup() {
             <span style={{ color: status[key] ? '#333' : '#bbb' }}>{CONFIG_LABELS[key]}</span>
           </span>
         ))}
-      </div>
-
-      {/* Seed section */}
-      <div style={{ background: '#fafafa', border: '1px solid #e8e8e8', borderRadius: 3, padding: '18px 20px', marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Seed Demo Data</div>
-            <p style={{ fontSize: 12, color: '#555', lineHeight: 1.6, margin: 0 }}>
-              Allocates 7 parties, deploys all 3 configuration contracts, assigns roles, and creates
-              5 sample interactions (completed with feedback, in-progress, and draft).
-            </p>
-          </div>
-          <div style={{ flexShrink: 0, paddingTop: 2 }}>
-            <button className="primary" disabled={seedBusy || !hasTids} onClick={handleSeed} style={{ minWidth: 130 }}>
-              {seedBusy ? 'Seeding…' : 'Seed Demo Data'}
-            </button>
-          </div>
-        </div>
-        {(seedLog.length > 0 || seedError) && (
-          <div style={{ marginTop: 14, borderTop: '1px solid #eee', paddingTop: 12 }}>
-            {seedLog.map((msg, i) => (
-              <div key={i} style={{ fontSize: 11, color: '#555', lineHeight: 1.8 }}>
-                <span style={{ color: '#27ae60', marginRight: 6 }}>✓</span>{msg}
-              </div>
-            ))}
-            {seedBusy && <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Working…</div>}
-            {seedError && <div style={{ fontSize: 11, color: '#c0392b', marginTop: 4 }}>✗ {seedError}</div>}
-          </div>
-        )}
       </div>
 
       {/* Manual config section label */}

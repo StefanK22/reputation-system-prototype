@@ -1,4 +1,4 @@
-export function Tag({ children }) {
+export function Tag({ children, color }) {
   const colors = {
     Agent:             { bg: '#e8f0fb', text: '#1a5ca8', border: '#c5d8f5' },
     Buyer:             { bg: '#f0f8ee', text: '#2a7a2a', border: '#c5e5c0' },
@@ -15,7 +15,7 @@ export function Tag({ children }) {
     processing:        { bg: '#fff8e6', text: '#8a5800', border: '#f0d98a' },
     processed:         { bg: '#f0f8ee', text: '#2a7a2a', border: '#c5e5c0' },
   };
-  const s = colors[children] || { bg: '#f5f5f5', text: '#666', border: '#e0e0e0' };
+  const s = color ? { bg: '#f5f5f5', text: color, border: '#e0e0e0' } : (colors[children] || { bg: '#f5f5f5', text: '#666', border: '#e0e0e0' });
   return (
     <span style={{ display: 'inline-block', background: s.bg, border: `1px solid ${s.border}`, color: s.text, padding: '2px 7px', fontSize: 11, borderRadius: 2, fontFamily: 'inherit', letterSpacing: '0.02em' }}>
       {children}

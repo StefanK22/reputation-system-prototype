@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
-import { KNOWN_MODULE_PATHS } from '../api/contracts.js';
+import { resolveTemplateIds } from '../api/contracts.js';
 import { getInterfaceIds } from '../api/reputation.js';
 
 const CONFIG_TYPES = [
@@ -11,17 +11,6 @@ const CONFIG_TYPES = [
 
 const tdSt = { padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333', verticalAlign: 'top' };
 const thSt = { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #eee', color: '#999', fontWeight: 'normal', fontSize: 11, textTransform: 'uppercase' };
-
-async function resolveTemplateIds() {
-  const interfaceIds = await getInterfaceIds().catch(() => ({}));
-  const pkgId = Object.values(interfaceIds)[0]?.split(':')[0];
-  if (!pkgId) throw new Error('Could not resolve package ID from backend.');
-  const map = {};
-  for (const [key, modEntity] of Object.entries(KNOWN_MODULE_PATHS)) {
-    map[key] = `${pkgId}:${modEntity}`;
-  }
-  return map;
-}
 
 function fmt(ts) {
   if (!ts) return '—';
@@ -53,7 +42,7 @@ export default function Disclosures() {
   const [loadError,   setLoadError]   = useState(null);
 
   useEffect(() => {
-    resolveTemplateIds()
+    resolveTemplateIds(getInterfaceIds)
       .then(setTids)
       .catch(e => setTidError(e.message));
   }, []);

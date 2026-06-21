@@ -4,7 +4,6 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { LedgerProvider, usePartyCtx } from './LedgerContext.jsx';
 import Nav             from './components/Nav.jsx';
 import Rankings        from './pages/Rankings.jsx';
-import Subject         from './pages/Subject.jsx';
 import Interactions    from './pages/Interactions.jsx';
 import Observations    from './pages/Observations.jsx';
 import Feedbacks       from './pages/Feedbacks.jsx';
@@ -52,7 +51,6 @@ function App() {
             <Routes>
               <Route path="/"                  element={<Navigate to="/rankings" replace />} />
               <Route path="/rankings"          element={<Rankings />} />
-              <Route path="/subject/:party"    element={<div className="page-scroll"><Subject /></div>} />
               <Route path="/interactions"      element={<Interactions />} />
               <Route path="/observations"      element={<Observations />} />
               <Route path="/feedback"          element={<Feedbacks />} />

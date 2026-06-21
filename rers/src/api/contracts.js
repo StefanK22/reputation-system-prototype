@@ -64,18 +64,20 @@ export const KNOWN_MODULE_PATHS = Object.freeze({
   TenantFeedbackObservation:           'Reputation.RentalAgreement.FeedbackObservation:TenantFeedbackObservation',
 });
 
-// Legacy template short names used by Contracts.jsx
-export const TEMPLATES = Object.freeze({
-  PARTY_ROLE:  'PartyRole',
-  INTERACTION: 'CompletedInteraction',
-  FEEDBACK:    'Feedback',
-});
-
-// Daml package name (from daml.yaml). Used to build package-name-qualified template IDs,
-// which Canton's HTTP API prefers over the deprecated hex package-ID form.
-export const DAML_PACKAGE_NAME = 'reputation';
-
 // ─── DAML Map field schema (used by LedgerClient to serialize map fields before submission)
 export const PAYLOAD_MAPS = Object.freeze({});
 
 export const CHOICE_MAPS = Object.freeze({});
+
+// Resolves KNOWN_MODULE_PATHS into full package-qualified template IDs using the
+// package ID extracted from the backend's interface IDs.
+export async function resolveTemplateIds(getInterfaceIds) {
+  const interfaceIds = await getInterfaceIds().catch(() => ({}));
+  const pkgId = Object.values(interfaceIds)[0]?.split(':')[0];
+  if (!pkgId) throw new Error('Could not resolve package ID from backend.');
+  const map = {};
+  for (const [key, modEntity] of Object.entries(KNOWN_MODULE_PATHS)) {
+    map[key] = `${pkgId}:${modEntity}`;
+  }
+  return map;
+}

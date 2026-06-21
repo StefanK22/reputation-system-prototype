@@ -17,10 +17,7 @@ import reputation.role.tenant.TenantRole;
 import reputation.types.ComponentId;
 
 import java.util.ArrayList;
-import java.util.List;            
-
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 @Component
 public class RoleHandler {
@@ -46,7 +43,7 @@ public class RoleHandler {
             }
 
             View view = View.valueDecoder().decode(viewRecord);
-            
+
             List<SubjectComponent> components = new ArrayList<>();
             view.roleComponents.forEach((componentId, roleComponent) -> {
                 SubjectComponent comp = new SubjectComponent();
@@ -88,7 +85,7 @@ public class RoleHandler {
         };
     }
 
-    private String componentIdName(ComponentId id) {
+    static String componentIdName(ComponentId id) {
         return switch (id) {
             case RELIABILITY    -> "Reliability";
             case RESPONSIVENESS -> "Responsiveness";

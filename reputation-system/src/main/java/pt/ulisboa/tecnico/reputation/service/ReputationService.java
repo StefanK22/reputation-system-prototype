@@ -15,6 +15,7 @@ import pt.ulisboa.tecnico.reputation.repository.EngineConfigurationRepository;
 import pt.ulisboa.tecnico.reputation.repository.SubjectRepository;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -232,7 +233,7 @@ public class ReputationService {
     public Map<String, Double> getSubjectInternalScores(String party) {
         return subjectRepo.findById(party)
                 .map(s -> {
-                    Map<String, Double> scores = new java.util.HashMap<>();
+                    Map<String, Double> scores = new HashMap<>();
                     s.getComponents().forEach(c -> scores.put(c.getComponentId(), c.getScore()));
                     return scores;
                 })

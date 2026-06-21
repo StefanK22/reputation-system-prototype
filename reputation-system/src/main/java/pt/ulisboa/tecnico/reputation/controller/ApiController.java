@@ -27,11 +27,11 @@ public class ApiController {
         return service.getRanking();
     }
 
-    // should replace the runtime exception with a error message response.
     @GetMapping("/subjects/{party}")
-    public SubjectDto getSubject(@PathVariable String party) {
+    public ResponseEntity<SubjectDto> getSubject(@PathVariable String party) {
         return service.getSubject(party)
-            .orElseThrow(() -> new RuntimeException("Subject not found for party: " + party));
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/tiers")

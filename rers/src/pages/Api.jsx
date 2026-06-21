@@ -69,7 +69,7 @@ export default function Api() {
         <ApiCard
           title="GET /rankings"
           params={[{ name: 'limit', label: 'Limit', type: 'number', default: 10, placeholder: '10' }]}
-          onCall={({ limit }) => getRankings(Number(limit) || 10)}
+          onCall={({ limit }) => getRankings().then(rows => rows.slice(0, Number(limit) || 10))}
         />
 
         <ApiCard

@@ -12,7 +12,6 @@ function fmt(iso) {
   return new Date(iso).toLocaleString();
 }
 
-
 function StatCard({ label, value, sub }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 4, padding: '14px 18px', minWidth: 120 }}>
@@ -184,7 +183,7 @@ export default function Database() {
           <StatCard
             label="Rep. Config"
             value={repConfig?.configured ? 'active' : 'none'}
-            sub={repConfig?.configured ? `floor ${repConfig.scoreFloor} · ceil ${repConfig.scoreCeiling}` : 'awaiting ScoringConfiguration contract'}
+            sub={repConfig?.configured ? `floor ${repConfig.scoreFloor} · ceil ${repConfig.scoreCeiling}` : 'awaiting RoleConfiguration contract'}
           />
         </div>
       </Section>
@@ -192,7 +191,7 @@ export default function Database() {
       {/* ── Reputation configuration ── */}
       <Section title="Reputation Configuration" defaultOpen={!!repConfig?.configured}>
         {!repConfig?.configured ? (
-          <p className="muted">No ScoringConfiguration contract has been processed yet.</p>
+          <p className="muted">No RoleConfiguration contract has been processed yet.</p>
         ) : (
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <div>

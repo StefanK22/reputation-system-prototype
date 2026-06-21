@@ -130,29 +130,6 @@ export class LedgerClient {
     }
   }
 
-  // ── Party / user management ─────────────────────────────────────────────────
-
-  async createUser(userId, primaryParty) {
-    return fetchJson(this.baseUrl, '/v2/users', {
-      method:  'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        user: {
-          id: userId,
-          primaryParty: primaryParty,
-          actAs: [primaryParty],
-          readAs: [],
-          isDeactivated: false,
-          metadata: {
-            resourceVersion: '',
-            annotations: {},
-          },
-          identityProviderId: '',
-        },
-      }),
-    });
-  }
-
   // ── Contract operations ─────────────────────────────────────────────────────
 
   async create(templateId, payload, { actAs = [] } = {}) {
@@ -209,35 +186,6 @@ export class LedgerClient {
 
   // ── Event stream ────────────────────────────────────────────────────────────
 
-  async streamFrom(offsetExclusive = 0, { signal, wait = true } = {}) {
-    const from = Number(offsetExclusive) || 0;
-
-    if (!wait) {
-      const res = await fetchJson(this.baseUrl, `/v2/events?from=${from}`);
-      return (Array.isArray(res.events) ? res.events : []).map((e) => ({ ...e, offset: Number(e.offset) }));
-    }
-
-    const local   = new AbortController();
-    const timer   = setTimeout(() => local.abort(), 35_000);
-    const forward = () => local.abort();
-    signal?.addEventListener('abort', forward, { once: true });
-
-    try {
-      const res = await fetchJson(
-        this.baseUrl,
-        `/v2/events?from=${from}&wait=true&timeout=30000`,
-        { signal: local.signal },
-      );
-      return (Array.isArray(res.events) ? res.events : []).map((e) => ({ ...e, offset: Number(e.offset) }));
-    } catch (e) {
-      if (e.name === 'AbortError') return [];
-      throw e;
-    } finally {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', forward);
-    }
-  }
-
   async ledgerEnd() {
     const res = await fetchJson(this.baseUrl, '/v2/state/ledger-end');
     return Number(res.offset || 0);
@@ -261,10 +209,6 @@ export class LedgerClient {
       headers: { 'content-type': 'application/json' },
       body:    JSON.stringify({ displayName, partyIdHint: partyIdHint || displayName }),
     });
-  }
-
-  async listAllUsers() {
-    return fetchJson(this.baseUrl, '/v2/users');
   }
 
   async queryAsParty(party, templateId, activeAtOffset) {
@@ -353,62 +297,6 @@ export class LedgerClient {
       }
     }
     return [...seen.values()];
-  }
-
-  async queryByInterface(interfaceId, activeAtOffset) {
-    const offset = activeAtOffset || await this._ledgerOffset();
-    const res = await fetchJson(this.baseUrl, '/v2/state/active-contracts', {
-      method:  'POST',
-      headers: { 'content-type': 'application/json' },
-      body:    JSON.stringify({
-        filter: {
-          filtersByParty: {
-            [this.party]: {
-              cumulative: [{
-                identifierFilter: {
-                  InterfaceFilter: {
-                    value: { interfaceId, includeInterfaceView: true, includeCreatedEventBlob: false },
-                  },
-                },
-              }],
-            },
-          },
-        },
-        verbose:        true,
-        activeAtOffset: offset,
-      }),
-    });
-    return parseContracts(res);
-  }
-
-  async queryAllParties(templateId) {
-    const { parties }  = await this.listAllParties();
-    const byParty      = {};
-    const allContracts = [];
-
-    for (const partyInfo of parties) {
-      try {
-        const contracts = await this.queryAsParty(partyInfo.party, templateId);
-        byParty[partyInfo.party] = contracts;
-        contracts.forEach((c) => allContracts.push({ ...c, ownerParty: partyInfo.party }));
-      } catch (err) {
-        console.warn(`[LedgerClient] Failed to query party ${partyInfo.party}:`, err.message);
-        byParty[partyInfo.party] = [];
-      }
-    }
-
-    return { byParty, allContracts };
-  }
-
-  async getFullLedgerState() {
-    const [{ parties }, packagesRes] = await Promise.all([
-      this.listAllParties(),
-      fetchJson(this.baseUrl, '/v2/packages'),
-    ]);
-    return {
-      parties,
-      contractsByTemplate: {},
-    };
   }
 
   // ── Browser-only ────────────────────────────────────────────────────────────

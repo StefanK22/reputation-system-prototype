@@ -10,7 +10,6 @@ import pt.ulisboa.tecnico.reputation.ledger.LedgerSubmitter;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.observation.View;
-import reputation.types.ComponentId;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -46,7 +45,7 @@ public class ObservationHandler {
 
             Map<String, Optional<Double>> componentValues = new HashMap<>();
             view.componentValues.forEach((componentId, optDecimal) ->
-                componentValues.put(componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
+                componentValues.put(RoleHandler.componentIdName(componentId), optDecimal.map(d -> d.doubleValue()))
             );
             log.info("Observation: subject={}, interactionId={}, components={}",
                     view.subject, view.interactionId, componentValues);
@@ -78,11 +77,4 @@ public class ObservationHandler {
         }
     }
 
-    private String componentIdName(ComponentId id) {
-        return switch (id) {
-            case RELIABILITY    -> "Reliability";
-            case RESPONSIVENESS -> "Responsiveness";
-            case ACCURACY       -> "Accuracy";
-        };
-    }
 }

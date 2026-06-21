@@ -2,6 +2,7 @@ package pt.ulisboa.tecnico.reputation.ledger.handlers;
 
 import com.daml.ledger.javaapi.data.CreatedEvent;
 import com.daml.ledger.javaapi.data.Identifier;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Component;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.propertypurchase.configuration.PropertyPurchaseConfiguration;
 import reputation.role.configuration.RoleConfiguration;
+
+import java.util.LinkedHashMap;
 
 @Component
 public class ConfigurationHandler {
@@ -44,9 +47,9 @@ public class ConfigurationHandler {
             double ceiling    = data.scoreCeiling.doubleValue();
             double startValue = data.startValue.doubleValue();
 
-            java.util.LinkedHashMap<String, Double> tiersMap = new java.util.LinkedHashMap<>();
+            LinkedHashMap<String, Double> tiersMap = new LinkedHashMap<>();
             data.tiers.forEach(t -> tiersMap.put(t._1, t._2.doubleValue()));
-            String tiersJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(tiersMap);
+            String tiersJson = new ObjectMapper().writeValueAsString(tiersMap);
 
             log.info("RoleConfiguration: configId={}, floor={}, ceiling={}, startValue={}, tiers={}",
                     data.configId, floor, ceiling, startValue, tiersJson);
