@@ -36,8 +36,20 @@ public class VcService {
         Subject subject = subjectRepo.findById(party).orElse(null);
         if (subject == null || subject.getTier() == null) return Optional.empty();
 
+        int interactionCount = subject.getInteractionCount();
+        if (interactionCount == 0) return Optional.empty();
+
         String issuanceDate = Instant.now().truncatedTo(ChronoUnit.MILLIS).toString();
-        return Optional.of(buildVcString(party, subject.getTier(), issuanceDate));
+        return Optional.of(buildVcString(party, subject.getTier(), issuanceDate, interactionCount));
+    }
+
+    /** Explains why issueMockVc returned empty for this party, for surfacing to API callers. */
+    public String issuanceBlockReason(String party) {
+        Subject subject = subjectRepo.findById(party).orElse(null);
+        if (subject == null) return "Unknown party: " + party;
+        if (subject.getInteractionCount() == 0) return "Party " + party + " has no recorded interactions yet";
+        if (subject.getTier() == null) return "Party " + party + " has not yet qualified for a tier";
+        return "Unable to issue VC for party: " + party;
     }
 
     public VcStatus verifyMockVc(String party, String tier, String issuanceDate, String jws) {
@@ -45,7 +57,7 @@ public class VcService {
         if (subject == null) return VcStatus.INVALID;
 
         try {
-            Map<String, Object> credential = buildCredential(party, tier, issuanceDate);
+            Map<String, Object> credential = buildCredential(party, tier, issuanceDate, subject.getInteractionCount());
             String expectedJws = mockSign(credential);
             if (!expectedJws.equals(jws)) return VcStatus.INVALID;
         } catch (Exception e) {
@@ -70,11 +82,12 @@ public class VcService {
         return lower + "-" + upper;
     }
 
-    private Map<String, Object> buildCredential(String party, String tier, String issuanceDate) {
+    private Map<String, Object> buildCredential(String party, String tier, String issuanceDate, int interactionCount) {
         Map<String, Object> credentialSubject = new LinkedHashMap<>();
         credentialSubject.put("id", party);
         credentialSubject.put("tier", tier);
         credentialSubject.put("reputationRange", reputationRangeLabel(tier));
+        credentialSubject.put("interactionCount", interactionCount);
 
         Map<String, Object> credential = new LinkedHashMap<>();
         credential.put("@context", List.of(
@@ -88,9 +101,9 @@ public class VcService {
         return credential;
     }
 
-    private String buildVcString(String party, String tier, String issuanceDate) {
+    private String buildVcString(String party, String tier, String issuanceDate, int interactionCount) {
         try {
-            Map<String, Object> credential = buildCredential(party, tier, issuanceDate);
+            Map<String, Object> credential = buildCredential(party, tier, issuanceDate, interactionCount);
 
             Map<String, Object> proof = new LinkedHashMap<>();
             proof.put("type", "RsaSignature2018");

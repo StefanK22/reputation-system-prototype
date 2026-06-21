@@ -43,7 +43,7 @@ public class ApiController {
     public ResponseEntity<String> issueVc(@PathVariable String party) {
         return vcService.issueMockVc(party)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.badRequest().body("No qualifying tier for party: " + party));
+                .orElseGet(() -> ResponseEntity.badRequest().body(vcService.issuanceBlockReason(party)));
     }
 
     @GetMapping("/vc/verify")

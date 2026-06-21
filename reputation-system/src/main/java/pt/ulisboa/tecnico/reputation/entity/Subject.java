@@ -32,4 +32,8 @@ public class Subject {
     private Instant updatedAt;
 
     private String tier;
+
+    public int getInteractionCount() {
+        return components.stream().mapToInt(SubjectComponent::getCount).max().orElse(0);
+    }
 }

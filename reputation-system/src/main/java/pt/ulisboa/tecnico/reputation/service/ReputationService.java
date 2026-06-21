@@ -196,6 +196,11 @@ public class ReputationService {
     }
 
     private void recomputeTier(Subject subject, Map<String, Double> tiers) {
+        if (subject.getInteractionCount() == 0) {
+            subject.setTier(null);
+            return;
+        }
+
         String bestTier = null;
         double bestThreshold = -1;
         for (Map.Entry<String, Double> entry : tiers.entrySet()) {
