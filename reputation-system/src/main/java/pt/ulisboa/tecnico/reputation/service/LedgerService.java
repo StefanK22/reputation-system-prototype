@@ -1,6 +1,7 @@
 package pt.ulisboa.tecnico.reputation.service;
 
 import com.daml.ledger.javaapi.data.CreatedEvent;
+import com.daml.ledger.javaapi.data.Identifier;
 import io.grpc.ManagedChannel;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -21,11 +22,8 @@ import reputation.interface$.configuration.Configuration;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.role.Role;
 
-/**
- * Owns the ledger event lifecycle: connects and streams via {@link LedgerListener}, wires the
- * channel into {@link LedgerSubmitter} for outbound commands, and routes each event to the
- * handler responsible for its interface/template.
- */
+import java.util.Map;
+
 @Service
 public class LedgerService {
 
@@ -64,6 +62,8 @@ public class LedgerService {
     public void onStart() {
         channel = ledgerListener.connect();
         ledgerSubmitter.setChannel(channel);
+        observationHandler.setLedgerService(this);
+        disclosureHandler.setLedgerService(this);
 
         long resumeOffset = configRepo.findById(1L)
                 .map(EngineConfiguration::getLedgerOffset)
@@ -98,5 +98,17 @@ public class LedgerService {
         } else {
             log.debug("No handler for template: {}", event.getTemplateId());
         }
+    }
+
+    public String markObservationProcessed(String contractId) {
+        return ledgerSubmitter.markObservationProcessed(contractId);
+    }
+
+    public String submitUpdateScore(String roleContractId, Map<String, Double> scores, String observationCid) {
+        return ledgerSubmitter.submitUpdateScore(roleContractId, scores, observationCid);
+    }
+
+    public void completeDisclosureRequest(Identifier templateId, String requestContractId, String configCid) {
+        ledgerSubmitter.completeDisclosureRequest(templateId, requestContractId, configCid);
     }
 }

@@ -6,8 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import pt.ulisboa.tecnico.reputation.ledger.LedgerSubmitter;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
+import pt.ulisboa.tecnico.reputation.service.LedgerService;
 import reputation.interface$.observation.Observation;
 import reputation.interface$.observation.View;
 
@@ -21,11 +21,14 @@ public class ObservationHandler {
     private static final Logger log = LoggerFactory.getLogger(ObservationHandler.class);
 
     private final ReputationService reputationService;
-    private final LedgerSubmitter ledgerSubmitter;
+    private LedgerService ledgerService;
 
-    public ObservationHandler(ReputationService reputationService, LedgerSubmitter ledgerSubmitter) {
+    public ObservationHandler(ReputationService reputationService) {
         this.reputationService = reputationService;
-        this.ledgerSubmitter = ledgerSubmitter;
+    }
+
+    public void setLedgerService(LedgerService ledgerService) {
+        this.ledgerService = ledgerService;
     }
 
     @Transactional
@@ -52,7 +55,7 @@ public class ObservationHandler {
 
             reputationService.applyObservation(view.subject, componentValues);
 
-            String newObsCid = ledgerSubmitter.markObservationProcessed(event.getContractId());
+            String newObsCid = ledgerService.markObservationProcessed(event.getContractId());
             if (newObsCid == null) {
                 log.warn("MarkProcessed failed for {}; skipping UpdateScore", event.getContractId());
                 return;
@@ -64,7 +67,7 @@ public class ObservationHandler {
                 return;
             }
 
-            String newRoleContractId = ledgerSubmitter.submitUpdateScore(
+            String newRoleContractId = ledgerService.submitUpdateScore(
                     subjectOpt.get().contractId(),
                     reputationService.getSubjectInternalScores(view.subject),
                     newObsCid

@@ -32,6 +32,10 @@ template DisclosureRequest
                     createdAt   = v.createdAt
                     details     = v.details
 
+        choice Reject : ()
+            controller operator
+            do
+                pure ()
 
 template ConfigurationDisclosure 
     with 

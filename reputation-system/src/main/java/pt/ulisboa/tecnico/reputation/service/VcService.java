@@ -3,9 +3,8 @@ package pt.ulisboa.tecnico.reputation.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
+import pt.ulisboa.tecnico.reputation.dto.SubjectDto;
 import pt.ulisboa.tecnico.reputation.dto.VcStatus;
-import pt.ulisboa.tecnico.reputation.entity.Subject;
-import pt.ulisboa.tecnico.reputation.repository.SubjectRepository;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -24,40 +23,42 @@ public class VcService {
     private static final String ISSUER_ID = "https://reputation-system.example/issuer";
     private static final String MOCK_SIGNING_SECRET = "mock-issuer-secret";
 
-    private final SubjectRepository subjectRepo;
     private final ReputationService reputationService;
 
-    public VcService(SubjectRepository subjectRepo, ReputationService reputationService) {
-        this.subjectRepo = subjectRepo;
+    public VcService(ReputationService reputationService) {
         this.reputationService = reputationService;
     }
 
-    public Optional<String> issueMockVc(String party) {
-        Subject subject = subjectRepo.findById(party).orElse(null);
-        if (subject == null || subject.getTier() == null) return Optional.empty();
+    private static int interactionCount(SubjectDto subject) {
+        return subject.components().stream().mapToInt(SubjectDto.ComponentDto::count).max().orElse(0);
+    }
 
-        int interactionCount = subject.getInteractionCount();
+    public Optional<String> issueMockVc(String party) {
+        SubjectDto subject = reputationService.getSubject(party).orElse(null);
+        if (subject == null || subject.tier() == null) return Optional.empty();
+
+        int interactionCount = interactionCount(subject);
         if (interactionCount == 0) return Optional.empty();
 
         String issuanceDate = Instant.now().truncatedTo(ChronoUnit.MILLIS).toString();
-        return Optional.of(buildVcString(party, subject.getTier(), issuanceDate, interactionCount));
+        return Optional.of(buildVcString(party, subject.tier(), issuanceDate, interactionCount));
     }
 
     /** Explains why issueMockVc returned empty for this party, for surfacing to API callers. */
     public String issuanceBlockReason(String party) {
-        Subject subject = subjectRepo.findById(party).orElse(null);
+        SubjectDto subject = reputationService.getSubject(party).orElse(null);
         if (subject == null) return "Unknown party: " + party;
-        if (subject.getInteractionCount() == 0) return "Party " + party + " has no recorded interactions yet";
-        if (subject.getTier() == null) return "Party " + party + " has not yet qualified for a tier";
+        if (interactionCount(subject) == 0) return "Party " + party + " has no recorded interactions yet";
+        if (subject.tier() == null) return "Party " + party + " has not yet qualified for a tier";
         return "Unable to issue VC for party: " + party;
     }
 
     public VcStatus verifyMockVc(String party, String tier, String issuanceDate, String jws) {
-        Subject subject = subjectRepo.findById(party).orElse(null);
+        SubjectDto subject = reputationService.getSubject(party).orElse(null);
         if (subject == null) return VcStatus.INVALID;
 
         try {
-            Map<String, Object> credential = buildCredential(party, tier, issuanceDate, subject.getInteractionCount());
+            Map<String, Object> credential = buildCredential(party, tier, issuanceDate, interactionCount(subject));
             String expectedJws = mockSign(credential);
             if (!expectedJws.equals(jws)) return VcStatus.INVALID;
         } catch (Exception e) {
@@ -65,7 +66,7 @@ public class VcService {
         }
 
         // The signature proves the VC was genuinely issued for this tier; this checks it's still current.
-        return Objects.equals(tier, subject.getTier()) ? VcStatus.VALID : VcStatus.REVOKED;
+        return Objects.equals(tier, subject.tier()) ? VcStatus.VALID : VcStatus.REVOKED;
     }
 
     private String reputationRangeLabel(String tier) {
