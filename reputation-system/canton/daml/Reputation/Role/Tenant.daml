@@ -29,6 +29,7 @@ template TenantRole
                 operator
                 party
                 assignedAt
+                configCid
                 roleComponents = Map.fromList [
                   (Reliability, reliability), 
                   (Responsiveness, responsiveness), 

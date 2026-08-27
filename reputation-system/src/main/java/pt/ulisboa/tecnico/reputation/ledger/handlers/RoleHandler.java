@@ -10,10 +10,6 @@ import pt.ulisboa.tecnico.reputation.entity.SubjectComponent;
 import pt.ulisboa.tecnico.reputation.service.ReputationService;
 import reputation.interface$.role.Role;
 import reputation.interface$.role.View;
-import reputation.role.agent.AgentRole;
-import reputation.role.buyer.BuyerRole;
-import reputation.role.landlord.LandlordRole;
-import reputation.role.tenant.TenantRole;
 import reputation.types.ComponentId;
 
 import java.util.ArrayList;
@@ -34,7 +30,6 @@ public class RoleHandler {
         try {
             String roleType = resolveRoleType(event.getTemplateId());
             String contractId = event.getContractId();
-            String configContractId = resolveConfigContractId(event);
 
             var viewRecord = event.getInterfaceViews().get(Role.INTERFACE_ID_WITH_PACKAGE_ID);
             if (viewRecord == null) {
@@ -43,6 +38,7 @@ public class RoleHandler {
             }
 
             View view = View.valueDecoder().decode(viewRecord);
+            String configContractId = view.configCid.contractId;
 
             List<SubjectComponent> components = new ArrayList<>();
             view.roleComponents.forEach((componentId, roleComponent) -> {
@@ -60,19 +56,6 @@ public class RoleHandler {
         } catch (Exception e) {
             log.error("Failed to handle Role event: {}", e.getMessage(), e);
         }
-    }
-
-    private String resolveConfigContractId(CreatedEvent event) {
-        if (AgentRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(event.getTemplateId())) {
-            return AgentRole.Contract.fromCreatedEvent(event).data.configCid.contractId;
-        } else if (BuyerRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(event.getTemplateId())) {
-            return BuyerRole.Contract.fromCreatedEvent(event).data.configCid.contractId;
-        } else if (LandlordRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(event.getTemplateId())) {
-            return LandlordRole.Contract.fromCreatedEvent(event).data.configCid.contractId;
-        } else if (TenantRole.TEMPLATE_ID_WITH_PACKAGE_ID.equals(event.getTemplateId())) {
-            return TenantRole.Contract.fromCreatedEvent(event).data.configCid.contractId;
-        }
-        return null;
     }
 
     private String resolveRoleType(Identifier templateId) {

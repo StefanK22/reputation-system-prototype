@@ -2,6 +2,7 @@ module Reputation.Interface.Role where
 
 import DA.Map (Map)
 import Reputation.Types (ComponentId, RoleComponent)
+import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Interface.Observation qualified as Observation (I)
 
 type I = Role
@@ -13,6 +14,7 @@ data View = View
         party               : Party
         roleComponents      : Map ComponentId RoleComponent
         assignedAt          : Time
+        configCid           : ContractId Configuration.I
         lastObservationCid  : Optional (ContractId Observation.I)
         lastUpdate          : Optional Time
     deriving (Eq, Show)
