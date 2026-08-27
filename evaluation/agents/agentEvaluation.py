@@ -502,7 +502,7 @@ def generate_pp_daml(profile: dict, params: dict, base_date: datetime) -> str:
     lines.append("")
 
     lines.append(f"  {var}_ipCid <- submit {agent_var} do")
-    lines.append(f"    exerciseCmd {var}_draftCid Begin with startedAt = {var}_t0; configCid = iPPConfigCid")
+    lines.append(f"    exerciseCmd {var}_draftCid Begin with startedAt = {var}_t0")
     lines.append("")
 
     for i, (t_sub, t_res, outcome) in enumerate(proposal_times):
@@ -710,7 +710,6 @@ def build_round_daml(round_num: int, profiles: list, params_list: list, start_ba
     lines.append("import Reputation.PropertyPurchase.Configuration qualified as PP")
     lines.append("import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))")
     lines.append("import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))")
-    lines.append("import Reputation.Interface.Configuration qualified as Configuration (I)")
     lines.append("import Reputation.Types")
     lines.append("import Reputation.PropertyPurchase.Feedback (PropertyPurchaseFeedbackRequest, SubmitFeedback(..))")
     lines.append("")
@@ -741,7 +740,6 @@ def build_round_daml(round_num: int, profiles: list, params_list: list, start_ba
     lines.append("  ppConfigCid <- case find (\\(_, c) -> c.configId == \"EVAL-PP-CONFIG\") ppConfigs of")
     lines.append("    None -> fail \"PropertyPurchaseConfiguration 'EVAL-PP-CONFIG' not found. Run EvalSeedAgentSetup first.\"")
     lines.append("    Some (cid, _) -> pure cid")
-    lines.append("  let iPPConfigCid : ContractId Configuration.I = toInterfaceContractId ppConfigCid")
     lines.append("")
 
     base = start_base

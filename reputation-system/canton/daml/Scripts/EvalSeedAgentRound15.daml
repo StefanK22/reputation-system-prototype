@@ -10,7 +10,6 @@ import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(
 import Reputation.PropertyPurchase.Configuration qualified as PP
 import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
 import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
-import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Types
 import Reputation.PropertyPurchase.Feedback (PropertyPurchaseFeedbackRequest, SubmitFeedback(..))
 
@@ -37,7 +36,6 @@ evalSeedAgentRound15 = do
   ppConfigCid <- case find (\(_, c) -> c.configId == "EVAL-PP-CONFIG") ppConfigs of
     None -> fail "PropertyPurchaseConfiguration 'EVAL-PP-CONFIG' not found. Run EvalSeedAgentSetup first."
     Some (cid, _) -> pure cid
-  let iPPConfigCid : ContractId Configuration.I = toInterfaceContractId ppConfigCid
 
   -- ═══════════════════════════════════════════════════════════
   -- TX-EVAL-057: AgentPro (Agent) + BuyerReluctant (Buyer)
@@ -64,7 +62,7 @@ evalSeedAgentRound15 = do
       openedAt = tx_eval_057_t0
 
   tx_eval_057_ipCid <- submit agentPro do
-    exerciseCmd tx_eval_057_draftCid Begin with startedAt = tx_eval_057_t0; configCid = iPPConfigCid
+    exerciseCmd tx_eval_057_draftCid Begin with startedAt = tx_eval_057_t0
 
   tx_eval_057_ipCid <- submit operator do
     exerciseCmd tx_eval_057_ipCid RecordEvent with
@@ -177,7 +175,7 @@ evalSeedAgentRound15 = do
       openedAt = tx_eval_058_t0
 
   tx_eval_058_ipCid <- submit agentSlowUploader do
-    exerciseCmd tx_eval_058_draftCid Begin with startedAt = tx_eval_058_t0; configCid = iPPConfigCid
+    exerciseCmd tx_eval_058_draftCid Begin with startedAt = tx_eval_058_t0
 
   tx_eval_058_ipCid <- submit operator do
     exerciseCmd tx_eval_058_ipCid RecordEvent with
@@ -290,7 +288,7 @@ evalSeedAgentRound15 = do
       openedAt = tx_eval_059_t0
 
   tx_eval_059_ipCid <- submit agentHighReject do
-    exerciseCmd tx_eval_059_draftCid Begin with startedAt = tx_eval_059_t0; configCid = iPPConfigCid
+    exerciseCmd tx_eval_059_draftCid Begin with startedAt = tx_eval_059_t0
 
   tx_eval_059_ipCid <- submit operator do
     exerciseCmd tx_eval_059_ipCid RecordEvent with
@@ -402,7 +400,7 @@ evalSeedAgentRound15 = do
       openedAt = tx_eval_060_t0
 
   tx_eval_060_ipCid <- submit agentUnreliable do
-    exerciseCmd tx_eval_060_draftCid Begin with startedAt = tx_eval_060_t0; configCid = iPPConfigCid
+    exerciseCmd tx_eval_060_draftCid Begin with startedAt = tx_eval_060_t0
 
   tx_eval_060_ipCid <- submit operator do
     exerciseCmd tx_eval_060_ipCid RecordEvent with
