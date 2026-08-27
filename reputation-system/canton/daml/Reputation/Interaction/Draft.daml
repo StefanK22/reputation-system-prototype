@@ -3,7 +3,6 @@ module Reputation.Interaction.Draft where
 import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
 import Reputation.Interaction.Discarded(DiscardedInteraction(..))
 import Reputation.Interaction.InProgress(InProgressInteraction(..))
-import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Types (RoleType)
 
 template DraftInteraction
@@ -30,13 +29,11 @@ template DraftInteraction
                 interactionType
                 participants
                 events          = []
-                configCid       = None
                 processed       = False
         
         choice Begin : ContractId InProgressInteraction
             with
                 startedAt : Time
-                configCid : ContractId Configuration.I
             controller initiator
             do
                 create InProgressInteraction with
@@ -46,7 +43,6 @@ template DraftInteraction
                     interactionType
                     participants    = participants ++ [(initiator, initiatorRole)]
                     events = []
-                    configCid  
                     startedAt
 
         choice Discard : ContractId DiscardedInteraction
@@ -60,7 +56,6 @@ template DraftInteraction
                     interactionId
                     interactionType
                     participants
-                    configCid       = None
                     discardedAt
 
         choice AddParticipant : ContractId DraftInteraction

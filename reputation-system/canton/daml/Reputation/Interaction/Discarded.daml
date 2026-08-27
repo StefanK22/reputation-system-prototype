@@ -1,7 +1,6 @@
 module Reputation.Interaction.Discarded where
 
 import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
-import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Types (RoleType)
 
 template DiscardedInteraction
@@ -11,8 +10,7 @@ template DiscardedInteraction
         interactionId   : Text
         interactionType : Text
         participants    : [(Party, RoleType)]
-        configCid       : Optional (ContractId Configuration.I)
-        discardedAt : Time
+        discardedAt     : Time
     where
         signatory initiator
         observer map fst participants ++ [operator]
@@ -27,7 +25,4 @@ template DiscardedInteraction
                 interactionType
                 participants
                 events = []
-                configCid
                 processed = False
-
-                        

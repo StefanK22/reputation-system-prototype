@@ -1,6 +1,5 @@
 module Reputation.Interaction.Completed where
 
-import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
 import Reputation.Types (RecordedEvent, RoleType)
 
@@ -14,7 +13,6 @@ template CompletedInteraction
         events          : [RecordedEvent]
         startedAt       : Time
         completedAt     : Time
-        configCid       : ContractId Configuration.I
         processed       : Bool
     where
         signatory initiator
@@ -33,7 +31,6 @@ template CompletedInteraction
                 interactionType
                 participants
                 events
-                configCid = Some configCid
                 processed
         
         choice ProcessInteraction : ContractId CompletedInteraction 

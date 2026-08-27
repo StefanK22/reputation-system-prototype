@@ -37,6 +37,12 @@ function statusFromTemplate(templateId) {
   return INTERACTION_TEMPLATES[templateId] || templateId;
 }
 
+function configKeyFromInteractionType(interactionType) {
+  if (interactionType === 'PropertyPurchase') return 'PROPERTY_PURCHASE';
+  if (interactionType === 'RentalAgreement') return 'RENTAL_AGREEMENT';
+  return interactionType;
+}
+
 // DAML tuple (Party, RoleType) serializes as { _1: party, _2: role }
 function partyStr(p) {
   if (typeof p === 'string') return p;
@@ -97,7 +103,6 @@ export default function Interactions() {
   const [parties,       setParties]       = useState([]);
   const [templateIdMap, setTemplateIdMap] = useState({});
   const [configMap,     setConfigMap]     = useState({});
-  const [contractTemplateMap, setContractTemplateMap] = useState({});
   const [observations,        setObservations]        = useState([]);
   const [expandedObsId,       setExpandedObsId]       = useState(null);
   const [partyRoleMap,        setPartyRoleMap]        = useState({});
@@ -165,11 +170,6 @@ export default function Interactions() {
       setTemplateIdMap(buildTemplateIdMap(contracts));
       setParties(pts);
 
-      // contractId → rawTemplateId for every contract on the ledger
-      const ctMap = {};
-      contracts.forEach(c => { if (c.contractId && c.rawTemplateId) ctMap[c.contractId] = c.rawTemplateId; });
-      setContractTemplateMap(ctMap);
-
       setObservations(contracts.filter(c => c.templateId in OBS_TEMPLATES).map(parseObservation));
 
       const roleMap = {};
@@ -200,7 +200,6 @@ export default function Interactions() {
           openedAt:        openedDate(c),
           completedAt:     completedDate(c),
           createdAt:       c.createdAt,
-          configContractId: c.payload?.configCid ?? null,
           processed:       c.payload?.processed ?? false,
         }))
         .sort((a, b) => new Date(b.openedAt || b.createdAt || 0) - new Date(a.openedAt || a.createdAt || 0));
@@ -236,12 +235,7 @@ export default function Interactions() {
   // ── Lifecycle actions ──────────────────────────────────────────────────────
 
   function handleBegin(ix) {
-    const cfg = configMap[ix.type];
-    if (!cfg) {
-      setActionError(`No ${ix.type} configuration contract found on the ledger. Ensure the ledger is seeded.`);
-      return;
-    }
-    return doExercise(ix, 'Begin', { startedAt: new Date().toISOString(), configCid: cfg.contractId });
+    return doExercise(ix, 'Begin', { startedAt: new Date().toISOString() });
   }
 
   function handleDiscard(ix) {
@@ -292,20 +286,16 @@ export default function Interactions() {
   }
 
   async function handleCreateObservations(ix) {
-    if (!ix.configContractId) {
-      setActionError('No config contract ID found on this interaction.');
-      return;
-    }
-    const rawTemplateId = contractTemplateMap[ix.configContractId];
-    if (!rawTemplateId) {
-      setActionError('Config contract not found on the ledger. Try refreshing.');
+    const cfg = configMap[configKeyFromInteractionType(ix.type)];
+    if (!cfg) {
+      setActionError(`No ${ix.type} configuration contract found on the ledger. Ensure the ledger is seeded.`);
       return;
     }
     setActionBusy('CreateObservations');
     setActionError(null);
     let err = null;
     try {
-      await ledger.exercise(ix.configContractId, rawTemplateId, 'CreateObservations', {
+      await ledger.exercise(cfg.contractId, cfg.rawTemplateId, 'CreateObservations', {
         completedCid: ix.contractId,
       });
     } catch (e) {

@@ -1,7 +1,6 @@
 module Reputation.Interaction.InProgress where
 
 import Reputation.Interface.Interaction qualified as Interaction (I, View(..))
-import Reputation.Interface.Configuration qualified as Configuration (I)
 import Reputation.Interaction.Discarded (DiscardedInteraction(..))
 import Reputation.Interaction.Completed (CompletedInteraction(..))
 import Reputation.Types (RoleType, RecordedEvent(..))
@@ -14,7 +13,6 @@ template InProgressInteraction
         interactionType : Text
         participants    : [(Party, RoleType)]
         events          : [RecordedEvent]
-        configCid       : ContractId Configuration.I
         startedAt       : Time
     where
         signatory initiator
@@ -30,7 +28,6 @@ template InProgressInteraction
                 interactionType
                 participants
                 events
-                configCid           = Some configCid
                 processed = False
 
         choice Discard : ContractId DiscardedInteraction
@@ -44,7 +41,6 @@ template InProgressInteraction
                     interactionId
                     interactionType
                     participants
-                    configCid       = Some configCid
                     discardedAt
 
         choice Complete : ContractId CompletedInteraction
@@ -61,7 +57,6 @@ template InProgressInteraction
                     events
                     startedAt
                     completedAt
-                    configCid
                     processed = False
 
         choice RecordEvent : ContractId InProgressInteraction
