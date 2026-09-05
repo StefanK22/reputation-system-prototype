@@ -23,7 +23,7 @@ public class DisclosureService {
         return configContractIds.get(templateName);
     }
 
-    public boolean shouldApprove(String configType) {
+    public boolean shouldApprove() {
         return true;
     }
 }

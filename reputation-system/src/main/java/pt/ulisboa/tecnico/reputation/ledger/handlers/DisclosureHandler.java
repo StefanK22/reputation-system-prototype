@@ -36,7 +36,7 @@ public class DisclosureHandler {
             DamlEnum configType = (DamlEnum) event.getArguments().getFields().get(2).getValue();
             String configTypeName = configType.getConstructor();
 
-            if (!disclosureService.shouldApprove(configTypeName)) {
+            if (!disclosureService.shouldApprove()) {
                 log.info("DisclosureRequest {} rejected by policy (configType={})", event.getContractId(), configTypeName);
                 return;
             }
