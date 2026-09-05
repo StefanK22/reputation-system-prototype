@@ -65,7 +65,7 @@ public class VcService {
         }
 
         // The signature proves the VC was genuinely issued for this tier; this checks it's still current.
-        return Objects.equals(tier, subject.tier()) ? VcStatus.VALID : VcStatus.REVOKED;
+        return Objects.equals(tier, subject.tier()) ? VcStatus.VALID : VcStatus.UNQUALIFIED;
     }
 
     private String reputationRangeLabel(String tier) {
