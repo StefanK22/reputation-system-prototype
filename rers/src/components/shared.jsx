@@ -52,6 +52,39 @@ export function normalizeScore(scaled, config) {
   return ((typeof scaled === 'number' ? scaled : 0) - floor) / (ceiling - floor);
 }
 
+// Raw observation and feedback values are stored in [0,1], while the UI uses
+// the score range configured by the operator. Fall back to the original
+// 0–100 presentation until that configuration is available.
+export function getScoreDisplayRange(config) {
+  const configuredFloor   = Number(config?.scoreFloor);
+  const configuredCeiling = Number(config?.scoreCeiling);
+  const floor   = Number.isFinite(configuredFloor)   ? configuredFloor   : 0;
+  const ceiling = Number.isFinite(configuredCeiling) && configuredCeiling !== floor
+    ? configuredCeiling
+    : 100;
+  return { floor, ceiling };
+}
+
+export function scaleScore(normalized, config) {
+  const { floor, ceiling } = getScoreDisplayRange(config);
+  const value = Number(normalized);
+  const safeValue = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+  return floor + safeValue * (ceiling - floor);
+}
+
+export function formatScoreValue(value, config) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  const { floor, ceiling } = getScoreDisplayRange(config);
+  const span = Math.abs(ceiling - floor);
+  const maximumFractionDigits = span <= 10 ? 2 : span <= 100 ? 1 : 0;
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits }).format(n);
+}
+
+export function formatScaledScore(normalized, config) {
+  return formatScoreValue(scaleScore(normalized, config), config);
+}
+
 const TIER_COLORS = {
   gold:   { bg: '#fff7e0', text: '#9a6b00', border: '#f0d98a' },
   silver: { bg: '#f3f4f6', text: '#5a5a5a', border: '#d8dbe0' },

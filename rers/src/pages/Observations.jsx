@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
-import { getInterfaceIds } from '../api/reputation.js';
+import { getInterfaceIds, getReputationConfig } from '../api/reputation.js';
 import { OBS_TEMPLATES, OBS_COMP_IDS, OBS_COMP_COLORS, parseObservation, optDecimal } from '../api/observations.js';
-import { Tag, ScoreBar } from '../components/shared.jsx';
+import { Tag, ScoreBar, formatScaledScore } from '../components/shared.jsx';
 
 const tdSt = { padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333', verticalAlign: 'middle' };
 const thSt = { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #eee', color: '#999', fontWeight: 'normal', fontSize: 11, textTransform: 'uppercase' };
@@ -115,41 +115,43 @@ function TenantMetrics({ p }) {
   );
 }
 
-function PropertyPurchaseFeedbackMetrics({ p }) {
-  const optPct = v => { const n = optDecimal(v); return n !== null ? String(Math.round(n * 100)) : 'N/A'; };
+function formatOptionalRating(value, repConfig) {
+  const normalized = optDecimal(value);
+  return normalized !== null ? formatScaledScore(normalized, repConfig) : 'N/A';
+}
+
+function PropertyPurchaseFeedbackMetrics({ p, repConfig }) {
   return (
     <MetricSection title="Peer ratings">
-      <MetricRow label="Professionalism"      value={optPct(p.professionalism)} />
-      <MetricRow label="Availability"         value={optPct(p.availability)} />
-      <MetricRow label="Honesty"              value={optPct(p.honesty)} />
+      <MetricRow label="Professionalism"      value={formatOptionalRating(p.professionalism, repConfig)} />
+      <MetricRow label="Availability"         value={formatOptionalRating(p.availability, repConfig)} />
+      <MetricRow label="Honesty"              value={formatOptionalRating(p.honesty, repConfig)} />
     </MetricSection>
   );
 }
 
-function LandlordFeedbackMetrics({ p }) {
-  const optPct = v => { const n = optDecimal(v); return n !== null ? String(Math.round(n * 100)) : 'N/A'; };
+function LandlordFeedbackMetrics({ p, repConfig }) {
   return (
     <MetricSection title="Peer ratings (tenant → landlord)">
-      <MetricRow label="Fairness"             value={optPct(p.fairness)} />
-      <MetricRow label="Availability"         value={optPct(p.availability)} />
-      <MetricRow label="Requirement Clarity"  value={optPct(p.requirementClarity)} />
+      <MetricRow label="Fairness"             value={formatOptionalRating(p.fairness, repConfig)} />
+      <MetricRow label="Availability"         value={formatOptionalRating(p.availability, repConfig)} />
+      <MetricRow label="Requirement Clarity"  value={formatOptionalRating(p.requirementClarity, repConfig)} />
     </MetricSection>
   );
 }
 
-function TenantFeedbackMetrics({ p }) {
-  const optPct = v => { const n = optDecimal(v); return n !== null ? String(Math.round(n * 100)) : 'N/A'; };
+function TenantFeedbackMetrics({ p, repConfig }) {
   return (
     <MetricSection title="Peer ratings (landlord → tenant)">
-      <MetricRow label="Document Honesty"          value={optPct(p.documentHonesty)} />
-      <MetricRow label="Communication Timeliness"  value={optPct(p.communicationTimeliness)} />
-      <MetricRow label="Requirement Compliance"    value={optPct(p.requirementCompliance)} />
+      <MetricRow label="Document Honesty"          value={formatOptionalRating(p.documentHonesty, repConfig)} />
+      <MetricRow label="Communication Timeliness"  value={formatOptionalRating(p.communicationTimeliness, repConfig)} />
+      <MetricRow label="Requirement Compliance"    value={formatOptionalRating(p.requirementCompliance, repConfig)} />
     </MetricSection>
   );
 }
 
 // compact=true skips the header and subject avatar (used when embedded inside a card that already shows them)
-export function ObservationDetail({ obs, onClose, compact = false }) {
+export function ObservationDetail({ obs, onClose, compact = false, repConfig = null }) {
   return (
     <div>
       {!compact && (
@@ -185,7 +187,7 @@ export function ObservationDetail({ obs, onClose, compact = false }) {
             <div key={id} style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                 <span style={{ fontSize: 12 }}>{id}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color }}>{(val * 100).toFixed(1)}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color }}>{formatScaledScore(val, repConfig)}</span>
               </div>
               <ScoreBar value={val} color={color} height={6} />
             </div>
@@ -205,10 +207,10 @@ export function ObservationDetail({ obs, onClose, compact = false }) {
           : obs.templateId === 'TenantObservation'
           ? <TenantMetrics p={obs.payload} />
           : obs.templateId === 'LandlordFeedbackObservation'
-          ? <LandlordFeedbackMetrics p={obs.payload} />
+          ? <LandlordFeedbackMetrics p={obs.payload} repConfig={repConfig} />
           : obs.templateId === 'TenantFeedbackObservation'
-          ? <TenantFeedbackMetrics p={obs.payload} />
-          : <PropertyPurchaseFeedbackMetrics p={obs.payload} />
+          ? <TenantFeedbackMetrics p={obs.payload} repConfig={repConfig} />
+          : <PropertyPurchaseFeedbackMetrics p={obs.payload} repConfig={repConfig} />
         }
       </div>
 
@@ -237,6 +239,7 @@ export default function Observations() {
   const ledger = useLedger();
   const { activeParty } = usePartyCtx();
   const [observations, setObservations] = useState([]);
+  const [repConfig,    setRepConfig]    = useState(null);
   const [selected,     setSelected]     = useState(null);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(null);
@@ -245,7 +248,11 @@ export default function Observations() {
     setLoading(true);
     setError(null);
     try {
-      const interfaceIds = await getInterfaceIds().catch(() => ({}));
+      const [interfaceIds, config] = await Promise.all([
+        getInterfaceIds().catch(() => ({})),
+        getReputationConfig().catch(() => null),
+      ]);
+      setRepConfig(config);
       const contracts    = await ledger.queryAll(activeParty, interfaceIds);
 
       const obs = contracts
@@ -321,7 +328,7 @@ export default function Observations() {
                         <td key={id} style={{ ...tdSt, minWidth: 100 }}>
                           {val !== undefined ? (
                             <>
-                              <div style={{ fontSize: 11, color: '#555', marginBottom: 4 }}>{(val * 100).toFixed(0)}</div>
+                              <div style={{ fontSize: 11, color: '#555', marginBottom: 4 }}>{formatScaledScore(val, repConfig)}</div>
                               <ScoreBar value={val} color={OBS_COMP_COLORS[id]} />
                             </>
                           ) : <span className="muted">—</span>}
@@ -345,7 +352,7 @@ export default function Observations() {
       {/* ── Detail panel ── */}
       {selected && (
         <div className="detail-panel" style={{ width: 320, borderLeft: '1px solid #e8e8e8', padding: 20, background: '#fafafa', overflowY: 'auto', flexShrink: 0 }}>
-          <ObservationDetail obs={selected} onClose={() => setSelected(null)} />
+          <ObservationDetail obs={selected} repConfig={repConfig} onClose={() => setSelected(null)} />
         </div>
       )}
     </div>

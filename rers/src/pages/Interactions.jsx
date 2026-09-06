@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
-import { Tag, ScoreBar } from '../components/shared.jsx';
-import { getInterfaceIds } from '../api/reputation.js';
+import { Tag, ScoreBar, formatScaledScore } from '../components/shared.jsx';
+import { getInterfaceIds, getReputationConfig } from '../api/reputation.js';
 import { OBS_TEMPLATES, OBS_COMP_IDS, OBS_COMP_COLORS, parseObservation } from '../api/observations.js';
 import { INTERACTION_TEMPLATES, ROLE_TEMPLATES, CONFIGURATION_TEMPLATES, KNOWN_MODULE_PATHS } from '../api/contracts.js';
 import { ObservationDetail } from './Observations.jsx';
@@ -106,6 +106,7 @@ export default function Interactions() {
   const [observations,        setObservations]        = useState([]);
   const [expandedObsId,       setExpandedObsId]       = useState(null);
   const [partyRoleMap,        setPartyRoleMap]        = useState({});
+  const [repConfig,           setRepConfig]           = useState(null);
 
   // New interaction form
   const [showNew,     setShowNew]     = useState(false);
@@ -140,9 +141,10 @@ export default function Interactions() {
     setLoading(true);
     setError(null);
     try {
-      const [interfaceIds, { parties: pts }] = await Promise.all([
+      const [interfaceIds, { parties: pts }, config] = await Promise.all([
         getInterfaceIds().catch(() => ({})),
         ledger.listAllParties().catch(() => ({ parties: [] })),
+        getReputationConfig().catch(() => null),
       ]);
 
       const pkgId = Object.values(interfaceIds).map(v => String(v).split(':')[0]).find(Boolean);
@@ -169,6 +171,7 @@ export default function Interactions() {
 
       setTemplateIdMap(buildTemplateIdMap(contracts));
       setParties(pts);
+      setRepConfig(config);
 
       setObservations(contracts.filter(c => c.templateId in OBS_TEMPLATES).map(parseObservation));
 
@@ -750,7 +753,7 @@ export default function Interactions() {
                             <div key={id} style={{ marginBottom: 5 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                                 <span style={{ fontSize: 10, color: '#999' }}>{id}</span>
-                                <span style={{ fontSize: 11, fontWeight: 600, color: OBS_COMP_COLORS[id] }}>{(val * 100).toFixed(0)}</span>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: OBS_COMP_COLORS[id] }}>{formatScaledScore(val, repConfig)}</span>
                               </div>
                               <ScoreBar value={val} color={OBS_COMP_COLORS[id]} />
                             </div>
@@ -760,7 +763,7 @@ export default function Interactions() {
                       {/* Expanded detail */}
                       {isExpanded && (
                         <div style={{ borderTop: '1px solid #e8e8e8', padding: 10 }}>
-                          <ObservationDetail obs={o} compact />
+                          <ObservationDetail obs={o} compact repConfig={repConfig} />
                         </div>
                       )}
                     </div>

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useLedger, usePartyCtx } from '../LedgerContext.jsx';
-import { getInterfaceIds } from '../api/reputation.js';
+import { getInterfaceIds, getReputationConfig } from '../api/reputation.js';
 import { FEEDBACK_REQUEST_TEMPLATES, FEEDBACK_TEMPLATES, ROLE_TEMPLATES, KNOWN_MODULE_PATHS } from '../api/contracts.js';
 import { optDecimal } from '../api/observations.js';
-import { Tag } from '../components/shared.jsx';
+import { Tag, formatScaledScore, formatScoreValue, getScoreDisplayRange, scaleScore } from '../components/shared.jsx';
 
 const tdSt    = { padding: '8px 12px', borderBottom: '1px solid #f0f0f0', color: '#333', verticalAlign: 'middle' };
 const thSt    = { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #eee', color: '#999', fontWeight: 'normal', fontSize: 11, textTransform: 'uppercase' };
@@ -58,15 +58,18 @@ function isExpired(expiresAt) {
   return expiresAt ? new Date(expiresAt) < new Date() : false;
 }
 
-function RatingSlider({ label, value, onChange, color }) {
-  const pct = value !== null ? Math.round(value * 100) : null;
+function RatingSlider({ label, value, onChange, color, repConfig }) {
+  const { floor, ceiling } = getScoreDisplayRange(repConfig);
+  const displayedValue = value !== null ? scaleScore(value, repConfig) : null;
+  const midpoint = floor + (ceiling - floor) / 2;
+  const step = Math.abs(ceiling - floor) / 100;
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
         <label style={{ ...labelSt, marginBottom: 0 }}>{label}</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {value !== null && (
-            <span style={{ fontSize: 13, fontWeight: 700, color }}>{pct}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color }}>{formatScoreValue(displayedValue, repConfig)}</span>
           )}
           <button
             onClick={() => onChange(null)}
@@ -76,15 +79,17 @@ function RatingSlider({ label, value, onChange, color }) {
       </div>
       <input
         type="range"
-        min={0} max={100} step={1}
-        value={value !== null ? pct : 50}
+        min={floor} max={ceiling} step={step}
+        value={displayedValue ?? midpoint}
         disabled={value === null}
-        onChange={e => onChange(Number(e.target.value) / 100)}
+        onChange={e => onChange((Number(e.target.value) - floor) / (ceiling - floor))}
         style={{ width: '100%', accentColor: color, opacity: value === null ? 0.3 : 1 }}
       />
       {value !== null && (
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#ccc', marginTop: 2 }}>
-          <span>0</span><span>50</span><span>100</span>
+          <span>{formatScoreValue(floor, repConfig)}</span>
+          <span>{formatScoreValue(midpoint, repConfig)}</span>
+          <span>{formatScoreValue(ceiling, repConfig)}</span>
         </div>
       )}
     </div>
@@ -98,6 +103,7 @@ export default function Feedbacks() {
   const [requests,     setRequests]     = useState([]);
   const [feedbacks,    setFeedbacks]    = useState([]);
   const [partyRoleMap, setPartyRoleMap] = useState({});
+  const [repConfig,    setRepConfig]    = useState(null);
   const [selected,  setSelected]  = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState(null);
@@ -114,7 +120,11 @@ export default function Feedbacks() {
     setLoading(true);
     setError(null);
     try {
-      const interfaceIds = await getInterfaceIds().catch(() => ({}));
+      const [interfaceIds, config] = await Promise.all([
+        getInterfaceIds().catch(() => ({})),
+        getReputationConfig().catch(() => null),
+      ]);
+      setRepConfig(config);
       const pkgId        = Object.values(interfaceIds).map(v => String(v).split(':')[0]).find(Boolean);
       const contracts    = pkgId
         ? await ledger.queryByTemplates(Object.values(KNOWN_MODULE_PATHS).map(p => `${pkgId}:${p}`))
@@ -312,9 +322,9 @@ export default function Feedbacks() {
                     <td style={tdSt}><span style={{ color: '#7a5abf' }}>{f.interactionId}</span></td>
                     <td style={tdSt}>{shortName(f.from)}</td>
                     <td style={tdSt}>{shortName(f.to)}</td>
-                    <td style={{ ...tdSt, color: '#1a6abf' }}>{f.reliability !== null ? Math.round(f.reliability * 100) : <span className="muted">N/A</span>}</td>
-                    <td style={{ ...tdSt, color: '#7a5abf' }}>{f.responsiveness !== null ? Math.round(f.responsiveness * 100) : <span className="muted">N/A</span>}</td>
-                    <td style={{ ...tdSt, color: '#2a7a6a' }}>{f.accuracy !== null ? Math.round(f.accuracy * 100) : <span className="muted">N/A</span>}</td>
+                    <td style={{ ...tdSt, color: '#1a6abf' }}>{f.reliability !== null ? formatScaledScore(f.reliability, repConfig) : <span className="muted">N/A</span>}</td>
+                    <td style={{ ...tdSt, color: '#7a5abf' }}>{f.responsiveness !== null ? formatScaledScore(f.responsiveness, repConfig) : <span className="muted">N/A</span>}</td>
+                    <td style={{ ...tdSt, color: '#2a7a6a' }}>{f.accuracy !== null ? formatScaledScore(f.accuracy, repConfig) : <span className="muted">N/A</span>}</td>
                     <td style={{ ...tdSt, color: '#888', fontSize: 11 }}>
                       {f.submittedAt ? new Date(f.submittedAt).toLocaleDateString() : '—'}
                     </td>
@@ -364,13 +374,15 @@ export default function Feedbacks() {
           {!selected.expired && (
             <>
               <div style={{ borderTop: '1px solid #eee', paddingTop: 14, marginBottom: 4 }}>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#999', letterSpacing: '0.08em', marginBottom: 12 }}>Ratings (0 – 100)</div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#999', letterSpacing: '0.08em', marginBottom: 12 }}>
+                  Ratings ({formatScoreValue(getScoreDisplayRange(repConfig).floor, repConfig)} – {formatScoreValue(getScoreDisplayRange(repConfig).ceiling, repConfig)})
+                </div>
                 {(() => {
                   const cfg = getFeedbackConfig(selected.templateId, partyRoleMap[selected.from]);
                   return (<>
-                    <RatingSlider label={cfg.labels[0]} value={reliability}    onChange={setReliability}    color="#1a6abf" />
-                    <RatingSlider label={cfg.labels[1]} value={responsiveness} onChange={setResponsiveness} color="#7a5abf" />
-                    <RatingSlider label={cfg.labels[2]} value={accuracy}       onChange={setAccuracy}       color="#2a7a6a" />
+                    <RatingSlider label={cfg.labels[0]} value={reliability}    onChange={setReliability}    color="#1a6abf" repConfig={repConfig} />
+                    <RatingSlider label={cfg.labels[1]} value={responsiveness} onChange={setResponsiveness} color="#7a5abf" repConfig={repConfig} />
+                    <RatingSlider label={cfg.labels[2]} value={accuracy}       onChange={setAccuracy}       color="#2a7a6a" repConfig={repConfig} />
                   </>);
                 })()}
               </div>
