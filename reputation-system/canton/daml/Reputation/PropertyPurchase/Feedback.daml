@@ -41,8 +41,7 @@ template PropertyPurchaseFeedbackRequest
                 submittedAt         : Time
             controller from
             do
-                now <- getTime
-                assertMsg "Feedback Request Expired" (now <= expiresAt)
+                assertMsg "Feedback Request Expired" (submittedAt <= expiresAt)
                 feedbackCid <- create PropertyPurchaseFeedback with
                     operator
                     interactionId
