@@ -22,7 +22,10 @@ computeResponsiveness proposalToCTime contractTimes w =
         optionalScore = case proposalToCTime of
             None   -> 0.0
             Some t -> w.responsivenessProposalToContractWeight * normalize w.responsivenessCapHours (intToDecimal t)
-        contractScore = w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean contractTimes)
+        contractScore = case contractTimes of
+            [] -> 0.0
+            _  -> w.responsivenessContractWeight *
+                normalize w.responsivenessCapHours (mean contractTimes)
     in
         Some (optionalScore + contractScore)
 

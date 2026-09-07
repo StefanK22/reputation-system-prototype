@@ -13,9 +13,18 @@ computeReliability uploadedC signedC =
 
 computeResponsiveness : [Int] -> [Int] -> BuyerObservationWeights -> Optional Decimal
 computeResponsiveness [] [] _ = None
-computeResponsiveness contractTimes proposalTimes w = Some (
-    w.responsivenessContractWeight * normalize w.responsivenessCapHours (mean contractTimes) +
-    w.responsivenessProposalWeight * normalize w.responsivenessCapHours (mean proposalTimes))
+computeResponsiveness contractTimes proposalTimes w =
+    let
+        contractScore = case contractTimes of
+            [] -> 0.0
+            _  -> w.responsivenessContractWeight *
+                normalize w.responsivenessCapHours (mean contractTimes)
+        proposalScore = case proposalTimes of
+            [] -> 0.0
+            _  -> w.responsivenessProposalWeight *
+                normalize w.responsivenessCapHours (mean proposalTimes)
+    in
+        Some (contractScore + proposalScore)
 
 computeAccuracy : Int -> Optional Decimal
 computeAccuracy 0 = None
