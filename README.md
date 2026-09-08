@@ -1,6 +1,6 @@
 # Reputation System Prototype
 
-A blockchain-based reputation system for real-estate interactions, built on **Daml/Canton** with an off-chain **Java** scoring engine and a **React** frontend (**RERS** — Real Estate Reputation Simulator): a prototype real estate application where users can act out Property Purchase and Rental Agreement interactions, submit feedback, and track reputation rankings.
+A blockchain-based reputation system for real-estate interactions, built on **Daml/Canton** with an off-chain **Java** scoring engine and the **Real Estate App**, a **React** frontend where users can act out Property Purchase and Rental Agreement interactions, submit feedback, and track reputation rankings.
 
 Two interaction domains are modeled:
 
@@ -16,7 +16,7 @@ Each participant accrues a reputation score across three weighted components —
 | `canton-sandbox` | Daml / Canton | Ledger — hosts and enforces all smart contracts | 6865 (gRPC), 7575 (JSON API) |
 | `reputation-engine` | Java 17 / Spring Boot | Off-chain engine — streams ledger events, computes & persists reputation scores, issues mock verifiable credentials | 8080 |
 | `database` | PostgreSQL 17 | Persistent store for scores, tiers, and ledger offset | 5432 |
-| `rers` | React / Vite | Browser UI for setup, interactions, rankings, and view ledger/database data | 3000 |
+| Real Estate App (`real-estate-app`) | React / Vite | Browser UI for setup, interactions, rankings, and view ledger/database data | 3000 |
 
 ## Repository layout
 
@@ -24,7 +24,7 @@ Each participant accrues a reputation score across three weighted components —
 reputation-system/        Daml contracts (canton/daml) + Java reputation engine (src/main/java)
   canton/                 Canton sandbox Dockerfile, startup script, Daml project
   src/main/java/...       Spring Boot app: ledger listener/submitter, event handlers, REST API
-rers/                     React + Vite frontend (the "Real Estate Reputation Simulator")
+real-estate-app/          React + Vite frontend (the "Real Estate App")
 evaluation/               Standalone Python analysis scripts — not part of the running system
   agents/                 Property Purchase round simulation using Gemini-generated interaction data
   landlords/              Weight-sensitivity and score-convergence analysis for the Landlord formula
@@ -39,11 +39,11 @@ Requires Docker.
 docker compose up
 ```
 
-This builds and starts the database and Canton sandbox first; once both are healthy, the reputation engine starts (its `system-start.sh` waits for Canton's JSON API, discovers the auto-allocated `Operator` party, and launches the Spring Boot app as that party); the `rers` frontend starts last.
+This builds and starts the database and Canton sandbox first; once both are healthy, the reputation engine starts (its `system-start.sh` waits for Canton's JSON API, discovers the auto-allocated `Operator` party, and launches the Spring Boot app as that party); the Real Estate App (`real-estate-app` service) starts last.
 
 Once everything is up:
 
-- **rers UI** — http://localhost:3000 (start on the *Setup* page to create the role/observation configuration and seed parties before doing anything else)
+- **Real Estate App** — http://localhost:3000 (start on the *Setup* page to create the role/observation configuration and seed parties before doing anything else)
 - **Reputation API** — http://localhost:8080 (`/rankings`, `/subjects/{party}`, `/tiers`, `/vc/issue/{party}`, `/vc/verify`, `/debug/*`)
 - **Canton JSON API** — http://localhost:7575
 
@@ -77,4 +77,3 @@ docker exec canton-sandbox daml script \
 ```bash
 python evaluation/agents/fetch_rankings.py
 ```
-

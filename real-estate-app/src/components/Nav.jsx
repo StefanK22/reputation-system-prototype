@@ -26,7 +26,7 @@ function NavGroup({ links }) {
 export default function Nav() {
   return (
     <nav>
-      <div className="nav-title">Real Estate<br />Reputation System</div>
+      <div className="nav-title">Real Estate<br />App</div>
       <NavGroup links={USER_LINKS} />
       <div className="nav-section-label">Debug</div>
       <NavGroup links={DEBUG_LINKS} />

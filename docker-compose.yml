@@ -60,11 +60,11 @@ services:
     networks:
       - reputation-network
 
-  rers:
+  real-estate-app:
     build:
-      context: ./rers
+      context: ./real-estate-app
       dockerfile: Dockerfile
-    container_name: rers
+    container_name: real-estate-app
     environment:
       API_URL: http://reputation-engine:8080
       CANTON_API_URL: http://canton-sandbox:7575
