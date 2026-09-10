@@ -120,6 +120,13 @@ public class ReputationService {
             n.setCreatedAt(Instant.now());
             return n;
         });
+        int storedVersion = s.getComponents().stream().mapToInt(SubjectComponent::getCount).max().orElse(0);
+        int incomingVersion = components.stream().mapToInt(SubjectComponent::getCount).max().orElse(0);
+        if (s.getContractId() != null && !s.getContractId().equals(contractId) && incomingVersion <= storedVersion) {
+            log.info("Ignoring stale Role event for party {}: incoming version {}, stored version {}",
+                    party, incomingVersion, storedVersion);
+            return;
+        }
         s.setRoleType(roleType);
         s.setContractId(contractId);
         s.setConfigContractId(configContractId);
