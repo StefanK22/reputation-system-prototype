@@ -257,6 +257,16 @@ pre {
   letter-spacing: 0;
 }
 
+.api-result {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
 .toggle-label {
   display: flex;
   align-items: center;

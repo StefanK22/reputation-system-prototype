@@ -51,10 +51,10 @@ function ApiCard({ title, params, onCall }) {
       </button>
       {result && (
         result.ok
-          ? <pre style={{ marginTop: 12, fontSize: 11, overflowX: 'auto', background: 'var(--bg-subtle, #f8f8f8)', padding: 10, borderRadius: 4, whiteSpace: 'pre-wrap' }}>
+          ? <pre className="api-result" style={{ marginTop: 12, fontSize: 11, background: 'var(--bg-subtle, #f8f8f8)', padding: 10, borderRadius: 4 }}>
               {formatResult(result.data)}
             </pre>
-          : <p className="error" style={{ marginTop: 10 }}>{result.error}</p>
+          : <p className="error api-result" style={{ marginTop: 10 }}>{result.error}</p>
       )}
     </div>
   );

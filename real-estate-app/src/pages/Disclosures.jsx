@@ -19,12 +19,33 @@ function fmt(ts) {
 
 function DetailCell({ contractId, payload }) {
   const data = { contractId, ...payload };
+  const details = payload?.details;
+  const values = details && typeof details === 'object' && 'value' in details
+    ? details.value
+    : details;
+
   return (
     <details>
-      <summary style={{ fontSize: 11, color: '#555', cursor: 'pointer' }}>show</summary>
-      <pre style={{ fontSize: 10, color: '#777', margin: '6px 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 8, borderRadius: 3 }}>
-        {JSON.stringify(data, null, 2)}
-      </pre>
+      <summary style={{ fontSize: 13, fontWeight: 600, color: '#444', cursor: 'pointer' }}>Show details</summary>
+      <div style={{ marginTop: 10, minWidth: 360 }}>
+        {details?.tag && (
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>
+            {details.tag}
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: '#777', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Configuration values
+        </div>
+        <pre style={{ fontSize: 14, lineHeight: 1.6, fontWeight: 500, color: '#222', margin: '6px 0 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#f5f7f9', padding: 14, borderRadius: 4 }}>
+          {JSON.stringify(values, null, 2)}
+        </pre>
+        <details>
+          <summary style={{ fontSize: 12, color: '#666', cursor: 'pointer' }}>Full disclosure record</summary>
+          <pre style={{ fontSize: 12, lineHeight: 1.5, color: '#555', margin: '6px 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </details>
+      </div>
     </details>
   );
 }
