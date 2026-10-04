@@ -174,7 +174,7 @@ function RoleConfigCard({ tids, ledger, deployed, parties, onDone }) {
   const [ceiling,    setCeiling]    = useState(100);
   const [startValue, setStartValue] = useState(50);
   const [weights,    setWeights]    = useState({ Agent: dflt(), Buyer: dflt(), Landlord: dflt(), Tenant: dflt() });
-  const [tiers,      setTiers]      = useState([{ name: 'Bronze', value: 0 }, { name: 'Silver', value: 50 }, { name: 'Gold', value: 80 }]);
+  const [tiers,      setTiers]      = useState([{ name: 'Bronze', value: 60 }, { name: 'Silver', value: 75 }, { name: 'Gold', value: 90 }]);
   const [busy,       setBusy]       = useState(false);
   const [result,     setResult]     = useState(null);
 
