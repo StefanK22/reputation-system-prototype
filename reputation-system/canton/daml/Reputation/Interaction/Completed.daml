@@ -21,6 +21,7 @@ template CompletedInteraction
         ensure
             interactionId /= "" 
                 && not (null participants)
+                && not (null events)
                 && completedAt >= startedAt
         
         interface instance Interaction.I for CompletedInteraction where

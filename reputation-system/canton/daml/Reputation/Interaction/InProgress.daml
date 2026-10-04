@@ -48,6 +48,7 @@ template InProgressInteraction
                 completedAt : Time
             controller initiator
             do
+                assertMsg "Interaction requires at least one recorded event" (not (null events))
                 create CompletedInteraction with
                     operator
                     initiator
