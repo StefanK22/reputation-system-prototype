@@ -25,9 +25,13 @@ reputation-system/        Daml contracts (canton/daml) + Java reputation engine 
   canton/                 Canton sandbox Dockerfile, startup script, Daml project
   src/main/java/...       Spring Boot app: ledger listener/submitter, event handlers, REST API
 real-estate-app/          React + Vite frontend (the "Real Estate App")
-evaluation/               Standalone Python analysis scripts — not part of the running system
-  agents/                 Property Purchase round simulation using Gemini-generated interaction data
-  landlords/              Weight-sensitivity and score-convergence analysis for the Landlord formula
+evaluation/               Validation scripts and saved evaluation results
+  evaluation5.1.1/        Configuration and disclosure validation
+  evaluation5.1.2/        Landlord interactions and credential validation
+  evaluation5.1.3/        Authorization and processing validation
+  evaluation5.1.4/        Auditability and traceability validation
+  evaluation5.2/          Repeated Agent reputation evaluation
+REPUTATION_ALGORITHM.md    Current reputation formulas
 docker-compose.yml        Orchestrates all four services
 ```
 
@@ -51,29 +55,44 @@ To stop: `docker compose down` (add `-v` to also drop the Postgres volume and st
 
 ## Evaluation scripts
 
-`evaluation/landlords/` contains two Python scripts that analyze the Landlord scoring formula without touching the ledger:
+The `evaluation/evaluation5.1.*` folders contain the functional validation scripts:
 
-```bash
-python evaluation/landlords/weightsRank.py      # weight-sensitivity / rank-crossover analysis
-python evaluation/landlords/stabilization.py    # score-convergence analysis
-```
+| Folder | Purpose | Daml script |
+|---|---|---|
+| `evaluation5.1.1` | Configuration changes and disclosure | `Scripts.ConfigurationDisclosure:baseline`, `updateRule`, `aggregation`, `initialization`, `display`, or `classification` |
+| `evaluation5.1.2` | Good and poor Landlord interactions used for credential validation | `Scripts.EvaluationLandlordInteractions:evaluationLandlordInteractions` or `Scripts.EvaluationLandlordBadInteractions:evaluationLandlordBadInteractions` |
+| `evaluation5.1.3` | Authorization, visibility, evidence validity, and replay protection | `Scripts.AuthorizationAndProcessing:authorizationAndProcessing` |
+| `evaluation5.1.4` | Traceability from interaction evidence to the updated reputation | `Scripts.AuditabilityTraceability:auditabilityTraceability` |
 
-Both require `numpy` and `matplotlib`.
-
-`evaluation/agents/agentEvaluation.py` uses Gemini via Vertex AI to generate simulated Property Purchase interaction rounds as Daml scripts (`EvalSeedAgentSetup`, `EvalSeedAgentRound1`, `EvalSeedAgentRound2`, ...) under `reputation-system/canton/daml/Scripts/`. It expects Google Cloud Application Default Credentials with access to a specific GCP project configured in the script, so it isn't runnable out of the box without that access.
-
-Once those round scripts exist, run any one of them directly against the live ledger (the stack must already be up via `docker compose up`), substituting the module and function name of the script you want to run (e.g. `Scripts.EvalSeedAgentRound1:evalSeedAgentRound1`):
+Copy the required Daml file to `reputation-system/canton/daml/Scripts/` before building the stack. Run it with:
 
 ```bash
 docker exec canton-sandbox daml script \
     --dar /app/daml/.daml/dist/reputation-0.0.1.dar \
-    --script-name Scripts.<ScriptName>:<scriptFunction> \
+    --script-name <module>:<function> \
     --ledger-host localhost \
     --ledger-port 6865
 ```
 
-`evaluation/agents/fetch_rankings.py` automates this end-to-end: it runs `EvalSeedAgentSetup` followed by every `EvalSeedAgentRound*` script in sequence, polls `/rankings` after each round, and plots reputation evolution across rounds. It also requires `numpy` and `matplotlib`.
+`evaluation/evaluation5.2/` evaluates four Agent profiles across 30 repetitions. Gemini generates 25 Property Purchase rounds per repetition as Daml scripts:
 
 ```bash
-python evaluation/agents/fetch_rankings.py
+python3.9 evaluation/evaluation5.2/agentEvaluation.py --model=<gemini-model>
 ```
+
+Generation requires Google Cloud Application Default Credentials and access to the configured Vertex AI project.
+
+Copy one generated `RepetitionNN` folder to `reputation-system/canton/daml/Scripts/Repetitions/`, rebuild the stack, and save its API results with:
+
+```bash
+python3.9 evaluation/evaluation5.2/fetch_rankings.py --repetition 1
+```
+
+The command runs the Daml setup and rounds, waits for the Reputation Engine, and saves `repetitions/run_NN.json`. Use the saved results without running the system again:
+
+```bash
+python3.9 evaluation/evaluation5.2/fetch_rankings.py --repetition 1 --analyze-only
+python3.9 evaluation/evaluation5.2/fetch_rankings.py --analyze-all
+```
+
+The analysis reports the final reputation and the stabilization round for the ±1, ±2, ±5, and ±10 bands as mean and sample standard deviation.

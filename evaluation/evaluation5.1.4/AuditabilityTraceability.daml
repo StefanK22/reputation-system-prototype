@@ -1,0 +1,412 @@
+module Scripts.AuditabilityTraceability where
+
+import Daml.Script
+import DA.Date (date, Month(..))
+import DA.Map qualified as Map
+import DA.Optional (isSome)
+import DA.Text (isPrefixOf)
+import DA.Time (time, seconds)
+
+import Reputation.Disclosure (DisclosureRequest(..), ConfigurationDisclosure(..))
+import Reputation.Interface.Configuration qualified as Configuration
+import Reputation.Interface.Observation qualified as Observation
+import Reputation.Interface.Role qualified as Role
+import Reputation.Interaction.Completed (CompletedInteraction(..))
+import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
+import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
+import Reputation.PropertyPurchase.AgentObservation (AgentObservation(..))
+import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..))
+import Reputation.PropertyPurchase.Configuration qualified as PP
+import Reputation.Role.Agent (AgentRole(..))
+import Reputation.Role.Configuration (RoleConfiguration(..), CreateRole(..))
+import Reputation.Types
+
+evaluationInteractionId : Text
+evaluationInteractionId = "EVAL-04-AUDIT-PP-001"
+
+roleConfigId : Text
+roleConfigId = "EVAL-04-ROLE-CONFIG"
+
+propertyPurchaseConfigId : Text
+propertyPurchaseConfigId = "EVAL-04-PP-CONFIG"
+
+waitForProcessedAgentObservation
+  : Party -> Int -> Script (ContractId AgentObservation, AgentObservation)
+waitForProcessedAgentObservation agent attempts = do
+  observations <- query @AgentObservation agent
+  case find (\(_, observation) ->
+      observation.interactionId == evaluationInteractionId &&
+      observation.subject == agent &&
+      observation.processed) observations of
+    Some result -> pure result
+    None ->
+      if attempts <= 0
+      then fail "Timed out waiting for the RERS to process the Agent Observation"
+      else do
+        sleep (seconds 1)
+        waitForProcessedAgentObservation agent (attempts - 1)
+
+waitForUpdatedAgentRole
+  : Party -> Int -> Script (ContractId AgentRole, AgentRole)
+waitForUpdatedAgentRole agent attempts = do
+  roles <- query @AgentRole agent
+  case find (\(_, role) ->
+      role.party == agent &&
+      role.reliability.count == 1 &&
+      role.responsiveness.count == 1 &&
+      role.accuracy.count == 1 &&
+      role.lastObservationCid /= None) roles of
+    Some result -> pure result
+    None ->
+      if attempts <= 0
+      then fail "Timed out waiting for the RERS to update the Agent Role"
+      else do
+        sleep (seconds 1)
+        waitForUpdatedAgentRole agent (attempts - 1)
+
+waitForPropertyPurchaseDisclosure
+  : Party -> Int -> Script (ContractId ConfigurationDisclosure, ConfigurationDisclosure)
+waitForPropertyPurchaseDisclosure agent attempts = do
+  disclosures <- query @ConfigurationDisclosure agent
+  case find (\(_, disclosure) ->
+      disclosure.configId == propertyPurchaseConfigId) disclosures of
+    Some result -> pure result
+    None ->
+      if attempts <= 0
+      then fail "Timed out waiting for the Property Purchase configuration disclosure"
+      else do
+        sleep (seconds 1)
+        waitForPropertyPurchaseDisclosure agent (attempts - 1)
+
+requiredComponent
+  : ComponentId -> Observation.View -> Script Decimal
+requiredComponent componentId observationView =
+  case Map.lookup componentId observationView.componentValues of
+    Some (Some value) -> pure value
+    Some None -> fail $ show componentId <> " is unavailable in the Agent Observation"
+    None -> fail $ show componentId <> " is absent from the Agent Observation"
+
+eventSequence : [RecordedEvent] -> Text
+eventSequence [] = ""
+eventSequence [recordedEvent] = show recordedEvent.event
+eventSequence (recordedEvent :: remainingEvents) =
+  show recordedEvent.event <> " > " <> eventSequence remainingEvents
+
+archiveLabel : Bool -> Text
+archiveLabel archived = if archived then "ARCHIVED" else "ACTIVE"
+
+activeLabel : Bool -> Text
+activeLabel active = if active then "ACTIVE" else "INACTIVE"
+
+matchLabel : Bool -> Text
+matchLabel matches = if matches then "MATCH" else "MISMATCH"
+
+visibilityLabel : Bool -> Text
+visibilityLabel visible = if visible then "VISIBLE" else "HIDDEN"
+
+auditabilityTraceability : Script ()
+auditabilityTraceability = do
+  knownParties <- listKnownParties
+  operator <- case find (\pd -> "Operator::" `isPrefixOf` partyToText pd.party) knownParties of
+    None -> fail "Operator party not found. Start the normal RERS first."
+    Some pd -> pure pd.party
+
+  agent <- allocatePartyByHint (PartyIdHint "Evaluation04Agent")
+  buyer <- allocatePartyByHint (PartyIdHint "Evaluation04Buyer")
+
+  let configuredAt = time (date 2026 Sep 28) 0 0 0
+      proposedAt = time (date 2026 Sep 28) 1 0 0
+      approvedAt = time (date 2026 Sep 28) 2 0 0
+      uploadedAt = time (date 2026 Sep 28) 9 0 0
+      signedAt = time (date 2026 Sep 28) 16 0 0
+      closedAt = time (date 2026 Sep 28) 17 0 0
+      completedAt = time (date 2026 Sep 28) 18 0 0
+      requestedAt = time (date 2026 Sep 28) 18 15 0
+      proposalSubmittedEvent = RecordedEvent ProposalSubmitted agent proposedAt (Some "proposal-001")
+      proposalApprovedEvent = RecordedEvent ProposalApproved buyer approvedAt (Some "proposal-001")
+      contractUploadedEvent = RecordedEvent ContractUploaded agent uploadedAt (Some "contract-001")
+      agentSignedEvent = RecordedEvent ContractSigned agent signedAt (Some "contract-001")
+      buyerSignedEvent = RecordedEvent ContractSigned buyer signedAt (Some "contract-001")
+      transactionClosedEvent = RecordedEvent TransactionStateChanged agent closedAt (Some "SELL_CLOSED")
+      expectedEvents =
+        [ proposalSubmittedEvent
+        , proposalApprovedEvent
+        , contractUploadedEvent
+        , agentSignedEvent
+        , buyerSignedEvent
+        , transactionClosedEvent
+        ]
+
+  roleConfigCid <- submit operator do
+    createCmd RoleConfiguration with
+      operator = operator
+      configId = roleConfigId
+      createdAt = configuredAt
+      agentWeights = AgentWeights 0.5 0.3 0.2
+      buyerWeights = BuyerWeights 0.4 0.4 0.2
+      landlordWeights = LandlordWeights 0.5 0.3 0.2
+      tenantWeights = TenantWeights 0.5 0.3 0.2
+      scoreFloor = 0.0
+      scoreCeiling = 100.0
+      startValue = 50.0
+      tiers = [("Bronze", 60.0), ("Silver", 75.0), ("Gold", 90.0)]
+
+  initialAgentRoleInterfaceCid <- submit operator do
+    exerciseCmd roleConfigCid CreateRole with
+      party = agent
+      roleType = Agent
+      assignedAt = configuredAt
+
+  _ <- submit operator do
+    exerciseCmd roleConfigCid CreateRole with
+      party = buyer
+      roleType = Buyer
+      assignedAt = configuredAt
+
+  let initialAgentRoleCid =
+        fromInterfaceContractId initialAgentRoleInterfaceCid : ContractId AgentRole
+
+  propertyPurchaseConfigCid <- submit operator do
+    createCmd PropertyPurchaseConfiguration with
+      operator = operator
+      configId = propertyPurchaseConfigId
+      createdAt = configuredAt
+      agentObsWeights = AgentObservationWeights 0.3 0.7 0.6 0.4 24.0
+      buyerObsWeights = BuyerObservationWeights 0.6 0.4 24.0
+      feedbackWindowDays = 30
+
+  draftCid <- submit agent do
+    createCmd DraftInteraction with
+      operator = operator
+      initiator = agent
+      initiatorRole = Agent
+      interactionId = evaluationInteractionId
+      interactionType = "PropertyPurchase"
+      participants = [(buyer, Buyer)]
+      openedAt = proposedAt
+
+  inProgressCid <- submit agent do
+    exerciseCmd draftCid Begin with startedAt = proposedAt
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with event = proposalSubmittedEvent
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with event = proposalApprovedEvent
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with event = contractUploadedEvent
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with event = agentSignedEvent
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with event = buyerSignedEvent
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with event = transactionClosedEvent
+
+  completedCid <- submit agent do
+    exerciseCmd inProgressCid Complete with completedAt = completedAt
+
+  completedBeforeProcessing <- queryContractId agent completedCid
+  completedRecord <- case completedBeforeProcessing of
+    None -> fail "Agent could not inspect the CompletedInteraction before processing"
+    Some record -> pure record
+
+  assertMsg "CompletedInteraction has the wrong interaction ID"
+    (completedRecord.interactionId == evaluationInteractionId)
+  assertMsg "CompletedInteraction has the wrong participants"
+    (completedRecord.participants == [(buyer, Buyer), (agent, Agent)])
+  assertMsg "CompletedInteraction does not preserve the ordered event history"
+    (completedRecord.events == expectedEvents)
+  assertMsg "CompletedInteraction was already marked as processed"
+    (not completedRecord.processed)
+
+  (observationCids, _) <- submit operator do
+    exerciseCmd propertyPurchaseConfigCid PP.CreateObservations with
+      completedCid = completedCid
+
+  let [originalAgentObservationInterfaceCid, _buyerObservationCid] = observationCids
+      originalAgentObservationCid =
+        fromInterfaceContractId originalAgentObservationInterfaceCid : ContractId AgentObservation
+
+  completedAfterProcessing <- queryContractId agent completedCid
+  let originalCompletedArchived = completedAfterProcessing == None
+  assertMsg "The pre-processing CompletedInteraction version is still active"
+    originalCompletedArchived
+
+  processedCompletedInteractions <- query @CompletedInteraction agent
+  (processedCompletedCid, processedCompleted) <-
+    case find (\(_, completed) ->
+        completed.interactionId == evaluationInteractionId && completed.processed)
+        processedCompletedInteractions of
+      None -> fail "Processed CompletedInteraction successor not found"
+      Some result -> pure result
+
+  processedCompletedContract <- queryContractId agent processedCompletedCid
+  let processedCompletedActive = isSome processedCompletedContract
+      processedCompletedFlag = processedCompleted.processed
+      eventHistoryMatches = processedCompleted.events == expectedEvents
+  assertMsg "Processed CompletedInteraction is not marked as processed"
+    processedCompletedFlag
+  assertMsg "Processed CompletedInteraction successor is not active"
+    processedCompletedActive
+  assertMsg "Processed CompletedInteraction changed its event history"
+    eventHistoryMatches
+
+  debug ""
+  debug "=== AUDITABILITY & TRACEABILITY ==="
+  debug "[1/4] PASS  Processing preserves the interaction evidence"
+  debug "      Checked: the original ID and participants, then the processed successor's ordered event history."
+  debug $ "      Ledger versions: original " <> archiveLabel originalCompletedArchived
+    <> " | processed " <> activeLabel processedCompletedActive
+  debug $ "      " <> evaluationInteractionId <> " | events ("
+    <> show (length processedCompleted.events) <> "): "
+    <> eventSequence processedCompleted.events
+    <> " | history: " <> matchLabel eventHistoryMatches
+
+  (processedAgentObservationCid, _) <- waitForProcessedAgentObservation agent 60
+  observationView <- submit agent do
+    exerciseCmd
+      (toInterfaceContractId @Observation.I processedAgentObservationCid)
+      Observation.GetView with viewer = agent
+  processedObservationContract <-
+    queryContractId agent processedAgentObservationCid
+
+  reliability <- requiredComponent Reliability observationView
+  responsiveness <- requiredComponent Responsiveness observationView
+  accuracy <- requiredComponent Accuracy observationView
+
+  let observationInteractionMatches =
+        observationView.interactionId == evaluationInteractionId
+      observationSubjectMatches = observationView.subject == agent
+      observationConfigMatches = observationView.configCid ==
+        toInterfaceContractId @Configuration.I propertyPurchaseConfigCid
+      processedObservationActive = isSome processedObservationContract
+
+  assertMsg "Processed Observation has the wrong interaction ID"
+    observationInteractionMatches
+  assertMsg "Processed Observation has the wrong subject"
+    observationSubjectMatches
+  assertMsg "Processed Observation references the wrong configuration"
+    observationConfigMatches
+  assertMsg "Processed Observation is not marked as processed"
+    observationView.processed
+  assertMsg "Processed Observation successor is not active"
+    processedObservationActive
+
+  originalObservationAfterProcessing <-
+    queryContractId agent originalAgentObservationCid
+  let originalObservationArchived = originalObservationAfterProcessing == None
+  assertMsg "The unprocessed Agent Observation version is still active"
+    originalObservationArchived
+
+  debug "[2/4] PASS  The Observation identifies its source"
+  debug "      Checked: the Observation points to this interaction, Agent, and configuration."
+  debug $ "      Ledger versions: original " <> archiveLabel originalObservationArchived
+    <> " | processed " <> activeLabel processedObservationActive
+  debug $ "      Links: interactionId " <> evaluationInteractionId <> " "
+    <> matchLabel observationInteractionMatches
+    <> " | subject Agent " <> matchLabel observationSubjectMatches
+    <> " | configId " <> propertyPurchaseConfigId <> " "
+    <> matchLabel observationConfigMatches
+  debug $ "      Observation values (R/Resp/A): " <> show reliability
+    <> "/" <> show responsiveness <> "/" <> show accuracy
+
+  (updatedAgentRoleCid, updatedAgentRole) <- waitForUpdatedAgentRole agent 60
+  roleView <- submit agent do
+    exerciseCmd
+      (toInterfaceContractId @Role.I updatedAgentRoleCid)
+      Role.GetView with viewer = agent
+  updatedRoleContract <- queryContractId agent updatedAgentRoleCid
+
+  let processedAgentObservationInterfaceCid =
+        toInterfaceContractId @Observation.I processedAgentObservationCid
+
+  let lastObservationMatches =
+        roleView.lastObservationCid == Some processedAgentObservationInterfaceCid
+      roleConfigMatches =
+        roleView.configCid == toInterfaceContractId @Configuration.I roleConfigCid
+      roleLastUpdateSet = roleView.lastUpdate /= None
+      rolePartyMatches = roleView.party == agent
+      updatedRoleActive = isSome updatedRoleContract
+      roleCountsCorrect =
+        updatedAgentRole.reliability.count == 1 &&
+        updatedAgentRole.responsiveness.count == 1 &&
+        updatedAgentRole.accuracy.count == 1
+
+  assertMsg "Updated Role references the wrong Observation"
+    lastObservationMatches
+  assertMsg "Updated Role references the wrong Role configuration"
+    roleConfigMatches
+  assertMsg "Updated Role has no update timestamp"
+    roleLastUpdateSet
+  assertMsg "Updated Role belongs to the wrong party"
+    rolePartyMatches
+  assertMsg "Updated Role successor is not active"
+    updatedRoleActive
+  assertMsg "Updated Role did not advance every component count"
+    roleCountsCorrect
+
+  initialRoleAfterUpdate <- queryContractId agent initialAgentRoleCid
+  let initialRoleArchived = initialRoleAfterUpdate == None
+  assertMsg "The initial Agent Role version is still active"
+    initialRoleArchived
+
+  debug "[3/4] PASS  The updated Role identifies the evidence it used"
+  debug "      Checked: lastObservationCid points to the processed Observation and configCid points to the Role configuration."
+  debug $ "      Ledger versions: initial " <> archiveLabel initialRoleArchived
+    <> " | updated " <> activeLabel updatedRoleActive
+  debug $ "      Scores (R/Resp/A): " <> show updatedAgentRole.reliability.score
+    <> "/" <> show updatedAgentRole.responsiveness.score
+    <> "/" <> show updatedAgentRole.accuracy.score
+    <> " | counts: " <> show updatedAgentRole.reliability.count
+    <> "/" <> show updatedAgentRole.responsiveness.count
+    <> "/" <> show updatedAgentRole.accuracy.count
+  debug $ "      Links: lastObservationCid -> processed Observation "
+    <> matchLabel lastObservationMatches
+    <> " | configCid -> " <> roleConfigId <> " " <> matchLabel roleConfigMatches
+    <> " | lastUpdate set: " <> show roleLastUpdateSet
+
+  _ <- submit agent do
+    createCmd DisclosureRequest with
+      requester = agent
+      operator = operator
+      configType = PropertyPurchaseConfig
+      requestedAt = requestedAt
+
+  (disclosureCid, disclosure) <- waitForPropertyPurchaseDisclosure agent 30
+  let disclosureSourceMatches = disclosure.sourceCid == observationView.configCid
+      disclosureRequesterMatches = disclosure.requester == agent
+  assertMsg "Disclosure does not identify the Observation configuration"
+    disclosureSourceMatches
+  assertMsg "Disclosure has the wrong requester"
+    disclosureRequesterMatches
+  case disclosure.details of
+    PPConfigDetails details ->
+      assertMsg "Disclosure contains the wrong Agent response cap"
+        (details.agentObsWeights.responsivenessCapHours == 24.0)
+    _ -> fail "Disclosure returned the wrong configuration detail type"
+
+  visibleInteraction <- queryContractId agent processedCompletedCid
+  visibleObservation <- queryContractId agent processedAgentObservationCid
+  visibleRole <- queryContractId agent updatedAgentRoleCid
+  visibleDisclosure <- queryContractId agent disclosureCid
+  let interactionVisible = isSome visibleInteraction
+      observationVisible = isSome visibleObservation
+      roleVisible = isSome visibleRole
+      disclosureVisible = isSome visibleDisclosure
+  assertMsg "Agent cannot see the processed interaction" interactionVisible
+  assertMsg "Agent cannot see the processed Observation" observationVisible
+  assertMsg "Agent cannot see the updated Role" roleVisible
+  assertMsg "Agent cannot see the configuration disclosure" disclosureVisible
+
+  debug "[4/4] PASS  The evaluated User can inspect the explanation chain"
+  debug "      Checked: the Agent queried the interaction, Observation, updated Role, and disclosure."
+  debug $ "      Ledger visibility: interaction " <> visibilityLabel interactionVisible
+    <> " | Observation: " <> visibilityLabel observationVisible
+    <> " | Role: " <> visibilityLabel roleVisible
+    <> " | Disclosure: " <> visibilityLabel disclosureVisible
+  debug $ "      Disclosure links: sourceCid -> Observation configuration "
+    <> matchLabel disclosureSourceMatches
+    <> " | requester -> Agent " <> matchLabel disclosureRequesterMatches
+
+  debug "------------------------------------------"
+  debug "RESULT  4/4 checks passed"
+  pure ()

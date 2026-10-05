@@ -1,0 +1,21 @@
+=== AUDITABILITY & TRACEABILITY ===
+[1/4] PASS  Processing preserves the interaction evidence
+      Checked: the original ID and participants, then the processed successor's ordered event history.
+      Ledger versions: original ARCHIVED | processed ACTIVE
+      EVAL-04-AUDIT-PP-001 | events (6): ProposalSubmitted > ProposalApproved > ContractUploaded > ContractSigned > ContractSigned > TransactionStateChanged | history: MATCH
+[2/4] PASS  The Observation identifies its source
+      Checked: the Observation points to this interaction, Agent, and configuration.
+      Ledger versions: original ARCHIVED | processed ACTIVE
+      Links: interactionId EVAL-04-AUDIT-PP-001 MATCH | subject Agent MATCH | configId EVAL-04-PP-CONFIG MATCH
+      Observation values (R/Resp/A): 1.0/0.7083333333/1.0
+[3/4] PASS  The updated Role identifies the evidence it used
+      Checked: lastObservationCid points to the processed Observation and configCid points to the Role configuration.
+      Ledger versions: initial ARCHIVED | updated ACTIVE
+      Scores (R/Resp/A): 0.75/0.6/0.75 | counts: 1/1/1
+      Links: lastObservationCid -> processed Observation MATCH | configCid -> EVAL-04-ROLE-CONFIG MATCH | lastUpdate set: True
+[4/4] PASS  The evaluated User can inspect the explanation chain
+      Checked: the Agent queried the interaction, Observation, updated Role, and disclosure.
+      Ledger visibility: interaction VISIBLE | Observation: VISIBLE | Role: VISIBLE | Disclosure: VISIBLE
+      Disclosure links: sourceCid -> Observation configuration MATCH | requester -> Agent MATCH
+------------------------------------------
+RESULT  4/4 checks passed

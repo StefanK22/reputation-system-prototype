@@ -1,0 +1,124 @@
+module Scripts.EvaluationLandlordInteractions where
+
+import Daml.Script
+import DA.Date (date, Month(..))
+import DA.Text (isPrefixOf)
+import DA.Time (time, addRelTime, hours)
+
+import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
+import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
+import Reputation.Types
+
+createGoodRentalInteraction : Party -> Party -> Party -> Text -> Time -> Script ()
+createGoodRentalInteraction operator landlord tenant interactionId startedAt = do
+  let firstUploadAt = addRelTime startedAt (hours 1)
+      firstApprovalAt = addRelTime startedAt (hours 2)
+      secondUploadAt = addRelTime startedAt (hours 3)
+      secondApprovalAt = addRelTime startedAt (hours 4)
+      proposalSubmittedAt = addRelTime startedAt (hours 5)
+      proposalApprovedAt = addRelTime startedAt (hours 6)
+      rentedAt = addRelTime startedAt (hours 7)
+      completedAt = addRelTime startedAt (hours 8)
+
+  draftCid <- submit landlord do
+    createCmd DraftInteraction with
+      operator = operator
+      initiator = landlord
+      initiatorRole = Landlord
+      interactionId = interactionId
+      interactionType = "RentalAgreement"
+      participants = [(tenant, Tenant)]
+      openedAt = startedAt
+
+  inProgressCid <- submit landlord do
+    exerciseCmd draftCid Begin with startedAt = startedAt
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentUploaded
+        actor = tenant
+        occurredAt = firstUploadAt
+        resourceId = Some (interactionId <> "-identity")
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentApproved
+        actor = landlord
+        occurredAt = firstApprovalAt
+        resourceId = Some (interactionId <> "-identity")
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentUploaded
+        actor = tenant
+        occurredAt = secondUploadAt
+        resourceId = Some (interactionId <> "-income")
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentApproved
+        actor = landlord
+        occurredAt = secondApprovalAt
+        resourceId = Some (interactionId <> "-income")
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted
+        actor = tenant
+        occurredAt = proposalSubmittedAt
+        resourceId = Some (interactionId <> "-proposal")
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved
+        actor = landlord
+        occurredAt = proposalApprovedAt
+        resourceId = Some (interactionId <> "-proposal")
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged
+        actor = landlord
+        occurredAt = rentedAt
+        resourceId = Some "RENTAL_RENTED"
+
+  _ <- submit landlord do
+    exerciseCmd inProgressCid Complete with completedAt = completedAt
+
+  pure ()
+
+evaluationLandlordInteractions : Script ()
+evaluationLandlordInteractions = do
+  knownParties <- listKnownParties
+  operator <- case find (\pd -> "Operator::" `isPrefixOf` partyToText pd.party) knownParties of
+    None -> fail "Operator party not found. Start the normal RERS first."
+    Some pd -> pure pd.party
+
+  landlord <- case find (\pd -> "Landlord01::" `isPrefixOf` partyToText pd.party) knownParties of
+    None -> fail "Landlord01 party not found. Create it before running this script."
+    Some pd -> pure pd.party
+  tenant1 <- allocatePartyByHint (PartyIdHint "EvaluationTenant1")
+  tenant2 <- allocatePartyByHint (PartyIdHint "EvaluationTenant2")
+  tenant3 <- allocatePartyByHint (PartyIdHint "EvaluationTenant3")
+
+  createGoodRentalInteraction
+    operator landlord tenant1 "EVAL-02-RENTAL-01"
+    (time (date 2026 Sep 27) 9 0 0)
+
+  createGoodRentalInteraction
+    operator landlord tenant2 "EVAL-02-RENTAL-02"
+    (time (date 2026 Sep 28) 9 0 0)
+
+  createGoodRentalInteraction
+    operator landlord tenant3 "EVAL-02-RENTAL-03"
+    (time (date 2026 Sep 29) 9 0 0)
+
+  debug $ "Created three completed Rental Agreement interactions for " <> partyToText landlord
+  pure ()

@@ -1,0 +1,1487 @@
+{
+  "run": 11,
+  "rounds": [
+    {
+      "round": 0,
+      "agents": {
+        "AgentHighReject": {
+          "overall": 50.0,
+          "scores": {
+            "Reliability": 50.0,
+            "Responsiveness": 50.0,
+            "Accuracy": 50.0
+          },
+          "counts": {
+            "Reliability": 0,
+            "Responsiveness": 0,
+            "Accuracy": 0
+          }
+        },
+        "AgentPro": {
+          "overall": 50.0,
+          "scores": {
+            "Reliability": 50.0,
+            "Responsiveness": 50.0,
+            "Accuracy": 50.0
+          },
+          "counts": {
+            "Reliability": 0,
+            "Responsiveness": 0,
+            "Accuracy": 0
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 50.0,
+          "scores": {
+            "Reliability": 50.0,
+            "Responsiveness": 50.0,
+            "Accuracy": 50.0
+          },
+          "counts": {
+            "Reliability": 0,
+            "Responsiveness": 0,
+            "Accuracy": 0
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 50.0,
+          "scores": {
+            "Reliability": 50.0,
+            "Responsiveness": 50.0,
+            "Accuracy": 50.0
+          },
+          "counts": {
+            "Reliability": 0,
+            "Responsiveness": 0,
+            "Accuracy": 0
+          }
+        }
+      }
+    },
+    {
+      "round": 1,
+      "agents": {
+        "AgentPro": {
+          "overall": 81.5,
+          "scores": {
+            "Reliability": 83.0,
+            "Responsiveness": 78.0,
+            "Accuracy": 83.0
+          },
+          "counts": {
+            "Reliability": 2,
+            "Responsiveness": 2,
+            "Accuracy": 2
+          }
+        },
+        "AgentHighReject": {
+          "overall": 70.2,
+          "scores": {
+            "Reliability": 77.0,
+            "Responsiveness": 79.0,
+            "Accuracy": 40.0
+          },
+          "counts": {
+            "Reliability": 2,
+            "Responsiveness": 2,
+            "Accuracy": 2
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 55.5,
+          "scores": {
+            "Reliability": 62.0,
+            "Responsiveness": 27.0,
+            "Accuracy": 82.0
+          },
+          "counts": {
+            "Reliability": 2,
+            "Responsiveness": 2,
+            "Accuracy": 2
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 49.6,
+          "scores": {
+            "Reliability": 28.0,
+            "Responsiveness": 64.0,
+            "Accuracy": 82.0
+          },
+          "counts": {
+            "Reliability": 2,
+            "Responsiveness": 2,
+            "Accuracy": 2
+          }
+        }
+      }
+    },
+    {
+      "round": 2,
+      "agents": {
+        "AgentPro": {
+          "overall": 83.1,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 80.0,
+            "Accuracy": 73.0
+          },
+          "counts": {
+            "Reliability": 4,
+            "Responsiveness": 4,
+            "Accuracy": 4
+          }
+        },
+        "AgentHighReject": {
+          "overall": 72.0,
+          "scores": {
+            "Reliability": 83.0,
+            "Responsiveness": 77.0,
+            "Accuracy": 37.0
+          },
+          "counts": {
+            "Reliability": 4,
+            "Responsiveness": 4,
+            "Accuracy": 4
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 57.4,
+          "scores": {
+            "Reliability": 69.0,
+            "Responsiveness": 17.0,
+            "Accuracy": 89.0
+          },
+          "counts": {
+            "Reliability": 4,
+            "Responsiveness": 4,
+            "Accuracy": 4
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.4,
+          "scores": {
+            "Reliability": 24.0,
+            "Responsiveness": 66.0,
+            "Accuracy": 63.0
+          },
+          "counts": {
+            "Reliability": 4,
+            "Responsiveness": 4,
+            "Accuracy": 4
+          }
+        }
+      }
+    },
+    {
+      "round": 3,
+      "agents": {
+        "AgentPro": {
+          "overall": 87.1,
+          "scores": {
+            "Reliability": 92.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 81.0
+          },
+          "counts": {
+            "Reliability": 6,
+            "Responsiveness": 6,
+            "Accuracy": 6
+          }
+        },
+        "AgentHighReject": {
+          "overall": 74.5,
+          "scores": {
+            "Reliability": 86.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 36.0
+          },
+          "counts": {
+            "Reliability": 6,
+            "Responsiveness": 6,
+            "Accuracy": 6
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 59.5,
+          "scores": {
+            "Reliability": 72.0,
+            "Responsiveness": 17.0,
+            "Accuracy": 92.0
+          },
+          "counts": {
+            "Reliability": 6,
+            "Responsiveness": 6,
+            "Accuracy": 6
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 45.7,
+          "scores": {
+            "Reliability": 22.0,
+            "Responsiveness": 67.0,
+            "Accuracy": 73.0
+          },
+          "counts": {
+            "Reliability": 6,
+            "Responsiveness": 6,
+            "Accuracy": 6
+          }
+        }
+      }
+    },
+    {
+      "round": 4,
+      "agents": {
+        "AgentPro": {
+          "overall": 87.1,
+          "scores": {
+            "Reliability": 93.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 77.0
+          },
+          "counts": {
+            "Reliability": 8,
+            "Responsiveness": 8,
+            "Accuracy": 8
+          }
+        },
+        "AgentHighReject": {
+          "overall": 76.1,
+          "scores": {
+            "Reliability": 88.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 36.0
+          },
+          "counts": {
+            "Reliability": 8,
+            "Responsiveness": 8,
+            "Accuracy": 8
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 59.2,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 86.0
+          },
+          "counts": {
+            "Reliability": 8,
+            "Responsiveness": 8,
+            "Accuracy": 8
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.7,
+          "scores": {
+            "Reliability": 21.0,
+            "Responsiveness": 68.0,
+            "Accuracy": 69.0
+          },
+          "counts": {
+            "Reliability": 8,
+            "Responsiveness": 8,
+            "Accuracy": 8
+          }
+        }
+      }
+    },
+    {
+      "round": 5,
+      "agents": {
+        "AgentPro": {
+          "overall": 87.8,
+          "scores": {
+            "Reliability": 94.0,
+            "Responsiveness": 82.0,
+            "Accuracy": 81.0
+          },
+          "counts": {
+            "Reliability": 10,
+            "Responsiveness": 10,
+            "Accuracy": 10
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.5,
+          "scores": {
+            "Reliability": 88.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 36.0
+          },
+          "counts": {
+            "Reliability": 10,
+            "Responsiveness": 10,
+            "Accuracy": 10
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 59.5,
+          "scores": {
+            "Reliability": 76.0,
+            "Responsiveness": 13.0,
+            "Accuracy": 88.0
+          },
+          "counts": {
+            "Reliability": 10,
+            "Responsiveness": 10,
+            "Accuracy": 10
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.4,
+          "scores": {
+            "Reliability": 20.0,
+            "Responsiveness": 68.0,
+            "Accuracy": 65.0
+          },
+          "counts": {
+            "Reliability": 10,
+            "Responsiveness": 10,
+            "Accuracy": 10
+          }
+        }
+      }
+    },
+    {
+      "round": 6,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.5,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 84.0
+          },
+          "counts": {
+            "Reliability": 12,
+            "Responsiveness": 12,
+            "Accuracy": 12
+          }
+        },
+        "AgentHighReject": {
+          "overall": 76.1,
+          "scores": {
+            "Reliability": 88.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 36.0
+          },
+          "counts": {
+            "Reliability": 12,
+            "Responsiveness": 12,
+            "Accuracy": 12
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 59.7,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 14.0,
+            "Accuracy": 90.0
+          },
+          "counts": {
+            "Reliability": 12,
+            "Responsiveness": 12,
+            "Accuracy": 12
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.7,
+          "scores": {
+            "Reliability": 20.0,
+            "Responsiveness": 69.0,
+            "Accuracy": 70.0
+          },
+          "counts": {
+            "Reliability": 12,
+            "Responsiveness": 12,
+            "Accuracy": 12
+          }
+        }
+      }
+    },
+    {
+      "round": 7,
+      "agents": {
+        "AgentPro": {
+          "overall": 87.8,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 77.0
+          },
+          "counts": {
+            "Reliability": 14,
+            "Responsiveness": 14,
+            "Accuracy": 14
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.9,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 82.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 14,
+            "Responsiveness": 14,
+            "Accuracy": 14
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.0,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 13.0,
+            "Accuracy": 83.0
+          },
+          "counts": {
+            "Reliability": 14,
+            "Responsiveness": 14,
+            "Accuracy": 14
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.0,
+          "scores": {
+            "Reliability": 20.0,
+            "Responsiveness": 70.0,
+            "Accuracy": 65.0
+          },
+          "counts": {
+            "Reliability": 14,
+            "Responsiveness": 14,
+            "Accuracy": 14
+          }
+        }
+      }
+    },
+    {
+      "round": 8,
+      "agents": {
+        "AgentPro": {
+          "overall": 88.5,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 79.0
+          },
+          "counts": {
+            "Reliability": 16,
+            "Responsiveness": 16,
+            "Accuracy": 16
+          }
+        },
+        "AgentHighReject": {
+          "overall": 76.2,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 16,
+            "Responsiveness": 16,
+            "Accuracy": 16
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.9,
+          "scores": {
+            "Reliability": 76.0,
+            "Responsiveness": 13.0,
+            "Accuracy": 85.0
+          },
+          "counts": {
+            "Reliability": 16,
+            "Responsiveness": 16,
+            "Accuracy": 16
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.9,
+          "scores": {
+            "Reliability": 20.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 68.0
+          },
+          "counts": {
+            "Reliability": 16,
+            "Responsiveness": 16,
+            "Accuracy": 16
+          }
+        }
+      }
+    },
+    {
+      "round": 9,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.2,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 85.0,
+            "Accuracy": 81.0
+          },
+          "counts": {
+            "Reliability": 18,
+            "Responsiveness": 18,
+            "Accuracy": 18
+          }
+        },
+        "AgentHighReject": {
+          "overall": 77.0,
+          "scores": {
+            "Reliability": 90.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 18,
+            "Responsiveness": 18,
+            "Accuracy": 18
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.9,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 14.0,
+            "Accuracy": 86.0
+          },
+          "counts": {
+            "Reliability": 18,
+            "Responsiveness": 18,
+            "Accuracy": 18
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 45.5,
+          "scores": {
+            "Reliability": 20.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 71.0
+          },
+          "counts": {
+            "Reliability": 18,
+            "Responsiveness": 18,
+            "Accuracy": 18
+          }
+        }
+      }
+    },
+    {
+      "round": 10,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.1,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 86.0,
+            "Accuracy": 79.0
+          },
+          "counts": {
+            "Reliability": 20,
+            "Responsiveness": 20,
+            "Accuracy": 20
+          }
+        },
+        "AgentHighReject": {
+          "overall": 77.0,
+          "scores": {
+            "Reliability": 90.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 20,
+            "Responsiveness": 20,
+            "Accuracy": 20
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.2,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 13.0,
+            "Accuracy": 84.0
+          },
+          "counts": {
+            "Reliability": 20,
+            "Responsiveness": 20,
+            "Accuracy": 20
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.7,
+          "scores": {
+            "Reliability": 20.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 67.0
+          },
+          "counts": {
+            "Reliability": 20,
+            "Responsiveness": 20,
+            "Accuracy": 20
+          }
+        }
+      }
+    },
+    {
+      "round": 11,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.5,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 86.0,
+            "Accuracy": 81.0
+          },
+          "counts": {
+            "Reliability": 22,
+            "Responsiveness": 22,
+            "Accuracy": 22
+          }
+        },
+        "AgentHighReject": {
+          "overall": 77.0,
+          "scores": {
+            "Reliability": 90.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 22,
+            "Responsiveness": 22,
+            "Accuracy": 22
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.4,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 13.0,
+            "Accuracy": 85.0
+          },
+          "counts": {
+            "Reliability": 22,
+            "Responsiveness": 22,
+            "Accuracy": 22
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.8,
+          "scores": {
+            "Reliability": 19.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 70.0
+          },
+          "counts": {
+            "Reliability": 22,
+            "Responsiveness": 22,
+            "Accuracy": 22
+          }
+        }
+      }
+    },
+    {
+      "round": 12,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.0,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 85.0,
+            "Accuracy": 80.0
+          },
+          "counts": {
+            "Reliability": 24,
+            "Responsiveness": 24,
+            "Accuracy": 24
+          }
+        },
+        "AgentHighReject": {
+          "overall": 76.7,
+          "scores": {
+            "Reliability": 90.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 24,
+            "Responsiveness": 24,
+            "Accuracy": 24
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.3,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 12.0,
+            "Accuracy": 86.0
+          },
+          "counts": {
+            "Reliability": 24,
+            "Responsiveness": 24,
+            "Accuracy": 24
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.9,
+          "scores": {
+            "Reliability": 18.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 68.0
+          },
+          "counts": {
+            "Reliability": 24,
+            "Responsiveness": 24,
+            "Accuracy": 24
+          }
+        }
+      }
+    },
+    {
+      "round": 13,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.4,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 85.0,
+            "Accuracy": 82.0
+          },
+          "counts": {
+            "Reliability": 26,
+            "Responsiveness": 26,
+            "Accuracy": 26
+          }
+        },
+        "AgentHighReject": {
+          "overall": 76.7,
+          "scores": {
+            "Reliability": 90.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 26,
+            "Responsiveness": 26,
+            "Accuracy": 26
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.8,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 13.0,
+            "Accuracy": 87.0
+          },
+          "counts": {
+            "Reliability": 26,
+            "Responsiveness": 26,
+            "Accuracy": 26
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.2,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 67.0
+          },
+          "counts": {
+            "Reliability": 26,
+            "Responsiveness": 26,
+            "Accuracy": 26
+          }
+        }
+      }
+    },
+    {
+      "round": 14,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.2,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 85.0,
+            "Accuracy": 81.0
+          },
+          "counts": {
+            "Reliability": 28,
+            "Responsiveness": 28,
+            "Accuracy": 28
+          }
+        },
+        "AgentHighReject": {
+          "overall": 76.7,
+          "scores": {
+            "Reliability": 90.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 28,
+            "Responsiveness": 28,
+            "Accuracy": 28
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.8,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 13.0,
+            "Accuracy": 87.0
+          },
+          "counts": {
+            "Reliability": 28,
+            "Responsiveness": 28,
+            "Accuracy": 28
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 42.8,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 65.0
+          },
+          "counts": {
+            "Reliability": 28,
+            "Responsiveness": 28,
+            "Accuracy": 28
+          }
+        }
+      }
+    },
+    {
+      "round": 15,
+      "agents": {
+        "AgentPro": {
+          "overall": 88.3,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 78.0
+          },
+          "counts": {
+            "Reliability": 30,
+            "Responsiveness": 30,
+            "Accuracy": 30
+          }
+        },
+        "AgentHighReject": {
+          "overall": 76.4,
+          "scores": {
+            "Reliability": 90.0,
+            "Responsiveness": 82.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 30,
+            "Responsiveness": 30,
+            "Accuracy": 30
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.0,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 13.0,
+            "Accuracy": 83.0
+          },
+          "counts": {
+            "Reliability": 30,
+            "Responsiveness": 30,
+            "Accuracy": 30
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 42.4,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 63.0
+          },
+          "counts": {
+            "Reliability": 30,
+            "Responsiveness": 30,
+            "Accuracy": 30
+          }
+        }
+      }
+    },
+    {
+      "round": 16,
+      "agents": {
+        "AgentPro": {
+          "overall": 88.7,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 80.0
+          },
+          "counts": {
+            "Reliability": 32,
+            "Responsiveness": 32,
+            "Accuracy": 32
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.9,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 82.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 32,
+            "Responsiveness": 32,
+            "Accuracy": 32
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.5,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 14.0,
+            "Accuracy": 84.0
+          },
+          "counts": {
+            "Reliability": 32,
+            "Responsiveness": 32,
+            "Accuracy": 32
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 42.8,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 65.0
+          },
+          "counts": {
+            "Reliability": 32,
+            "Responsiveness": 32,
+            "Accuracy": 32
+          }
+        }
+      }
+    },
+    {
+      "round": 17,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.1,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 84.0,
+            "Accuracy": 82.0
+          },
+          "counts": {
+            "Reliability": 34,
+            "Responsiveness": 34,
+            "Accuracy": 34
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.9,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 82.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 34,
+            "Responsiveness": 34,
+            "Accuracy": 34
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.8,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 84.0
+          },
+          "counts": {
+            "Reliability": 34,
+            "Responsiveness": 34,
+            "Accuracy": 34
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.2,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 67.0
+          },
+          "counts": {
+            "Reliability": 34,
+            "Responsiveness": 34,
+            "Accuracy": 34
+          }
+        }
+      }
+    },
+    {
+      "round": 18,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.0,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 83.0
+          },
+          "counts": {
+            "Reliability": 36,
+            "Responsiveness": 36,
+            "Accuracy": 36
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.6,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 36,
+            "Responsiveness": 36,
+            "Accuracy": 36
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.8,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 84.0
+          },
+          "counts": {
+            "Reliability": 36,
+            "Responsiveness": 36,
+            "Accuracy": 36
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.2,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 67.0
+          },
+          "counts": {
+            "Reliability": 36,
+            "Responsiveness": 36,
+            "Accuracy": 36
+          }
+        }
+      }
+    },
+    {
+      "round": 19,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.0,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 83.0
+          },
+          "counts": {
+            "Reliability": 38,
+            "Responsiveness": 38,
+            "Accuracy": 38
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.6,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 38,
+            "Responsiveness": 38,
+            "Accuracy": 38
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.8,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 84.0
+          },
+          "counts": {
+            "Reliability": 38,
+            "Responsiveness": 38,
+            "Accuracy": 38
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.9,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 72.0,
+            "Accuracy": 69.0
+          },
+          "counts": {
+            "Reliability": 38,
+            "Responsiveness": 38,
+            "Accuracy": 38
+          }
+        }
+      }
+    },
+    {
+      "round": 20,
+      "agents": {
+        "AgentPro": {
+          "overall": 89.0,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 83.0
+          },
+          "counts": {
+            "Reliability": 40,
+            "Responsiveness": 40,
+            "Accuracy": 40
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.6,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 40,
+            "Responsiveness": 40,
+            "Accuracy": 40
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 59.3,
+          "scores": {
+            "Reliability": 76.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 84.0
+          },
+          "counts": {
+            "Reliability": 40,
+            "Responsiveness": 40,
+            "Accuracy": 40
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.3,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 72.0,
+            "Accuracy": 71.0
+          },
+          "counts": {
+            "Reliability": 40,
+            "Responsiveness": 40,
+            "Accuracy": 40
+          }
+        }
+      }
+    },
+    {
+      "round": 21,
+      "agents": {
+        "AgentPro": {
+          "overall": 88.8,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 83.0,
+            "Accuracy": 82.0
+          },
+          "counts": {
+            "Reliability": 42,
+            "Responsiveness": 42,
+            "Accuracy": 42
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.6,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 42,
+            "Responsiveness": 42,
+            "Accuracy": 42
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 59.6,
+          "scores": {
+            "Reliability": 77.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 83.0
+          },
+          "counts": {
+            "Reliability": 42,
+            "Responsiveness": 42,
+            "Accuracy": 42
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 44.0,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 71.0,
+            "Accuracy": 71.0
+          },
+          "counts": {
+            "Reliability": 42,
+            "Responsiveness": 42,
+            "Accuracy": 42
+          }
+        }
+      }
+    },
+    {
+      "round": 22,
+      "agents": {
+        "AgentPro": {
+          "overall": 88.1,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 82.0,
+            "Accuracy": 80.0
+          },
+          "counts": {
+            "Reliability": 44,
+            "Responsiveness": 44,
+            "Accuracy": 44
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.6,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 44,
+            "Responsiveness": 44,
+            "Accuracy": 44
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 59.4,
+          "scores": {
+            "Reliability": 77.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 82.0
+          },
+          "counts": {
+            "Reliability": 44,
+            "Responsiveness": 44,
+            "Accuracy": 44
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.3,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 70.0,
+            "Accuracy": 69.0
+          },
+          "counts": {
+            "Reliability": 44,
+            "Responsiveness": 44,
+            "Accuracy": 44
+          }
+        }
+      }
+    },
+    {
+      "round": 23,
+      "agents": {
+        "AgentPro": {
+          "overall": 87.4,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 78.0
+          },
+          "counts": {
+            "Reliability": 46,
+            "Responsiveness": 46,
+            "Accuracy": 46
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.3,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 80.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 46,
+            "Responsiveness": 46,
+            "Accuracy": 46
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 59.0,
+          "scores": {
+            "Reliability": 77.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 80.0
+          },
+          "counts": {
+            "Reliability": 46,
+            "Responsiveness": 46,
+            "Accuracy": 46
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 42.6,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 69.0,
+            "Accuracy": 67.0
+          },
+          "counts": {
+            "Reliability": 46,
+            "Responsiveness": 46,
+            "Accuracy": 46
+          }
+        }
+      }
+    },
+    {
+      "round": 24,
+      "agents": {
+        "AgentPro": {
+          "overall": 87.4,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 78.0
+          },
+          "counts": {
+            "Reliability": 48,
+            "Responsiveness": 48,
+            "Accuracy": 48
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.3,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 80.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 48,
+            "Responsiveness": 48,
+            "Accuracy": 48
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.5,
+          "scores": {
+            "Reliability": 76.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 80.0
+          },
+          "counts": {
+            "Reliability": 48,
+            "Responsiveness": 48,
+            "Accuracy": 48
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.0,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 69.0,
+            "Accuracy": 69.0
+          },
+          "counts": {
+            "Reliability": 48,
+            "Responsiveness": 48,
+            "Accuracy": 48
+          }
+        }
+      }
+    },
+    {
+      "round": 25,
+      "agents": {
+        "AgentPro": {
+          "overall": 87.4,
+          "scores": {
+            "Reliability": 95.0,
+            "Responsiveness": 81.0,
+            "Accuracy": 78.0
+          },
+          "counts": {
+            "Reliability": 50,
+            "Responsiveness": 50,
+            "Accuracy": 50
+          }
+        },
+        "AgentHighReject": {
+          "overall": 75.3,
+          "scores": {
+            "Reliability": 89.0,
+            "Responsiveness": 80.0,
+            "Accuracy": 34.0
+          },
+          "counts": {
+            "Reliability": 50,
+            "Responsiveness": 50,
+            "Accuracy": 50
+          }
+        },
+        "AgentSlowUploader": {
+          "overall": 58.0,
+          "scores": {
+            "Reliability": 75.0,
+            "Responsiveness": 15.0,
+            "Accuracy": 80.0
+          },
+          "counts": {
+            "Reliability": 50,
+            "Responsiveness": 50,
+            "Accuracy": 50
+          }
+        },
+        "AgentUnreliable": {
+          "overall": 43.2,
+          "scores": {
+            "Reliability": 17.0,
+            "Responsiveness": 69.0,
+            "Accuracy": 70.0
+          },
+          "counts": {
+            "Reliability": 50,
+            "Responsiveness": 50,
+            "Accuracy": 50
+          }
+        }
+      }
+    }
+  ]
+}

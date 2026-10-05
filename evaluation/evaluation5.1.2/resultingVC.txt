@@ -1,0 +1,25 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://www.w3.org/2018/credentials/examples/v1"
+  ],
+  "id": "urn:vc:reputation:Landlord01::122085e5dee9f3baafa2d69ed7f674ecc50acb8c40c15d862e5efe9c76333acdc73f",
+  "type": [
+    "VerifiableCredential",
+    "ReputationCredential"
+  ],
+  "issuer": "https://reputation-system.example/issuer",
+  "issuanceDate": "2026-09-27T17:20:08.092Z",
+  "credentialSubject": {
+    "id": "Landlord01::122085e5dee9f3baafa2d69ed7f674ecc50acb8c40c15d862e5efe9c76333acdc73f",
+    "tier": "Silver",
+    "reputationRange": "75.0-90.0"
+  },
+  "proof": {
+    "type": "RsaSignature2018",
+    "created": "2026-09-27T17:20:08.092Z",
+    "proofPurpose": "assertionMethod",
+    "verificationMethod": "https://reputation-system.example/issuer#key-1",
+    "jws": "eyJhbGciOiJtb2NrMjU2IiwidHlwIjoiSldUIn0.eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSIsImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL2V4YW1wbGVzL3YxIl0sImlkIjoidXJuOnZjOnJlcHV0YXRpb246TGFuZGxvcmQwMTo6MTIyMDg1ZTVkZWU5ZjNiYWFmYTJkNjllZDdmNjc0ZWNjNTBhY2I4YzQwYzE1ZDg2MmU1ZWZlOWM3NjMzM2FjZGM3M2YiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiUmVwdXRhdGlvbkNyZWRlbnRpYWwiXSwiaXNzdWVyIjoiaHR0cHM6Ly9yZXB1dGF0aW9uLXN5c3RlbS5leGFtcGxlL2lzc3VlciIsImlzc3VhbmNlRGF0ZSI6IjIwMjYtMDktMjdUMTc6MjA6MDguMDkyWiIsImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoiTGFuZGxvcmQwMTo6MTIyMDg1ZTVkZWU5ZjNiYWFmYTJkNjllZDdmNjc0ZWNjNTBhY2I4YzQwYzE1ZDg2MmU1ZWZlOWM3NjMzM2FjZGM3M2YiLCJ0aWVyIjoiU2lsdmVyIiwicmVwdXRhdGlvblJhbmdlIjoiNzUuMC05MC4wIn19.k78wW6GAly36QbnVb5NK1xyWCX5q0Zn70kuNARtvGPc"
+  }
+}

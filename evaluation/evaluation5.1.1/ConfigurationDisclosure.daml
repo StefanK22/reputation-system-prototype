@@ -1,0 +1,358 @@
+module Scripts.ConfigurationDisclosure where
+
+import Daml.Script
+import DA.Date (date, Month(..))
+import DA.Text (isPrefixOf)
+import DA.Time (time, seconds)
+
+import Reputation.Disclosure (DisclosureRequest(..), ConfigurationDisclosure(..))
+import Reputation.Interface.Configuration qualified as Configuration
+import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
+import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
+import Reputation.PropertyPurchase.Configuration (PropertyPurchaseConfiguration(..))
+import Reputation.PropertyPurchase.Configuration qualified as PP
+import Reputation.Role.Configuration (RoleConfiguration(..), CreateRole(..))
+import Reputation.Types
+
+data Variant = Variant
+  with
+    name : Text
+    key : Text
+    agentWeights : AgentWeights
+    scoreFloor : Decimal
+    scoreCeiling : Decimal
+    startValue : Decimal
+    tiers : [(Text, Decimal)]
+    responsivenessCapHours : Decimal
+    expectedEffect : Text
+  deriving (Eq, Show)
+
+baselineAgentWeights : AgentWeights
+baselineAgentWeights = AgentWeights with
+  reliability = 0.5
+  responsiveness = 0.3
+  accuracy = 0.2
+
+aggregationAgentWeights : AgentWeights
+aggregationAgentWeights = AgentWeights with
+  reliability = 0.2
+  responsiveness = 0.6
+  accuracy = 0.2
+
+baselineTiers : [(Text, Decimal)]
+baselineTiers = [("Bronze", 60.0), ("Silver", 75.0), ("Gold", 90.0)]
+
+classificationTiers : [(Text, Decimal)]
+classificationTiers = [("Bronze", 55.0), ("Silver", 70.0), ("Gold", 85.0)]
+
+displayTiers : [(Text, Decimal)]
+displayTiers = [("Bronze", 3.4), ("Silver", 4.0), ("Gold", 4.6)]
+
+defaultBuyerWeights : BuyerWeights
+defaultBuyerWeights = BuyerWeights with
+  reliability = 0.4
+  responsiveness = 0.4
+  accuracy = 0.2
+
+defaultLandlordWeights : LandlordWeights
+defaultLandlordWeights = LandlordWeights with
+  reliability = 0.5
+  responsiveness = 0.3
+  accuracy = 0.2
+
+defaultTenantWeights : TenantWeights
+defaultTenantWeights = TenantWeights with
+  reliability = 0.5
+  responsiveness = 0.3
+  accuracy = 0.2
+
+agentObservationWeights : Decimal -> AgentObservationWeights
+agentObservationWeights cap = AgentObservationWeights with
+  reliabilityVoidedWeight = 0.3
+  reliabilityCompletionWeight = 0.7
+  responsivenessProposalToContractWeight = 0.6
+  responsivenessContractWeight = 0.4
+  responsivenessCapHours = cap
+
+defaultBuyerObservationWeights : BuyerObservationWeights
+defaultBuyerObservationWeights = BuyerObservationWeights with
+  responsivenessContractWeight = 0.6
+  responsivenessProposalWeight = 0.4
+  responsivenessCapHours = 24.0
+
+baselineVariant : Variant
+baselineVariant = Variant with
+  name = "Baseline"
+  key = "BASELINE"
+  agentWeights = baselineAgentWeights
+  scoreFloor = 0.0
+  scoreCeiling = 100.0
+  startValue = 50.0
+  tiers = baselineTiers
+  responsivenessCapHours = 24.0
+  expectedEffect = "Reference result for all comparisons."
+
+updateRuleVariant : Variant
+updateRuleVariant = Variant with
+  name = "Update rule"
+  key = "UPDATE-RULE"
+  agentWeights = baselineAgentWeights
+  scoreFloor = 0.0
+  scoreCeiling = 100.0
+  startValue = 50.0
+  tiers = baselineTiers
+  responsivenessCapHours = 48.0
+  expectedEffect = "Responsiveness changes; Reliability and Accuracy remain unchanged."
+
+aggregationVariant : Variant
+aggregationVariant = Variant with
+  name = "Aggregation"
+  key = "AGGREGATION"
+  agentWeights = aggregationAgentWeights
+  scoreFloor = 0.0
+  scoreCeiling = 100.0
+  startValue = 50.0
+  tiers = baselineTiers
+  responsivenessCapHours = 24.0
+  expectedEffect = "Component values remain unchanged; the overall score changes."
+
+initializationVariant : Variant
+initializationVariant = Variant with
+  name = "Initialization"
+  key = "INITIALIZATION"
+  agentWeights = baselineAgentWeights
+  scoreFloor = 0.0
+  scoreCeiling = 100.0
+  startValue = 70.0
+  tiers = baselineTiers
+  responsivenessCapHours = 24.0
+  expectedEffect = "Early component values change because the initial value contributes to the running average."
+
+displayVariant : Variant
+displayVariant = Variant with
+  name = "Display"
+  key = "DISPLAY"
+  agentWeights = baselineAgentWeights
+  scoreFloor = 1.0
+  scoreCeiling = 5.0
+  startValue = 3.0
+  tiers = displayTiers
+  responsivenessCapHours = 24.0
+  expectedEffect = "Normalized reputation remains equivalent; displayed values change from 0-100 to 1-5."
+
+classificationVariant : Variant
+classificationVariant = Variant with
+  name = "Classification"
+  key = "CLASSIFICATION"
+  agentWeights = baselineAgentWeights
+  scoreFloor = 0.0
+  scoreCeiling = 100.0
+  startValue = 50.0
+  tiers = classificationTiers
+  responsivenessCapHours = 24.0
+  expectedEffect = "Numeric reputation remains unchanged; the assigned tier changes."
+
+waitForDisclosure : Party -> Text -> Int -> Script ConfigurationDisclosure
+waitForDisclosure requester expectedConfigId attempts = do
+  disclosures <- query @ConfigurationDisclosure requester
+  case find (\(_, disclosure) -> disclosure.configId == expectedConfigId) disclosures of
+    Some (_, disclosure) -> pure disclosure
+    None ->
+      if attempts <= 0
+      then fail $ "Timed out waiting for disclosure of " <> expectedConfigId
+      else do
+        sleep (seconds 1)
+        waitForDisclosure requester expectedConfigId (attempts - 1)
+
+runVariant : Variant -> Script ()
+runVariant variant = do
+  knownParties <- listKnownParties
+  operator <- case find (\pd -> "Operator::" `isPrefixOf` partyToText pd.party) knownParties of
+    None -> fail "Operator party not found. Start the normal RERS first."
+    Some pd -> pure pd.party
+
+  agent <- allocatePartyByHint (PartyIdHint ("Evaluation01Agent" <> variant.key))
+  buyer <- allocatePartyByHint (PartyIdHint ("Evaluation01Buyer" <> variant.key))
+
+  let configuredAt = time (date 2026 Sep 25) 0 0 0
+      proposedAt = time (date 2026 Sep 25) 1 0 0
+      approvedAt = time (date 2026 Sep 25) 2 0 0
+      uploadedAt = time (date 2026 Sep 25) 9 0 0
+      signedAt = time (date 2026 Sep 25) 16 0 0
+      closedAt = time (date 2026 Sep 25) 17 0 0
+      completedAt = time (date 2026 Sep 25) 18 0 0
+      requestedAt = time (date 2026 Sep 25) 18 15 0
+      roleConfigId = "EVAL-01-ROLE-" <> variant.key
+      ppConfigId = "EVAL-01-PP-" <> variant.key
+      interactionId = "EVAL-01-PROPERTY-PURCHASE-" <> variant.key
+      configuredAgentObsWeights = agentObservationWeights variant.responsivenessCapHours
+
+  roleConfigCid <- submit operator do
+    createCmd RoleConfiguration with
+      operator = operator
+      configId = roleConfigId
+      createdAt = configuredAt
+      agentWeights = variant.agentWeights
+      buyerWeights = defaultBuyerWeights
+      landlordWeights = defaultLandlordWeights
+      tenantWeights = defaultTenantWeights
+      scoreFloor = variant.scoreFloor
+      scoreCeiling = variant.scoreCeiling
+      startValue = variant.startValue
+      tiers = variant.tiers
+
+  _ <- submit operator do
+    exerciseCmd roleConfigCid CreateRole with
+      party = agent
+      roleType = Agent
+      assignedAt = configuredAt
+
+  _ <- submit operator do
+    exerciseCmd roleConfigCid CreateRole with
+      party = buyer
+      roleType = Buyer
+      assignedAt = configuredAt
+
+  ppConfigCid <- submit operator do
+    createCmd PropertyPurchaseConfiguration with
+      operator = operator
+      configId = ppConfigId
+      createdAt = configuredAt
+      agentObsWeights = configuredAgentObsWeights
+      buyerObsWeights = defaultBuyerObservationWeights
+      feedbackWindowDays = 30
+
+  draftCid <- submit agent do
+    createCmd DraftInteraction with
+      operator = operator
+      initiator = agent
+      initiatorRole = Agent
+      interactionId = interactionId
+      interactionType = "PropertyPurchase"
+      participants = [(buyer, Buyer)]
+      openedAt = proposedAt
+
+  inProgressCid <- submit agent do
+    exerciseCmd draftCid Begin with startedAt = proposedAt
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted
+        actor = agent
+        occurredAt = proposedAt
+        resourceId = Some "proposal-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved
+        actor = buyer
+        occurredAt = approvedAt
+        resourceId = Some "proposal-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractUploaded
+        actor = agent
+        occurredAt = uploadedAt
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned
+        actor = agent
+        occurredAt = signedAt
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ContractSigned
+        actor = buyer
+        occurredAt = signedAt
+        resourceId = Some "contract-001"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged
+        actor = agent
+        occurredAt = closedAt
+        resourceId = Some "SELL_CLOSED"
+
+  completedCid <- submit agent do
+    exerciseCmd inProgressCid Complete with completedAt = completedAt
+
+  _ <- submit operator do
+    exerciseCmd ppConfigCid PP.CreateObservations with completedCid = completedCid
+
+  _ <- submit agent do
+    createCmd DisclosureRequest with
+      requester = agent
+      operator = operator
+      configType = RoleConfig
+      requestedAt = requestedAt
+
+  _ <- submit agent do
+    createCmd DisclosureRequest with
+      requester = agent
+      operator = operator
+      configType = PropertyPurchaseConfig
+      requestedAt = requestedAt
+
+  roleDisclosure <- waitForDisclosure agent roleConfigId 30
+  ppDisclosure <- waitForDisclosure agent ppConfigId 30
+
+  assertMsg "Role disclosure points to the wrong contract"
+    (roleDisclosure.sourceCid == toInterfaceContractId @Configuration.I roleConfigCid)
+  assertMsg "Property Purchase disclosure points to the wrong contract"
+    (ppDisclosure.sourceCid == toInterfaceContractId @Configuration.I ppConfigCid)
+
+  case roleDisclosure.details of
+    RoleConfigDetails details -> do
+      assertMsg "Disclosed Agent weights differ from the configured weights"
+        (details.agentWeights == variant.agentWeights)
+      assertMsg "Disclosed score range differs from the configured range"
+        (details.scoreFloor == variant.scoreFloor && details.scoreCeiling == variant.scoreCeiling)
+      assertMsg "Disclosed initial value differs from the configured value"
+        (details.startValue == variant.startValue)
+      assertMsg "Disclosed tiers differ from the configured tiers"
+        (details.tiers == variant.tiers)
+    _ -> fail "Role disclosure returned the wrong configuration detail type"
+
+  case ppDisclosure.details of
+    PPConfigDetails details -> do
+      assertMsg "Disclosed Agent observation weights differ from the configured values"
+        (details.agentObsWeights == configuredAgentObsWeights)
+      assertMsg "Disclosed Buyer observation weights differ from the configured values"
+        (details.buyerObsWeights == defaultBuyerObservationWeights)
+      assertMsg "Disclosed feedback window differs from the configured value"
+        (details.feedbackWindowDays == 30)
+    _ -> fail "Property Purchase disclosure returned the wrong configuration detail type"
+
+  debug ""
+  debug $ "PASS: " <> variant.name <> " configuration created and both disclosures verified."
+  debug $ "Expected effect: " <> variant.expectedEffect
+  debug $ "Agent party for the REST result: " <> partyToText agent
+  pure ()
+
+baseline : Script ()
+baseline = runVariant baselineVariant
+
+updateRule : Script ()
+updateRule = runVariant updateRuleVariant
+
+aggregation : Script ()
+aggregation = runVariant aggregationVariant
+
+initialization : Script ()
+initialization = runVariant initializationVariant
+
+display : Script ()
+display = runVariant displayVariant
+
+classification : Script ()
+classification = runVariant classificationVariant

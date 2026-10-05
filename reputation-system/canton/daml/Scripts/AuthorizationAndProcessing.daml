@@ -1,0 +1,309 @@
+module Scripts.AuthorizationAndProcessing where
+
+import Daml.Script
+import DA.Date (date, Month(..))
+import DA.Optional (isSome)
+import DA.Text (isPrefixOf)
+import DA.Time (time, seconds)
+
+import Reputation.Interface.Observation qualified as Observation
+import Reputation.Interaction.Completed (CompletedInteraction(..))
+import Reputation.Interaction.Draft (DraftInteraction(..), Begin(..))
+import Reputation.Interaction.InProgress (RecordEvent(..), Complete(..))
+import Reputation.RentalAgreement.Configuration (RentalAgreementConfiguration(..))
+import Reputation.RentalAgreement.Configuration qualified as RA
+import Reputation.RentalAgreement.FeedbackRequest
+  (RentalAgreementFeedbackRequest, SubmitFeedbackAsTenant(..))
+import Reputation.RentalAgreement.LandlordObservation (LandlordObservation(..))
+import Reputation.Role.Configuration (RoleConfiguration(..), CreateRole(..))
+import Reputation.Role.Landlord (LandlordRole(..))
+import Reputation.Types
+
+evaluationInteractionId : Text
+evaluationInteractionId = "EVAL-03-AUTHORIZATION"
+
+emptyInteractionId : Text
+emptyInteractionId = "EVAL-03-EMPTY-INTERACTION"
+
+waitForProcessedLandlordObservation
+  : Party -> Int -> Script (ContractId LandlordObservation, LandlordObservation)
+waitForProcessedLandlordObservation operator attempts = do
+  observations <- query @LandlordObservation operator
+  case find (\(_, observation) ->
+      observation.interactionId == evaluationInteractionId && observation.processed) observations of
+    Some result -> pure result
+    None ->
+      if attempts <= 0
+      then fail "Timed out waiting for the RERS to mark the Landlord Observation as processed"
+      else do
+        sleep (seconds 1)
+        waitForProcessedLandlordObservation operator (attempts - 1)
+
+waitForLandlordUpdate
+  : Party -> Party -> Int -> Int -> Script (ContractId LandlordRole, LandlordRole)
+waitForLandlordUpdate operator landlord expectedCount attempts = do
+  roles <- query @LandlordRole operator
+  case find (\(_, role) ->
+      role.party == landlord &&
+      role.reliability.count == expectedCount &&
+      role.responsiveness.count == expectedCount &&
+      role.accuracy.count == expectedCount) roles of
+    Some result -> pure result
+    None ->
+      if attempts <= 0
+      then fail "Timed out waiting for the RERS to update the Landlord role"
+      else do
+        sleep (seconds 1)
+        waitForLandlordUpdate operator landlord expectedCount (attempts - 1)
+
+getLandlordRole : Party -> Party -> Script LandlordRole
+getLandlordRole operator landlord = do
+  roles <- query @LandlordRole operator
+  case find (\(_, role) -> role.party == landlord) roles of
+    Some (_, role) -> pure role
+    None -> fail "Evaluation03Landlord role not found"
+
+changeLabel : Bool -> Text
+changeLabel unchanged = if unchanged then "UNCHANGED" else "CHANGED"
+
+visibilityLabel : Bool -> Text
+visibilityLabel visible = if visible then "VISIBLE" else "HIDDEN"
+
+authorizationAndProcessing : Script ()
+authorizationAndProcessing = do
+  knownParties <- listKnownParties
+  operator <- case find (\pd -> "Operator::" `isPrefixOf` partyToText pd.party) knownParties of
+    None -> fail "Operator party not found. Start the normal RERS first."
+    Some pd -> pure pd.party
+
+  landlord <- allocatePartyByHint (PartyIdHint "Evaluation03Landlord")
+  tenant <- allocatePartyByHint (PartyIdHint "Evaluation03Tenant")
+  unauthorizedUser <- allocatePartyByHint (PartyIdHint "Evaluation03UnauthorizedUser")
+
+  let configuredAt = time (date 2026 Sep 26) 8 0 0
+      startedAt = time (date 2026 Sep 26) 9 0 0
+      uploadedAt = time (date 2026 Sep 26) 10 0 0
+      approvedAt = time (date 2026 Sep 26) 11 0 0
+      proposalSubmittedAt = time (date 2026 Sep 26) 12 0 0
+      proposalApprovedAt = time (date 2026 Sep 26) 13 0 0
+      rentedAt = time (date 2026 Sep 26) 14 0 0
+      completedAt = time (date 2026 Sep 26) 15 0 0
+      feedbackAt = time (date 2026 Sep 26) 16 0 0
+
+  roleConfigCid <- submit operator do
+    createCmd RoleConfiguration with
+      operator = operator
+      configId = "EVAL-03-ROLE-CONFIG"
+      createdAt = configuredAt
+      agentWeights = AgentWeights with
+        reliability = 0.5
+        responsiveness = 0.3
+        accuracy = 0.2
+      buyerWeights = BuyerWeights with
+        reliability = 0.4
+        responsiveness = 0.4
+        accuracy = 0.2
+      landlordWeights = LandlordWeights with
+        reliability = 0.5
+        responsiveness = 0.3
+        accuracy = 0.2
+      tenantWeights = TenantWeights with
+        reliability = 0.5
+        responsiveness = 0.3
+        accuracy = 0.2
+      scoreFloor = 0.0
+      scoreCeiling = 100.0
+      startValue = 50.0
+      tiers = [("Bronze", 60.0), ("Silver", 75.0), ("Gold", 90.0)]
+
+  _ <- submit operator do
+    exerciseCmd roleConfigCid CreateRole with
+      party = landlord
+      roleType = Landlord
+      assignedAt = configuredAt
+
+  _ <- submit operator do
+    exerciseCmd roleConfigCid CreateRole with
+      party = tenant
+      roleType = Tenant
+      assignedAt = configuredAt
+
+  rentalConfigCid <- submit operator do
+    createCmd RentalAgreementConfiguration with
+      operator = operator
+      configId = "EVAL-03-RENTAL-CONFIG"
+      createdAt = configuredAt
+      landlordObsWeights = LandlordObservationWeights with
+        responsivenessCapHours = 24.0
+      tenantObsWeights = TenantObservationWeights with
+        responsivenessFirstUploadWeight = 0.6
+        responsivenessReuploadWeight = 0.4
+        responsivenessCapHours = 24.0
+      feedbackWindowDays = 30
+
+  draftCid <- submit landlord do
+    createCmd DraftInteraction with
+      operator = operator
+      initiator = landlord
+      initiatorRole = Landlord
+      interactionId = evaluationInteractionId
+      interactionType = "RentalAgreement"
+      participants = [(tenant, Tenant)]
+      openedAt = startedAt
+
+  inProgressCid <- submit landlord do
+    exerciseCmd draftCid Begin with startedAt = startedAt
+
+  -- The Operator is authorized to record the event.
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentUploaded
+        actor = tenant
+        occurredAt = uploadedAt
+        resourceId = Some "EVAL-03-DOCUMENT"
+
+  debug ""
+  debug "=== AUTHORIZATION & EVIDENCE VALIDITY ==="
+  submitMustFail tenant do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentUploaded
+        actor = tenant
+        occurredAt = uploadedAt
+        resourceId = Some "EVAL-03-UNAUTHORIZED-DOCUMENT"
+  debug "[1/5] PASS  Only the Operator can record interaction events"
+  debug "      Tested: the Tenant attempted RecordEvent on an active interaction."
+  debug "      Ledger result: the transaction was REJECTED."
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = DocumentApproved
+        actor = landlord
+        occurredAt = approvedAt
+        resourceId = Some "EVAL-03-DOCUMENT"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalSubmitted
+        actor = tenant
+        occurredAt = proposalSubmittedAt
+        resourceId = Some "EVAL-03-PROPOSAL"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = ProposalApproved
+        actor = landlord
+        occurredAt = proposalApprovedAt
+        resourceId = Some "EVAL-03-PROPOSAL"
+
+  inProgressCid <- submit operator do
+    exerciseCmd inProgressCid RecordEvent with
+      event = RecordedEvent with
+        event = TransactionStateChanged
+        actor = landlord
+        occurredAt = rentedAt
+        resourceId = Some "RENTAL_RENTED"
+
+  completedCid <- submit landlord do
+    exerciseCmd inProgressCid Complete with completedAt = completedAt
+
+  (_, feedbackRequests) <- submit operator do
+    exerciseCmd rentalConfigCid RA.CreateObservations with completedCid = completedCid
+
+  let [_landlordRequest, tenantRequest] = feedbackRequests
+      concreteTenantRequest =
+        fromInterfaceContractId tenantRequest : ContractId RentalAgreementFeedbackRequest
+
+  submitMustFail (actAs unauthorizedUser <> readAs operator) do
+    exerciseCmd concreteTenantRequest SubmitFeedbackAsTenant with
+      fairness = Some 0.8
+      availability = Some 0.8
+      requirementClarity = Some 0.8
+      submittedAt = feedbackAt
+  debug "[2/5] PASS  Only the assigned rater can submit feedback"
+  debug "      Tested: an unrelated User used the Tenant's Feedback Request."
+  debug "      Ledger result: the feedback transaction was REJECTED."
+
+  (processedObservationCid, _) <- waitForProcessedLandlordObservation operator 60
+  (_, roleBeforeReplay) <- waitForLandlordUpdate operator landlord 1 60
+
+  replayedObservationInterfaceCid <- submit operator do
+    exerciseCmd
+      (toInterfaceContractId @Observation.I processedObservationCid)
+      Observation.MarkProcessed
+
+  let replayedObservationCid =
+        fromInterfaceContractId replayedObservationInterfaceCid : ContractId LandlordObservation
+
+  sleep (seconds 5)
+  roleAfterReplay <- getLandlordRole operator landlord
+
+  let reliabilityUnchanged = roleAfterReplay.reliability == roleBeforeReplay.reliability
+      responsivenessUnchanged = roleAfterReplay.responsiveness == roleBeforeReplay.responsiveness
+      accuracyUnchanged = roleAfterReplay.accuracy == roleBeforeReplay.accuracy
+      allComponentsUnchanged =
+        reliabilityUnchanged && responsivenessUnchanged && accuracyUnchanged
+
+  assertMsg "RERS applied processed evidence to Landlord reliability again"
+    reliabilityUnchanged
+  assertMsg "RERS applied processed evidence to Landlord responsiveness again"
+    responsivenessUnchanged
+  assertMsg "RERS applied processed evidence to Landlord accuracy again"
+    accuracyUnchanged
+  debug "[3/5] PASS  Processed evidence cannot update reputation twice"
+  debug "      Tested: MarkProcessed was exercised again on a processed Observation."
+  debug $ "      Checked Role scores (R/Resp/A): "
+    <> show roleBeforeReplay.reliability.score <> "/"
+    <> show roleBeforeReplay.responsiveness.score <> "/"
+    <> show roleBeforeReplay.accuracy.score <> " | replay result: "
+    <> changeLabel allComponentsUnchanged
+
+  authorizedObservation <- queryContractId landlord replayedObservationCid
+  unauthorizedObservation <- queryContractId unauthorizedUser replayedObservationCid
+  let evaluatedUserVisible = isSome authorizedObservation
+      unrelatedUserVisible = isSome unauthorizedObservation
+  assertMsg "Landlord could not see their own Observation"
+    evaluatedUserVisible
+  assertMsg "Unrelated User could see the Landlord Observation"
+    (not unrelatedUserVisible)
+  debug "[4/5] PASS  Reputation evidence is private to its stakeholders"
+  debug "      Tested: the same Observation was queried by the Landlord and an unrelated User."
+  debug $ "      Ledger visibility: Landlord " <> visibilityLabel evaluatedUserVisible
+    <> " | unrelated User: " <> visibilityLabel unrelatedUserVisible
+
+  let emptyStartedAt = time (date 2026 Sep 26) 17 0 0
+      emptyCompletedAt = time (date 2026 Sep 26) 18 0 0
+
+  emptyDraftCid <- submit landlord do
+    createCmd DraftInteraction with
+      operator = operator
+      initiator = landlord
+      initiatorRole = Landlord
+      interactionId = emptyInteractionId
+      interactionType = "RentalAgreement"
+      participants = [(tenant, Tenant)]
+      openedAt = emptyStartedAt
+
+  emptyInProgressCid <- submit landlord do
+    exerciseCmd emptyDraftCid Begin with startedAt = emptyStartedAt
+
+  submitMustFail landlord do
+    exerciseCmd emptyInProgressCid Complete with completedAt = emptyCompletedAt
+
+  completedInteractions <- query @CompletedInteraction landlord
+  let completedInteractionCreated =
+        any (\(_, interaction) -> interaction.interactionId == emptyInteractionId) completedInteractions
+  assertMsg "Empty interaction produced a CompletedInteraction"
+    (not completedInteractionCreated)
+  debug "[5/5] PASS  An empty interaction cannot create reputation evidence"
+  debug "      Tested: Complete was exercised before any event was recorded."
+  debug $ "      Ledger result: completion REJECTED | matching CompletedInteraction created: "
+    <> show completedInteractionCreated
+
+  debug "------------------------------------------"
+  debug "RESULT  5/5 checks passed"
+  pure ()

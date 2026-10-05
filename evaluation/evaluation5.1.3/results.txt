@@ -1,0 +1,18 @@
+=== AUTHORIZATION & EVIDENCE VALIDITY ===
+[1/5] PASS  Only the Operator can record interaction events
+      Tested: the Tenant attempted RecordEvent on an active interaction.
+      Ledger result: the transaction was REJECTED.
+[2/5] PASS  Only the assigned rater can submit feedback
+      Tested: an unrelated User used the Tenant's Feedback Request.
+      Ledger result: the feedback transaction was REJECTED.
+[3/5] PASS  Processed evidence cannot update reputation twice
+      Tested: MarkProcessed was exercised again on a processed Observation.
+      Checked Role scores (R/Resp/A): 0.75/0.73/0.75 | replay result: UNCHANGED
+[4/5] PASS  Reputation evidence is private to its stakeholders
+      Tested: the same Observation was queried by the Landlord and an unrelated User.
+      Ledger visibility: Landlord VISIBLE | unrelated User: HIDDEN
+[5/5] PASS  An empty interaction cannot create reputation evidence
+      Tested: Complete was exercised before any event was recorded.
+      Ledger result: completion REJECTED | matching CompletedInteraction created: False
+------------------------------------------
+RESULT  5/5 checks passed
