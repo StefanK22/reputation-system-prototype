@@ -126,7 +126,7 @@ def print_repetition_stabilization(rounds, run_number):
         print(f"{agent:<24} " + "    ".join(f"{value:>3}" for value in values))
 
 
-def show_reputation_evolution(rounds, run_number):
+def show_reputation_evolution(rounds, run_number, output_path=None):
     import matplotlib.lines as mlines
     import matplotlib.ticker as mticker
     import matplotlib.pyplot as plt
@@ -146,7 +146,7 @@ def show_reputation_evolution(rounds, run_number):
     panels = COMPONENTS + ("Overall",)
     round_labels = ["Prior" if entry["round"] == 0 else f"TX-{entry['round']}" for entry in rounds]
     positions = list(range(len(rounds)))
-    figure, axes = plt.subplots(2, 2, figsize=(16, 10))
+    figure, axes = plt.subplots(2, 2, figsize=(20, 13.5))
 
     for axis, panel in zip(axes.flatten(), panels):
         for agent in AGENTS:
@@ -167,11 +167,11 @@ def show_reputation_evolution(rounds, run_number):
         if panel == "Overall":
             axis.set_title(
                 "Overall  (Reli×0.5 + Resp×0.3 + Accu×0.2)",
-                fontsize=10,
+                fontsize=19,
                 fontweight="bold",
             )
         else:
-            axis.set_title(panel, fontsize=10, fontweight="bold")
+            axis.set_title(panel, fontsize=19, fontweight="bold")
 
         shown = list(range(0, len(rounds), max(1, (len(rounds) - 1) // 10)))
         if len(rounds) - 1 not in shown:
@@ -179,13 +179,14 @@ def show_reputation_evolution(rounds, run_number):
         axis.set_xticks(shown)
         axis.set_xticklabels(
             [round_labels[index] for index in shown],
-            fontsize=8,
+            fontsize=16,
             rotation=45,
             ha="right",
         )
         axis.set_xlim(-0.4, len(rounds) - 0.6)
         axis.set_ylim(0, 100)
-        axis.set_ylabel("Score (0-100)", fontsize=9)
+        axis.set_ylabel("Score (0-100)", fontsize=18)
+        axis.tick_params(axis="y", labelsize=16)
         axis.yaxis.set_major_locator(mticker.MultipleLocator(20))
         axis.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.4)
         axis.spines["top"].set_visible(False)
@@ -217,18 +218,21 @@ def show_reputation_evolution(rounds, run_number):
         handles=legend_handles,
         loc="lower center",
         ncol=5,
-        fontsize=9,
+        fontsize=20,
         frameon=False,
         bbox_to_anchor=(0.5, 0),
     )
     figure.suptitle(
-        f"Agent Reputation Evolution across Interactions — Repetition {run_number}",
-        fontsize=13,
+        f"Agent Reputation Evolution across Interactions",
+        fontsize=27,
         fontweight="bold",
         y=0.99,
     )
-    figure.tight_layout(rect=[0, 0.06, 1, 0.97])
-    plt.show()
+    figure.tight_layout(rect=[0, 0.1, 1, 0.95])
+    if output_path:
+        figure.savefig(output_path, dpi=180, bbox_inches="tight")
+    else:
+        plt.show()
     plt.close(figure)
 
 
