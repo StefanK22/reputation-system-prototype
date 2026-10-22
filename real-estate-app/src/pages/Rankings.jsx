@@ -251,7 +251,7 @@ export default function Rankings() {
                   <th style={thSt}>Reliability</th>
                   <th style={thSt}>Responsiveness</th>
                   <th style={thSt}>Accuracy</th>
-                  <th style={thSt}>Interactions</th>
+                  <th style={thSt}>Observations</th>
                 </>}
               </tr>
             </thead>
